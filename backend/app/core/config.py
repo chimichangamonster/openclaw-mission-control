@@ -81,6 +81,31 @@ class Settings(BaseSettings):
     rq_dispatch_retry_base_seconds: float = 10.0
     rq_dispatch_retry_max_seconds: float = 120.0
 
+    # Email OAuth - Zoho
+    zoho_oauth_client_id: str = ""
+    zoho_oauth_client_secret: str = ""
+    zoho_oauth_redirect_uri: str = ""
+
+    # Email OAuth - Microsoft
+    microsoft_oauth_client_id: str = ""
+    microsoft_oauth_client_secret: str = ""
+    microsoft_oauth_redirect_uri: str = ""
+    microsoft_oauth_tenant_id: str = "common"
+
+    # Encryption (Fernet key — shared across email, polymarket, etc.)
+    encryption_key: str = ""
+    email_token_encryption_key: str = ""  # legacy alias, use ENCRYPTION_KEY instead
+
+    # Email sync
+    email_sync_interval_seconds: int = 300
+    email_sync_queue_name: str = "email_sync"
+
+    # Polymarket
+    polymarket_clob_base_url: str = "https://clob.polymarket.com"
+    polymarket_gamma_base_url: str = "https://gamma-api.polymarket.com"
+    polymarket_chain_id: int = 137
+    polymarket_queue_name: str = "trade_execution"
+
     # OpenClaw gateway runtime compatibility
     gateway_min_version: str = "2026.02.9"
 

@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { useAuth, useUser } from "@/auth/clerk";
 import { useQueryClient } from "@tanstack/react-query";
 import { Globe, Mail, RotateCcw, Save, Trash2, User } from "lucide-react";
+import { EmailIntegrations } from "@/components/email/EmailIntegrations";
 
 import {
   useDeleteMeApiV1UsersMeDelete,
@@ -240,6 +241,8 @@ export default function SettingsPage() {
               </div>
             </form>
           </section>
+
+          <EmailIntegrations />
 
           <section className="rounded-xl border border-rose-200 bg-rose-50/70 p-6 shadow-sm">
             <h2 className="text-base font-semibold text-rose-900">

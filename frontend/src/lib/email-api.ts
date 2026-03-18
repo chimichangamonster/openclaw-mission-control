@@ -1,0 +1,175 @@
+/**
+ * Manual email API helpers until Orval is regenerated.
+ *
+ * These call the email endpoints added to the backend.
+ * After running `npx orval`, replace these with the auto-generated hooks.
+ */
+
+import { customFetch } from "@/api/mutator";
+
+const V1 = "/api/v1";
+
+// --- Types ---
+
+export interface EmailAccount {
+  id: string;
+  organization_id: string;
+  user_id: string;
+  provider: "zoho" | "microsoft";
+  email_address: string;
+  display_name: string | null;
+  sync_enabled: boolean;
+  last_sync_at: string | null;
+  last_sync_error: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EmailMessage {
+  id: string;
+  organization_id: string;
+  email_account_id: string;
+  provider_message_id: string;
+  thread_id: string | null;
+  subject: string | null;
+  sender_email: string;
+  sender_name: string | null;
+  recipients_to: { email: string; name: string }[];
+  recipients_cc: { email: string; name: string }[] | null;
+  body_text: string | null;
+  body_html: string | null;
+  received_at: string;
+  is_read: boolean;
+  is_starred: boolean;
+  folder: string;
+  labels: string[] | null;
+  has_attachments: boolean;
+  triage_status: string;
+  triage_category: string | null;
+  linked_task_id: string | null;
+  synced_at: string;
+  created_at: string;
+}
+
+// --- Account APIs ---
+
+export async function fetchEmailAccounts(): Promise<EmailAccount[]> {
+  const res = await customFetch<{ data: EmailAccount[] }>(
+    `${V1}/email/accounts`,
+    { method: "GET" },
+  );
+  return res.data;
+}
+
+export async function deleteEmailAccount(accountId: string): Promise<void> {
+  await customFetch(`${V1}/email/accounts/${accountId}`, {
+    method: "DELETE",
+  });
+}
+
+export async function updateEmailAccount(
+  accountId: string,
+  data: { sync_enabled?: boolean; display_name?: string },
+): Promise<EmailAccount> {
+  const res = await customFetch<{ data: EmailAccount }>(
+    `${V1}/email/accounts/${accountId}`,
+    { method: "PATCH", body: JSON.stringify(data) },
+  );
+  return res.data;
+}
+
+export async function triggerEmailSync(
+  accountId: string,
+): Promise<{ ok: boolean; enqueued: boolean }> {
+  const res = await customFetch<{
+    data: { ok: boolean; enqueued: boolean };
+  }>(`${V1}/email/accounts/${accountId}/sync`, { method: "POST" });
+  return res.data;
+}
+
+export async function getOAuthUrl(
+  provider: "zoho" | "microsoft",
+): Promise<{ authorization_url: string }> {
+  const res = await customFetch<{
+    data: { authorization_url: string; state: string };
+  }>(`${V1}/email/oauth/${provider}/authorize`, { method: "GET" });
+  return res.data;
+}
+
+// --- Message APIs ---
+
+export async function fetchEmailMessages(
+  accountId: string,
+  params?: {
+    folder?: string;
+    triage_status?: string;
+    is_read?: boolean;
+    limit?: number;
+    offset?: number;
+  },
+): Promise<EmailMessage[]> {
+  const searchParams = new URLSearchParams();
+  if (params?.folder) searchParams.set("folder", params.folder);
+  if (params?.triage_status)
+    searchParams.set("triage_status", params.triage_status);
+  if (params?.is_read !== undefined)
+    searchParams.set("is_read", String(params.is_read));
+  if (params?.limit) searchParams.set("limit", String(params.limit));
+  if (params?.offset) searchParams.set("offset", String(params.offset));
+
+  const qs = searchParams.toString();
+  const res = await customFetch<{ data: EmailMessage[] }>(
+    `${V1}/email/accounts/${accountId}/messages${qs ? `?${qs}` : ""}`,
+    { method: "GET" },
+  );
+  return res.data;
+}
+
+export async function fetchEmailMessage(
+  accountId: string,
+  messageId: string,
+): Promise<EmailMessage> {
+  const res = await customFetch<{ data: EmailMessage }>(
+    `${V1}/email/accounts/${accountId}/messages/${messageId}`,
+    { method: "GET" },
+  );
+  return res.data;
+}
+
+export async function updateEmailMessage(
+  accountId: string,
+  messageId: string,
+  data: {
+    is_read?: boolean;
+    triage_status?: string;
+    triage_category?: string;
+    linked_task_id?: string;
+  },
+): Promise<EmailMessage> {
+  const res = await customFetch<{ data: EmailMessage }>(
+    `${V1}/email/accounts/${accountId}/messages/${messageId}`,
+    { method: "PATCH", body: JSON.stringify(data) },
+  );
+  return res.data;
+}
+
+export async function replyToEmail(
+  accountId: string,
+  messageId: string,
+  data: { body_text: string },
+): Promise<void> {
+  await customFetch(
+    `${V1}/email/accounts/${accountId}/messages/${messageId}/reply`,
+    { method: "POST", body: JSON.stringify(data) },
+  );
+}
+
+export async function archiveEmail(
+  accountId: string,
+  messageId: string,
+): Promise<void> {
+  await customFetch(
+    `${V1}/email/accounts/${accountId}/messages/${messageId}/archive`,
+    { method: "POST" },
+  );
+}

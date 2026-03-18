@@ -11,7 +11,15 @@ from app.models.board_onboarding import BoardOnboardingSession
 from app.models.board_webhook_payloads import BoardWebhookPayload
 from app.models.board_webhooks import BoardWebhook
 from app.models.boards import Board
+from app.models.email_accounts import EmailAccount
+from app.models.email_attachments import EmailAttachment
+from app.models.email_messages import EmailMessage
 from app.models.gateways import Gateway
+from app.models.polymarket_positions import PolymarketPosition
+from app.models.polymarket_risk_config import PolymarketRiskConfig
+from app.models.polymarket_wallets import PolymarketWallet
+from app.models.trade_history import TradeHistory
+from app.models.trade_proposals import TradeProposal
 from app.models.organization_board_access import OrganizationBoardAccess
 from app.models.organization_invite_board_access import OrganizationInviteBoardAccess
 from app.models.organization_invites import OrganizationInvite
@@ -42,7 +50,15 @@ __all__ = [
     "BoardOnboardingSession",
     "BoardGroup",
     "Board",
+    "EmailAccount",
+    "EmailAttachment",
+    "EmailMessage",
     "Gateway",
+    "PolymarketPosition",
+    "PolymarketRiskConfig",
+    "PolymarketWallet",
+    "TradeHistory",
+    "TradeProposal",
     "GatewayInstalledSkill",
     "MarketplaceSkill",
     "SkillPack",

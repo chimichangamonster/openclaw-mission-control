@@ -483,5 +483,16 @@ async def update_approval(
                 approval.id,
                 approval.status,
             )
+        # Polymarket trade execution hook
+        if approval.action_type == "polymarket_trade":
+            try:
+                from app.services.polymarket.hooks import handle_trade_approval_resolution
+
+                await handle_trade_approval_resolution(session=session, approval=approval)
+            except Exception:
+                logger.exception(
+                    "approval.polymarket_hook_failed approval_id=%s",
+                    approval.id,
+                )
     reads = await _approval_reads(session, [approval])
     return reads[0]

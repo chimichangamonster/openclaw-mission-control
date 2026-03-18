@@ -12,6 +12,8 @@ from fastapi_pagination import add_pagination
 
 from app.api.activity import router as activity_router
 from app.api.agent import router as agent_router
+from app.api.agent_email import router as agent_email_router
+from app.api.agent_polymarket import router as agent_polymarket_router
 from app.api.agents import router as agents_router
 from app.api.approvals import router as approvals_router
 from app.api.auth import router as auth_router
@@ -21,7 +23,10 @@ from app.api.board_memory import router as board_memory_router
 from app.api.board_onboarding import router as board_onboarding_router
 from app.api.board_webhooks import router as board_webhooks_router
 from app.api.boards import router as boards_router
+from app.api.email import router as email_router
+from app.api.email_oauth import router as email_oauth_router
 from app.api.gateway import router as gateway_router
+from app.api.polymarket import router as polymarket_router
 from app.api.gateways import router as gateways_router
 from app.api.metrics import router as metrics_router
 from app.api.organizations import router as organizations_router
@@ -85,6 +90,14 @@ OPENAPI_TAGS = [
     {
         "name": "skills",
         "description": "Skills marketplace, install, uninstall, and synchronization endpoints.",
+    },
+    {
+        "name": "trading",
+        "description": "Polymarket prediction market trading, wallet management, risk controls, and approval-gated execution.",
+    },
+    {
+        "name": "email",
+        "description": "Email account OAuth connection, sync, message management, and agent triage endpoints.",
     },
     {
         "name": "board-groups",
@@ -164,6 +177,8 @@ _JSON_SCHEMA_REF_PREFIX = "#/components/schemas/"
 _OPENAPI_EXAMPLE_TAGS = {
     "agents",
     "activity",
+    "email",
+    "trading",
     "gateways",
     "metrics",
     "organizations",
@@ -550,6 +565,11 @@ api_v1.include_router(skills_marketplace_router)
 api_v1.include_router(board_groups_router)
 api_v1.include_router(board_group_memory_router)
 api_v1.include_router(boards_router)
+api_v1.include_router(email_router)
+api_v1.include_router(email_oauth_router)
+api_v1.include_router(agent_email_router)
+api_v1.include_router(polymarket_router)
+api_v1.include_router(agent_polymarket_router)
 api_v1.include_router(board_memory_router)
 api_v1.include_router(board_webhooks_router)
 api_v1.include_router(board_onboarding_router)
