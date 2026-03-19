@@ -173,12 +173,13 @@ async def agent_reply_to_email(
     payload: EmailReplyCreate,
     agent_ctx: AgentAuthContext = AGENT_CTX_DEP,
     session: AsyncSession = SESSION_DEP,
-) -> dict[str, bool]:
-    """Agent sends a reply to an email."""
+) -> dict[str, str]:
+    """Agent proposes a reply — creates an approval instead of sending directly."""
     agent = agent_ctx.agent
     if agent.board_id is None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
 
+    from app.models.approvals import Approval
     from app.models.boards import Board
 
     board = await session.get(Board, agent.board_id)
@@ -193,31 +194,41 @@ async def agent_reply_to_email(
     if account is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
 
-    access_token = await get_valid_access_token(session, account)
+    # Create approval instead of sending directly
+    approval = Approval(
+        id=uuid4(),
+        board_id=board.id,
+        agent_id=agent.id,
+        action_type="email_reply",
+        payload={
+            "reason": f"Reply to '{msg.subject}' from {msg.sender_email}",
+            "account_id": str(account.id),
+            "message_id": str(msg.id),
+            "body_text": payload.body_text,
+            "to": msg.sender_email,
+            "subject": f"Re: {msg.subject or ''}",
+            "from_account": account.email_address,
+            "original_subject": msg.subject,
+            "original_sender": msg.sender_email,
+            "original_preview": (msg.body_text or "")[:200],
+        },
+        confidence=80.0,
+        status="pending",
+        created_at=utcnow(),
+    )
+    session.add(approval)
+    await session.commit()
 
-    if account.provider == "zoho":
-        from app.services.email.providers.zoho import send_message
+    logger.info(
+        "email.reply.approval_created",
+        extra={
+            "approval_id": str(approval.id),
+            "to": msg.sender_email,
+            "subject": msg.subject,
+        },
+    )
 
-        await send_message(
-            access_token,
-            account.provider_account_id or "",
-            to=msg.sender_email,
-            subject=f"Re: {msg.subject or ''}",
-            body=payload.body_text,
-            in_reply_to=msg.provider_message_id,
-        )
-    elif account.provider == "microsoft":
-        from app.services.email.providers.microsoft import send_message
-
-        await send_message(
-            access_token,
-            to=msg.sender_email,
-            subject=f"Re: {msg.subject or ''}",
-            body=payload.body_text,
-            reply_to_message_id=msg.provider_message_id,
-        )
-
-    return {"ok": True}
+    return {"status": "pending_approval", "approval_id": str(approval.id)}
 
 
 @router.post("/messages/{message_id}/archive", status_code=status.HTTP_202_ACCEPTED)

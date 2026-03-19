@@ -504,5 +504,15 @@ async def update_approval(
                     "approval.crypto_hook_failed approval_id=%s",
                     approval.id,
                 )
+        if approval.action_type == "email_reply":
+            try:
+                from app.services.email.hooks import handle_email_approval_resolution
+
+                await handle_email_approval_resolution(session=session, approval=approval)
+            except Exception:
+                logger.exception(
+                    "approval.email_hook_failed approval_id=%s",
+                    approval.id,
+                )
     reads = await _approval_reads(session, [approval])
     return reads[0]
