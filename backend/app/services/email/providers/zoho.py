@@ -114,7 +114,20 @@ async def send_message(
 ) -> dict:
     """Send or reply to an email via Zoho Mail API."""
     url = f"{BASE_URL}/{account_id}/messages"
+    # Get the from address from account info
+    from_address = None
+    async with httpx.AsyncClient() as client:
+        acct_resp = await client.get(
+            f"{BASE_URL}",
+            headers=_headers(access_token),
+        )
+        if acct_resp.status_code == 200:
+            accounts = acct_resp.json().get("data", [])
+            if accounts:
+                from_address = accounts[0].get("primaryEmailAddress")
+
     payload: dict = {
+        "fromAddress": from_address or to,  # fallback to recipient if can't find
         "toAddress": to,
         "subject": subject,
         "content": body,
