@@ -39,7 +39,7 @@ async def search_markets(
 
     results = []
     for market in data if isinstance(data, list) else data.get("data", data.get("markets", [])):
-        outcomes = []
+        outcomes: list[str] = []
         tokens = market.get("tokens", [])
         yes_price = None
         no_price = None
@@ -55,7 +55,27 @@ async def search_markets(
                     no_price = float(price)
 
         if not outcomes:
-            outcomes = market.get("outcomes", [])
+            raw_outcomes = market.get("outcomes", [])
+            if isinstance(raw_outcomes, str):
+                try:
+                    import json as _json
+                    raw_outcomes = _json.loads(raw_outcomes)
+                except (ValueError, TypeError):
+                    raw_outcomes = []
+            outcomes = raw_outcomes if isinstance(raw_outcomes, list) else []
+
+        # Parse prices from outcomePrices string if tokens didn't provide them
+        if yes_price is None or no_price is None:
+            raw_prices = market.get("outcomePrices", "")
+            if isinstance(raw_prices, str) and raw_prices:
+                try:
+                    import json as _json
+                    price_list = _json.loads(raw_prices)
+                    if isinstance(price_list, list) and len(price_list) >= 2:
+                        yes_price = yes_price or float(price_list[0])
+                        no_price = no_price or float(price_list[1])
+                except (ValueError, TypeError, IndexError):
+                    pass
 
         results.append(
             MarketSearchResult(
@@ -105,7 +125,26 @@ async def get_market_detail(condition_id: str) -> MarketDetailRead | None:
                 no_price = float(price)
 
     if not outcomes:
-        outcomes = market.get("outcomes", [])
+        raw_outcomes = market.get("outcomes", [])
+        if isinstance(raw_outcomes, str):
+            try:
+                import json as _json
+                raw_outcomes = _json.loads(raw_outcomes)
+            except (ValueError, TypeError):
+                raw_outcomes = []
+        outcomes = raw_outcomes if isinstance(raw_outcomes, list) else []
+
+    if yes_price is None or no_price is None:
+        raw_prices = market.get("outcomePrices", "")
+        if isinstance(raw_prices, str) and raw_prices:
+            try:
+                import json as _json
+                price_list = _json.loads(raw_prices)
+                if isinstance(price_list, list) and len(price_list) >= 2:
+                    yes_price = yes_price or float(price_list[0])
+                    no_price = no_price or float(price_list[1])
+            except (ValueError, TypeError, IndexError):
+                pass
 
     return MarketDetailRead(
         condition_id=market.get("conditionId", market.get("condition_id", "")),

@@ -38,9 +38,9 @@ class EmailOAuthProvider(ABC):
 class ZohoOAuthProvider(EmailOAuthProvider):
     """OAuth2 implementation for Zoho Mail."""
 
-    AUTH_URL = "https://accounts.zoho.com/oauth/v2/auth"
-    TOKEN_URL = "https://accounts.zoho.com/oauth/v2/token"
-    USER_INFO_URL = "https://mail.zoho.com/api/accounts"
+    AUTH_URL = "https://accounts.zohocloud.ca/oauth/v2/auth"
+    TOKEN_URL = "https://accounts.zohocloud.ca/oauth/v2/token"
+    USER_INFO_URL = "https://mail.zohocloud.ca/api/accounts"
     SCOPES = "ZohoMail.messages.READ ZohoMail.messages.CREATE ZohoMail.accounts.READ"
 
     def get_authorization_url(self, state: str) -> str:

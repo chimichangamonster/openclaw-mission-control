@@ -483,7 +483,7 @@ async def update_approval(
                 approval.id,
                 approval.status,
             )
-        # Polymarket trade execution hook
+        # Trade execution hooks
         if approval.action_type == "polymarket_trade":
             try:
                 from app.services.polymarket.hooks import handle_trade_approval_resolution
@@ -492,6 +492,16 @@ async def update_approval(
             except Exception:
                 logger.exception(
                     "approval.polymarket_hook_failed approval_id=%s",
+                    approval.id,
+                )
+        if approval.action_type == "crypto_trade":
+            try:
+                from app.services.binance.hooks import handle_crypto_trade_approval_resolution
+
+                await handle_crypto_trade_approval_resolution(session=session, approval=approval)
+            except Exception:
+                logger.exception(
+                    "approval.crypto_hook_failed approval_id=%s",
                     approval.id,
                 )
     reads = await _approval_reads(session, [approval])

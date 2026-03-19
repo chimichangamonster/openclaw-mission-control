@@ -11,7 +11,10 @@ from app.models.board_onboarding import BoardOnboardingSession
 from app.models.board_webhook_payloads import BoardWebhookPayload
 from app.models.board_webhooks import BoardWebhook
 from app.models.boards import Board
+from app.models.crypto_positions import CryptoPosition
+from app.models.crypto_trade_proposals import CryptoTradeProposal
 from app.models.email_accounts import EmailAccount
+from app.models.exchange_accounts import ExchangeAccount
 from app.models.email_attachments import EmailAttachment
 from app.models.email_messages import EmailMessage
 from app.models.gateways import Gateway
@@ -50,7 +53,10 @@ __all__ = [
     "BoardOnboardingSession",
     "BoardGroup",
     "Board",
+    "CryptoPosition",
+    "CryptoTradeProposal",
     "EmailAccount",
+    "ExchangeAccount",
     "EmailAttachment",
     "EmailMessage",
     "Gateway",

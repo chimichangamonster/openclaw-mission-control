@@ -8,6 +8,7 @@ import {
   Bot,
   Boxes,
   CheckCircle2,
+  FileText,
   Folder,
   Building2,
   LayoutGrid,
@@ -106,6 +107,30 @@ export function DashboardSidebar() {
               >
                 <Mail className="h-4 w-4" />
                 Email
+              </Link>
+              <Link
+                href="/documents"
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-slate-700 transition",
+                  pathname.startsWith("/documents")
+                    ? "bg-blue-100 text-blue-800 font-medium"
+                    : "hover:bg-slate-100",
+                )}
+              >
+                <FileText className="h-4 w-4" />
+                Documents
+              </Link>
+              <Link
+                href="/memory"
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-slate-700 transition",
+                  pathname.startsWith("/memory")
+                    ? "bg-blue-100 text-blue-800 font-medium"
+                    : "hover:bg-slate-100",
+                )}
+              >
+                <Folder className="h-4 w-4" />
+                Memory
               </Link>
               <Link
                 href="/activity"

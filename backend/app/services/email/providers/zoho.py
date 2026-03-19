@@ -11,7 +11,7 @@ from app.services.email.types import RawAttachment, RawEmailMessage
 
 logger = get_logger(__name__)
 
-BASE_URL = "https://mail.zoho.com/api/accounts"
+BASE_URL = "https://mail.zohocloud.ca/api/accounts"
 
 
 def _parse_zoho_date(ms_str: str | int) -> datetime:
@@ -32,15 +32,9 @@ async def fetch_messages(
     from_message_id: str | None = None,
 ) -> list[RawEmailMessage]:
     """Fetch messages from a Zoho Mail folder."""
-    folder_map = {"inbox": "INBOX", "sent": "SENT", "archive": "ARCHIVE", "trash": "TRASH"}
-    zoho_folder = folder_map.get(folder, folder.upper())
-
     url = f"{BASE_URL}/{account_id}/messages/view"
     params: dict[str, str | int] = {
-        "folderId": zoho_folder,
         "limit": limit,
-        "sortBy": "date",
-        "sortOrder": "desc",
     }
     if from_message_id:
         params["fromMessageId"] = from_message_id
@@ -52,14 +46,30 @@ async def fetch_messages(
 
     messages = []
     for msg in data.get("data", []):
-        recipients_to = [
-            {"email": r.get("address", ""), "name": r.get("name", "")}
-            for r in msg.get("toAddress", [])
-        ]
-        recipients_cc = [
-            {"email": r.get("address", ""), "name": r.get("name", "")}
-            for r in msg.get("ccAddress", [])
-        ] or None
+        # Zoho CA returns toAddress/ccAddress as strings, not lists of dicts
+        raw_to = msg.get("toAddress", "")
+        if isinstance(raw_to, str):
+            # Parse email from string like "&lt;info@example.com&gt;" or "user@example.com"
+            import re
+            emails = re.findall(r'[\w.+-]+@[\w.-]+', raw_to.replace("&lt;", "<").replace("&gt;", ">"))
+            recipients_to = [{"email": e, "name": ""} for e in emails]
+        else:
+            recipients_to = [
+                {"email": r.get("address", ""), "name": r.get("name", "")}
+                for r in raw_to
+            ]
+
+        raw_cc = msg.get("ccAddress", "")
+        if isinstance(raw_cc, str) and raw_cc and raw_cc != "Not Provided":
+            emails = re.findall(r'[\w.+-]+@[\w.-]+', raw_cc.replace("&lt;", "<").replace("&gt;", ">"))
+            recipients_cc = [{"email": e, "name": ""} for e in emails] or None
+        elif isinstance(raw_cc, list):
+            recipients_cc = [
+                {"email": r.get("address", ""), "name": r.get("name", "")}
+                for r in raw_cc
+            ] or None
+        else:
+            recipients_cc = None
 
         attachments = [
             RawAttachment(
