@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   Activity,
   BarChart3,
+  Radio,
   Bot,
   Boxes,
   CheckCircle2,
@@ -133,6 +134,18 @@ export function DashboardSidebar() {
                 Memory
               </Link>
               <Link
+                href="/live"
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-slate-700 transition",
+                  pathname.startsWith("/live")
+                    ? "bg-blue-100 text-blue-800 font-medium"
+                    : "hover:bg-slate-100",
+                )}
+              >
+                <Radio className="h-4 w-4" />
+                Live Activity
+              </Link>
+              <Link
                 href="/activity"
                 className={cn(
                   "flex items-center gap-3 rounded-lg px-3 py-2.5 text-slate-700 transition",
@@ -142,7 +155,7 @@ export function DashboardSidebar() {
                 )}
               >
                 <Activity className="h-4 w-4" />
-                Live feed
+                Activity Log
               </Link>
             </div>
           </div>

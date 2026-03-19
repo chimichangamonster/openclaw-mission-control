@@ -30,6 +30,7 @@ from app.api.gateway import router as gateway_router
 from app.api.polymarket import router as polymarket_router
 from app.api.invoice_pdf import router as invoice_pdf_router
 from app.api.memory import router as memory_router
+from app.api.gateway_live import router as gateway_live_router
 from app.api.gateways import router as gateways_router
 from app.api.metrics import router as metrics_router
 from app.api.organizations import router as organizations_router
@@ -575,6 +576,7 @@ api_v1.include_router(polymarket_router)
 api_v1.include_router(agent_polymarket_router)
 api_v1.include_router(invoice_pdf_router)
 api_v1.include_router(memory_router)
+api_v1.include_router(gateway_live_router)
 api_v1.include_router(crypto_trading_router)
 api_v1.include_router(board_memory_router)
 api_v1.include_router(board_webhooks_router)
