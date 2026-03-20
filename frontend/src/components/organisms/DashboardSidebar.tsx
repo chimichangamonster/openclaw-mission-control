@@ -86,17 +86,37 @@ export function DashboardSidebar() {
                 Dashboard
               </Link>
               <Link
-                href="/trading"
+                href="/live"
                 className={cn(
                   "flex items-center gap-3 rounded-lg px-3 py-2.5 text-slate-700 transition",
-                  pathname.startsWith("/trading")
+                  pathname.startsWith("/live")
                     ? "bg-blue-100 text-blue-800 font-medium"
                     : "hover:bg-slate-100",
                 )}
               >
-                <TrendingUp className="h-4 w-4" />
-                Trading
+                <Radio className="h-4 w-4" />
+                Live Feed
               </Link>
+              <Link
+                href="/activity"
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-slate-700 transition",
+                  pathname.startsWith("/activity")
+                    ? "bg-blue-100 text-blue-800 font-medium"
+                    : "hover:bg-slate-100",
+                )}
+              >
+                <Activity className="h-4 w-4" />
+                Activity Log
+              </Link>
+            </div>
+          </div>
+
+          <div>
+            <p className="px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+              Trading
+            </p>
+            <div className="mt-1 space-y-1">
               <Link
                 href="/paper-trading"
                 className={cn(
@@ -109,6 +129,26 @@ export function DashboardSidebar() {
                 <BarChart3 className="h-4 w-4" />
                 Paper Trading
               </Link>
+              <Link
+                href="/trading"
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-slate-700 transition",
+                  pathname.startsWith("/trading")
+                    ? "bg-blue-100 text-blue-800 font-medium"
+                    : "hover:bg-slate-100",
+                )}
+              >
+                <TrendingUp className="h-4 w-4" />
+                Prediction Markets
+              </Link>
+            </div>
+          </div>
+
+          <div>
+            <p className="px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+              Business
+            </p>
+            <div className="mt-1 space-y-1">
               <Link
                 href="/email"
                 className={cn(
@@ -133,6 +173,14 @@ export function DashboardSidebar() {
                 <FileText className="h-4 w-4" />
                 Documents
               </Link>
+            </div>
+          </div>
+
+          <div>
+            <p className="px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+              System
+            </p>
+            <div className="mt-1 space-y-1">
               <Link
                 href="/memory"
                 className={cn(
@@ -146,28 +194,16 @@ export function DashboardSidebar() {
                 Memory
               </Link>
               <Link
-                href="/live"
+                href="/costs"
                 className={cn(
                   "flex items-center gap-3 rounded-lg px-3 py-2.5 text-slate-700 transition",
-                  pathname.startsWith("/live")
+                  pathname.startsWith("/costs")
                     ? "bg-blue-100 text-blue-800 font-medium"
                     : "hover:bg-slate-100",
                 )}
               >
-                <Radio className="h-4 w-4" />
-                Live Activity
-              </Link>
-              <Link
-                href="/activity"
-                className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-slate-700 transition",
-                  pathname.startsWith("/activity")
-                    ? "bg-blue-100 text-blue-800 font-medium"
-                    : "hover:bg-slate-100",
-                )}
-              >
-                <Activity className="h-4 w-4" />
-                Activity Log
+                <Folder className="h-4 w-4" />
+                Cost & Usage
               </Link>
             </div>
           </div>

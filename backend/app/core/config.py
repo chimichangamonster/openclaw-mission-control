@@ -106,6 +106,9 @@ class Settings(BaseSettings):
     polymarket_chain_id: int = 137
     polymarket_queue_name: str = "trade_execution"
 
+    # OpenRouter (for cost tracking)
+    openrouter_api_key: str = ""
+
     # OpenClaw gateway runtime compatibility
     gateway_min_version: str = "2026.02.9"
 

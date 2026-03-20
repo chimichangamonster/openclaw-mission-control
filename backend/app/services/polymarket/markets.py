@@ -20,22 +20,59 @@ async def search_markets(
     offset: int = 0,
     active: bool = True,
 ) -> list[MarketSearchResult]:
-    """Search Polymarket markets via the Gamma API."""
-    params: dict[str, str | int | bool] = {
-        "limit": limit,
-        "offset": offset,
-        "closed": not active,
-        "order": "volume",
-        "ascending": False,
-    }
-    if query:
-        params["tag"] = query  # Gamma supports tag-based filtering
+    """Search Polymarket markets via the Gamma API.
 
-    url = f"{GAMMA_URL}/markets"
+    When a category tag is provided, uses the /events endpoint with tag_slug
+    and flattens nested markets. Otherwise uses /markets for top-by-volume.
+    """
+    # Known category tags that map to Gamma event tag_slugs
+    CATEGORY_TAGS = {
+        "elections", "politics", "crypto", "sports", "finance",
+        "science", "pop-culture", "us-presidential-election",
+        "global-elections", "world-elections",
+    }
+
     async with httpx.AsyncClient(timeout=15.0) as client:
-        resp = await client.get(url, params=params)
-        resp.raise_for_status()
-        data = resp.json()
+        if query and query.lower() in CATEGORY_TAGS:
+            # Use events endpoint for category filtering
+            params: dict[str, str | int | bool] = {
+                "limit": min(limit, 10),  # events contain multiple markets each
+                "closed": not active,
+                "order": "volume",
+                "ascending": False,
+                "tag_slug": query.lower(),
+            }
+            url = f"{GAMMA_URL}/events"
+            resp = await client.get(url, params=params)
+            resp.raise_for_status()
+            events = resp.json()
+
+            # Flatten markets from events
+            raw_markets = []
+            for event in (events if isinstance(events, list) else []):
+                for m in event.get("markets", []):
+                    if not m.get("closed", False):
+                        raw_markets.append(m)
+
+            # Sort by volume and limit
+            raw_markets.sort(
+                key=lambda m: float(m.get("volumeNum", m.get("volume", 0)) or 0),
+                reverse=True,
+            )
+            data = raw_markets[:limit]
+        else:
+            # Use markets endpoint for top-by-volume or free-text search
+            params = {
+                "limit": limit,
+                "offset": offset,
+                "closed": not active,
+                "order": "volume",
+                "ascending": False,
+            }
+            url = f"{GAMMA_URL}/markets"
+            resp = await client.get(url, params=params)
+            resp.raise_for_status()
+            data = resp.json()
 
     results = []
     for market in data if isinstance(data, list) else data.get("data", data.get("markets", [])):

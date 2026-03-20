@@ -27,6 +27,7 @@ from app.api.crypto_trading import router as crypto_trading_router
 from app.api.email import router as email_router
 from app.api.email_oauth import router as email_oauth_router
 from app.api.gateway import router as gateway_router
+from app.api.cost_tracker import router as cost_tracker_router
 from app.api.paper_trading import router as paper_trading_router
 from app.api.polymarket import router as polymarket_router
 from app.api.invoice_pdf import router as invoice_pdf_router
@@ -580,6 +581,7 @@ api_v1.include_router(memory_router)
 api_v1.include_router(gateway_live_router)
 api_v1.include_router(crypto_trading_router)
 api_v1.include_router(paper_trading_router)
+api_v1.include_router(cost_tracker_router)
 api_v1.include_router(board_memory_router)
 api_v1.include_router(board_webhooks_router)
 api_v1.include_router(board_onboarding_router)
