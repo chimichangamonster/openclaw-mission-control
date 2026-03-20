@@ -98,6 +98,18 @@ export function DashboardSidebar() {
                 Trading
               </Link>
               <Link
+                href="/paper-trading"
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-slate-700 transition",
+                  pathname.startsWith("/paper-trading")
+                    ? "bg-blue-100 text-blue-800 font-medium"
+                    : "hover:bg-slate-100",
+                )}
+              >
+                <BarChart3 className="h-4 w-4" />
+                Paper Trading
+              </Link>
+              <Link
                 href="/email"
                 className={cn(
                   "flex items-center gap-3 rounded-lg px-3 py-2.5 text-slate-700 transition",
