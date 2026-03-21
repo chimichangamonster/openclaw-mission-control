@@ -4,6 +4,7 @@ coverage
 cypress/screenshots
 cypress/videos
 npm-debug.log*
+package-lock.json
 .env
 .env.*
 .git
