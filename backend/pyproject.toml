@@ -33,6 +33,8 @@ dependencies = [
     "rq==2.6.0",
     "cryptography==45.0.7",
     "reportlab>=4.0",
+    "prometheus-client>=0.22.0",
+    "prometheus-fastapi-instrumentator>=7.0.0",
 ]
 
 [project.optional-dependencies]

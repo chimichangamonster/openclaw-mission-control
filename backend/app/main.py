@@ -499,10 +499,27 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     except Exception as exc:  # noqa: BLE001
         logger.warning("app.lifecycle.gateway_listener_init_failed error=%s", exc)
 
+    # Background task: update DB pool metrics for Prometheus every 15s.
+    async def _update_pool_metrics() -> None:
+        from app.core.prometheus import db_pool_checked_out, db_pool_size
+        from app.db.session import async_engine
+
+        while True:
+            try:
+                pool = async_engine.pool
+                db_pool_size.set(pool.size())
+                db_pool_checked_out.set(pool.checkedout())
+            except Exception:  # noqa: BLE001
+                pass
+            await asyncio.sleep(15)
+
+    pool_task = asyncio.create_task(_update_pool_metrics())
+
     logger.info("app.lifecycle.started")
     try:
         yield
     finally:
+        pool_task.cancel()
         if listener_task and not listener_task.done():
             listener_task.cancel()
             try:
@@ -542,6 +559,10 @@ app.add_middleware(
     permissions_policy=settings.security_header_permissions_policy,
 )
 install_error_handling(app)
+
+from app.core.prometheus import setup_metrics  # noqa: E402
+
+setup_metrics(app)
 
 
 @app.get(

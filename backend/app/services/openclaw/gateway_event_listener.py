@@ -332,6 +332,12 @@ async def _listen(config: GatewayConfig) -> None:
 
         logger.info("gateway_event_listener.connected")
 
+        try:
+            from app.core.prometheus import gateway_listener_connected
+            gateway_listener_connected.set(1)
+        except Exception:  # noqa: BLE001
+            pass
+
         # Publish a synthetic "connected" event
         broadcast.publish(LiveActivityEvent(
             event_type="gateway.connected",
@@ -392,6 +398,11 @@ async def run_event_listener(config: GatewayConfig) -> None:
                 exc,
                 backoff,
             )
+            try:
+                from app.core.prometheus import gateway_listener_connected
+                gateway_listener_connected.set(0)
+            except Exception:  # noqa: BLE001
+                pass
             broadcast.publish(LiveActivityEvent(
                 event_type="gateway.disconnected",
                 message=f"Disconnected: {exc}",
