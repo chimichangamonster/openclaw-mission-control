@@ -32,6 +32,11 @@ Fork of abhi1693/openclaw-mission-control. Separate git repo (not a submodule).
 - `GET /cost-tracker/usage` — OpenRouter credit balance and spending
 - `GET /cost-tracker/models` — live model pricing from OpenRouter with tier classification
 - `POST/GET/PATCH /paper-bets/portfolios/{id}/bets` — sports betting CRUD
+- `GET/POST /watchlist/portfolios/{id}/items` — watchlist CRUD (status filter: watching/alerting/bought/all)
+- `PATCH /watchlist/portfolios/{id}/items/{id}` — update price, RSI, volume, sentiment, status
+- `DELETE /watchlist/portfolios/{id}/items/{id}` — remove from watchlist
+- `POST /watchlist/portfolios/{id}/items/bulk` — bulk add from report scan
+- `GET /watchlist/portfolios/{id}/items/summary` — counts + active alerts
 
 ## Environment Variables (mc-backend)
 - `OPENROUTER_API_KEY` — required for cost tracking page (added to docker-compose.mission-control.yml)

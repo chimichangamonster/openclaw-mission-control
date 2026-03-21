@@ -108,6 +108,7 @@ class Settings(BaseSettings):
 
     # OpenRouter (for cost tracking)
     openrouter_api_key: str = ""
+    openrouter_management_key: str = ""
 
     # OpenClaw gateway runtime compatibility
     gateway_min_version: str = "2026.02.9"

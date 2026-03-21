@@ -2,8 +2,8 @@
 
 export const dynamic = "force-dynamic";
 
-import { useCallback, useEffect, useState } from "react";
-import { DollarSign, TrendingUp, AlertTriangle, Zap, BarChart3 } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { DollarSign, TrendingUp, AlertTriangle, Zap, BarChart3, RefreshCw, Calendar } from "lucide-react";
 
 import { useAuth } from "@/auth/clerk";
 import { DashboardPageLayout } from "@/components/templates/DashboardPageLayout";
@@ -42,6 +42,39 @@ interface ModelInfo {
   tier: string;
 }
 
+interface ModelUsage {
+  model: string;
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
+  estimated_cost: number;
+  session_count: number;
+  agents: string[];
+  tier: string;
+}
+
+interface ActivityModelEntry {
+  model: string;
+  cost: number;
+  requests: number;
+  prompt_tokens: number;
+  completion_tokens: number;
+  tier: string;
+}
+
+interface ActivityPeriod {
+  period: string;
+  total_cost: number;
+  models: ActivityModelEntry[];
+}
+
+interface ActivityData {
+  period_type: string;
+  periods: ActivityPeriod[];
+  model_totals: ActivityModelEntry[];
+  grand_total: number;
+}
+
 // Fallback pricing for cost estimation if live data not loaded yet
 const FALLBACK_PRICING: Record<string, { prompt: number; completion: number }> = {
   "claude-sonnet-4": { prompt: 3.0, completion: 15.0 },
@@ -67,8 +100,41 @@ export default function CostsPage() {
   const [usage, setUsage] = useState<UsageData | null>(null);
   const [sessions, setSessions] = useState<SessionData[]>([]);
   const [models, setModels] = useState<ModelInfo[]>([]);
+  const [modelUsage, setModelUsage] = useState<ModelUsage[]>([]);
   const [showAllModels, setShowAllModels] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [liveRefreshing, setLiveRefreshing] = useState(false);
+  const [activity, setActivity] = useState<ActivityData | null>(null);
+  const [activityPeriod, setActivityPeriod] = useState<"daily" | "weekly" | "monthly">("daily");
+  const [activityLoading, setActivityLoading] = useState(false);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const loadActivity = useCallback(async (period: string) => {
+    try {
+      setActivityLoading(true);
+      const raw: any = await customFetch(`/api/v1/cost-tracker/activity?period=${period}`, { method: "GET" }).catch(() => null);
+      const data = raw?.data ?? raw;
+      if (data?.periods) {
+        setActivity(data as ActivityData);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setActivityLoading(false);
+    }
+  }, []);
+
+  const loadModelUsage = useCallback(async () => {
+    try {
+      const raw: any = await customFetch("/api/v1/cost-tracker/usage-by-model", { method: "GET" }).catch(() => null);
+      const data = raw?.data ?? raw;
+      if (data?.models) {
+        setModelUsage(data.models as ModelUsage[]);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
 
   const loadData = useCallback(async () => {
     try {
@@ -85,6 +151,9 @@ export default function CostsPage() {
       const modelsRaw: any = await customFetch("/api/v1/cost-tracker/models?filter=configured", { method: "GET" }).catch(() => null);
       const modelsData = modelsRaw?.data ?? modelsRaw;
       if (modelsData?.models) setModels(modelsData.models as ModelInfo[]);
+
+      // Fetch per-model usage + historical activity
+      await Promise.all([loadModelUsage(), loadActivity(activityPeriod)]);
 
       // Fetch gateway sessions for per-agent breakdown
       const boardId = "fc95c061-3c32-4c82-a87d-9e21225e59fd";
@@ -121,11 +190,24 @@ export default function CostsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [loadModelUsage, loadActivity, activityPeriod]);
 
   useEffect(() => {
     if (isSignedIn) loadData();
   }, [isSignedIn, loadData]);
+
+  // Live refresh: poll per-model usage every 30s
+  useEffect(() => {
+    if (!isSignedIn) return;
+    intervalRef.current = setInterval(async () => {
+      setLiveRefreshing(true);
+      await loadModelUsage();
+      setLiveRefreshing(false);
+    }, 30_000);
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [isSignedIn, loadModelUsage]);
 
   const usagePct = usage ? ((usage.total_usage / usage.total_credits) * 100) : 0;
   const totalSessionCost = sessions.reduce((sum, s) => sum + s.estimatedCost, 0);
@@ -188,6 +270,239 @@ export default function CostsPage() {
               </div>
             </div>
           )}
+
+          {/* Spending by Model — Leaderboard */}
+          {modelUsage.length > 0 && (() => {
+            const hasHistory = activity && activity.model_totals.length > 0 && activity.grand_total > 0;
+            // Merge live session data with 30-day historical totals (if available)
+            const merged = new Map<string, { model: string; live_cost: number; hist_cost: number; live_tokens: number; hist_tokens: number; hist_requests: number; sessions: number; agents: string[]; tier: string }>();
+            for (const m of modelUsage) {
+              merged.set(m.model, { model: m.model, live_cost: m.estimated_cost, hist_cost: 0, live_tokens: m.total_tokens, hist_tokens: 0, hist_requests: 0, sessions: m.session_count, agents: m.agents, tier: m.tier });
+            }
+            if (hasHistory) {
+              for (const mt of activity!.model_totals) {
+                const existing = merged.get(mt.model);
+                if (existing) {
+                  existing.hist_cost = mt.cost;
+                  existing.hist_tokens = mt.prompt_tokens + mt.completion_tokens;
+                  existing.hist_requests = mt.requests;
+                } else {
+                  merged.set(mt.model, { model: mt.model, live_cost: 0, hist_cost: mt.cost, live_tokens: 0, hist_tokens: mt.prompt_tokens + mt.completion_tokens, hist_requests: mt.requests, sessions: 0, agents: [], tier: mt.tier });
+                }
+              }
+            }
+            const leaderboard = [...merged.values()].sort((a, b) => {
+              const aCost = hasHistory ? a.hist_cost + a.live_cost : a.live_cost;
+              const bCost = hasHistory ? b.hist_cost + b.live_cost : b.live_cost;
+              return bCost - aCost;
+            });
+            const maxCost = leaderboard.length > 0 ? (hasHistory ? leaderboard[0].hist_cost + leaderboard[0].live_cost : leaderboard[0].live_cost) : 1;
+
+            return (
+              <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+                <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-900">Model Spending Leaderboard</h3>
+                    <p className="text-xs text-slate-500">
+                      {hasHistory ? "30-day history + live session data" : "Live session token usage (estimated cost)"} • {leaderboard.length} models
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {liveRefreshing && <RefreshCw className="h-3 w-3 animate-spin text-slate-400" />}
+                    <span className="rounded bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
+                      LIVE • 30s
+                    </span>
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-100 text-left text-xs text-slate-500">
+                        <th className="px-4 py-2 w-8">#</th>
+                        <th className="px-4 py-2">Model</th>
+                        <th className="px-4 py-2">Tier</th>
+                        {hasHistory && <th className="px-4 py-2 text-right">30d Cost</th>}
+                        <th className="px-4 py-2 text-right">{hasHistory ? "Live Cost" : "Est. Cost"}</th>
+                        <th className="px-4 py-2 text-right">Tokens</th>
+                        <th className="px-4 py-2 text-right">{hasHistory ? "Requests" : "Sessions"}</th>
+                        <th className="px-4 py-2">Agents</th>
+                        <th className="px-4 py-2 w-[25%]"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {leaderboard.map((m, i) => {
+                        const totalCost = hasHistory ? m.hist_cost + m.live_cost : m.live_cost;
+                        const pct = maxCost > 0 ? (totalCost / maxCost) * 100 : 0;
+                        const tierColor = m.tier.includes("4") ? "bg-red-500" :
+                          m.tier.includes("3") ? "bg-purple-500" :
+                          m.tier.includes("2") ? "bg-blue-500" : "bg-emerald-500";
+                        const isTop3 = i < 3;
+                        return (
+                          <tr key={m.model} className={`border-b border-slate-50 hover:bg-slate-50 ${isTop3 ? "bg-slate-25" : ""}`}>
+                            <td className="px-4 py-2.5">
+                              <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
+                                i === 0 ? "bg-amber-100 text-amber-700" :
+                                i === 1 ? "bg-slate-200 text-slate-600" :
+                                i === 2 ? "bg-orange-100 text-orange-700" :
+                                "text-slate-400"
+                              }`}>
+                                {i + 1}
+                              </span>
+                            </td>
+                            <td className="px-4 py-2.5">
+                              <span className="font-mono font-medium text-slate-800">{m.model}</span>
+                            </td>
+                            <td className="px-4 py-2.5">
+                              <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                                m.tier.includes("4") ? "bg-red-100 text-red-700" :
+                                m.tier.includes("3") ? "bg-purple-100 text-purple-700" :
+                                m.tier.includes("2") ? "bg-blue-100 text-blue-700" :
+                                "bg-emerald-100 text-emerald-700"
+                              }`}>
+                                {m.tier.replace("Tier ", "T").replace(" — ", " ")}
+                              </span>
+                            </td>
+                            {hasHistory && (
+                              <td className="px-4 py-2.5 text-right font-mono text-xs font-semibold text-slate-900">
+                                ${m.hist_cost.toFixed(4)}
+                              </td>
+                            )}
+                            <td className={`px-4 py-2.5 text-right font-mono text-xs ${hasHistory ? "text-slate-500" : "font-semibold text-slate-900"}`}>
+                              {m.live_cost > 0 ? `$${m.live_cost.toFixed(4)}` : "—"}
+                            </td>
+                            <td className="px-4 py-2.5 text-right font-mono text-xs text-slate-500">
+                              {(m.hist_tokens + m.live_tokens).toLocaleString()}
+                            </td>
+                            <td className="px-4 py-2.5 text-right font-mono text-xs text-slate-500">
+                              {hasHistory && m.hist_requests > 0 ? m.hist_requests.toLocaleString() : m.sessions > 0 ? m.sessions : "—"}
+                            </td>
+                            <td className="px-4 py-2.5">
+                              {m.agents.length > 0 ? (
+                                <div className="flex flex-wrap gap-1">
+                                  {m.agents.map((a) => (
+                                    <span key={a} className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">{a}</span>
+                                  ))}
+                                </div>
+                              ) : null}
+                            </td>
+                            <td className="px-4 py-2.5">
+                              <div className="h-2 w-full rounded-full bg-slate-100">
+                                <div className={`h-2 rounded-full transition-all ${tierColor}`} style={{ width: `${Math.max(pct, 2)}%` }} />
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Historical Spending by Model — only shows if activity API returns data */}
+          {activity && activity.periods.length > 0 && activity.grand_total > 0 && <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+            <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900">
+                  <Calendar className="mr-1.5 inline h-4 w-4" />
+                  Spending History by Model
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Last 30 days from OpenRouter{activity ? ` • $${activity.grand_total.toFixed(4)} total` : ""}
+                </p>
+              </div>
+              <div className="flex rounded-lg border border-slate-200 overflow-hidden">
+                {(["daily", "weekly", "monthly"] as const).map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => {
+                      setActivityPeriod(p);
+                      loadActivity(p);
+                    }}
+                    className={`px-3 py-1.5 text-xs font-medium transition ${
+                      activityPeriod === p
+                        ? "bg-slate-900 text-white"
+                        : "bg-white text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    {p.charAt(0).toUpperCase() + p.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {activityLoading ? (
+              <p className="py-6 text-center text-sm text-slate-400">Loading history...</p>
+            ) : activity && activity.periods.length > 0 ? (
+              <div className="divide-y divide-slate-100">
+                {/* Model totals summary row */}
+                <div className="px-4 py-3 bg-slate-50">
+                  <div className="flex flex-wrap gap-3">
+                    {activity.model_totals.map((mt) => {
+                      const pct = activity.grand_total > 0 ? (mt.cost / activity.grand_total) * 100 : 0;
+                      return (
+                        <div key={mt.model} className="flex items-center gap-1.5 text-xs">
+                          <span className={`inline-block h-2 w-2 rounded-full ${
+                            mt.tier.includes("4") ? "bg-red-500" :
+                            mt.tier.includes("3") ? "bg-purple-500" :
+                            mt.tier.includes("2") ? "bg-blue-500" : "bg-emerald-500"
+                          }`} />
+                          <span className="font-mono font-medium text-slate-700">{mt.model}</span>
+                          <span className="text-slate-500">${mt.cost.toFixed(4)}</span>
+                          <span className="text-slate-400">({pct.toFixed(0)}%)</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Period rows */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-100 text-left text-xs text-slate-500">
+                        <th className="px-4 py-2">Period</th>
+                        <th className="px-4 py-2 text-right">Total Cost</th>
+                        <th className="px-4 py-2">Model Breakdown</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {activity.periods.map((p) => (
+                        <tr key={p.period} className="border-b border-slate-50 hover:bg-slate-50">
+                          <td className="px-4 py-2 font-mono text-xs font-medium text-slate-700 whitespace-nowrap">
+                            {p.period}
+                          </td>
+                          <td className="px-4 py-2 text-right font-mono text-xs font-semibold text-slate-900">
+                            ${p.total_cost.toFixed(4)}
+                          </td>
+                          <td className="px-4 py-2">
+                            <div className="flex flex-wrap gap-2">
+                              {p.models.map((pm) => (
+                                <span
+                                  key={pm.model}
+                                  className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-mono ${
+                                    pm.tier.includes("4") ? "bg-red-50 text-red-700" :
+                                    pm.tier.includes("3") ? "bg-purple-50 text-purple-700" :
+                                    pm.tier.includes("2") ? "bg-blue-50 text-blue-700" :
+                                    "bg-emerald-50 text-emerald-700"
+                                  }`}
+                                >
+                                  {pm.model}: ${pm.cost.toFixed(4)}
+                                  <span className="text-slate-400">({pm.requests} req)</span>
+                                </span>
+                              ))}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              <p className="py-6 text-center text-sm text-slate-400">No activity data available</p>
+            )}
+          </div>}
 
           {/* Per-Agent Cost Breakdown */}
           <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
