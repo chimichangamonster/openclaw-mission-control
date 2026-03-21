@@ -15,6 +15,7 @@ from app.models.exchange_accounts import ExchangeAccount
 from app.models.polymarket_risk_config import PolymarketRiskConfig
 from app.schemas.crypto_trading import CryptoTradeProposalCreate
 from app.services.binance.credentials import get_binance_client
+from app.services.binance.queue import QueuedCryptoTrade, enqueue_crypto_trade
 
 if TYPE_CHECKING:
     from sqlmodel.ext.asyncio.session import AsyncSession
@@ -81,45 +82,85 @@ async def create_crypto_trade_proposal(
     session.add(proposal)
     await session.flush()
 
-    # Create linked Approval
-    approval = Approval(
-        id=uuid4(),
-        board_id=board_id,
-        agent_id=agent_id,
-        action_type="crypto_trade",
-        payload={
-            "trade_proposal_id": str(proposal.id),
-            "exchange": "binance",
-            "symbol": params.symbol.upper(),
-            "side": params.side.upper(),
-            "order_type": params.order_type,
-            "value": trade_value,
-            "reasoning": params.reasoning,
-            "reason": params.reasoning,
-            "strategy": params.strategy,
-            "target": str(params.target_price) if params.target_price else None,
-            "stop_loss": str(params.stop_loss_price) if params.stop_loss_price else None,
-        },
-        confidence=params.confidence,
-        status="pending",
-        created_at=now,
+    # Check if auto-execution is allowed (uses shared Polymarket risk config)
+    stmt_risk = select(PolymarketRiskConfig).where(
+        PolymarketRiskConfig.organization_id == org_id
     )
-    session.add(approval)
-    await session.flush()
+    risk_config = (await session.execute(stmt_risk)).scalar_one_or_none()
 
-    proposal.approval_id = approval.id
-    session.add(proposal)
-    await session.flush()
-
-    logger.info(
-        "binance.trade.proposed",
-        extra={
-            "proposal_id": str(proposal.id),
-            "symbol": params.symbol,
-            "side": params.side,
-            "value": trade_value,
-        },
+    # Determine trade size for auto-execute check
+    trade_size = params.quote_amount or (
+        (params.quantity or 0) * (params.price or 0)
     )
+    auto_execute = (
+        risk_config is not None
+        and not risk_config.require_approval
+        and trade_size <= (risk_config.auto_execute_max_size_usdc or 50.0)
+        and params.confidence >= (risk_config.auto_execute_min_confidence or 75.0)
+    )
+
+    if auto_execute:
+        proposal.status = "approved"
+        session.add(proposal)
+        await session.flush()
+
+        enqueue_crypto_trade(
+            QueuedCryptoTrade(
+                trade_proposal_id=proposal.id,
+                organization_id=org_id,
+            )
+        )
+
+        logger.info(
+            "binance.trade.auto_approved",
+            extra={
+                "proposal_id": str(proposal.id),
+                "symbol": params.symbol,
+                "side": params.side,
+                "value": trade_value,
+                "confidence": params.confidence,
+            },
+        )
+    else:
+        # Create linked Approval (human review required)
+        approval = Approval(
+            id=uuid4(),
+            board_id=board_id,
+            agent_id=agent_id,
+            action_type="crypto_trade",
+            payload={
+                "trade_proposal_id": str(proposal.id),
+                "exchange": "binance",
+                "symbol": params.symbol.upper(),
+                "side": params.side.upper(),
+                "order_type": params.order_type,
+                "value": trade_value,
+                "reasoning": params.reasoning,
+                "reason": params.reasoning,
+                "strategy": params.strategy,
+                "target": str(params.target_price) if params.target_price else None,
+                "stop_loss": str(params.stop_loss_price) if params.stop_loss_price else None,
+            },
+            confidence=params.confidence,
+            status="pending",
+            created_at=now,
+        )
+        session.add(approval)
+        await session.flush()
+
+        proposal.approval_id = approval.id
+        session.add(proposal)
+        await session.flush()
+
+        logger.info(
+            "binance.trade.proposed",
+            extra={
+                "proposal_id": str(proposal.id),
+                "symbol": params.symbol,
+                "side": params.side,
+                "value": trade_value,
+            },
+        )
     return proposal
 
 

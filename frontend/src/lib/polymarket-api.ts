@@ -30,6 +30,8 @@ export interface RiskConfig {
   market_whitelist: string[] | null;
   market_blacklist: string[] | null;
   require_approval: boolean;
+  auto_execute_max_size_usdc: number;
+  auto_execute_min_confidence: number;
   created_at: string;
   updated_at: string;
 }

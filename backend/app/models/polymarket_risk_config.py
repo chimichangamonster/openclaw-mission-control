@@ -31,5 +31,7 @@ class PolymarketRiskConfig(TenantScoped, table=True):
     market_whitelist: list[str] | None = Field(default=None, sa_column=Column(JSON))
     market_blacklist: list[str] | None = Field(default=None, sa_column=Column(JSON))
     require_approval: bool = Field(default=True)
+    auto_execute_max_size_usdc: float = Field(default=50.0)
+    auto_execute_min_confidence: float = Field(default=75.0)
     created_at: datetime = Field(default_factory=utcnow)
     updated_at: datetime = Field(default_factory=utcnow)

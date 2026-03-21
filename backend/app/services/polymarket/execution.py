@@ -17,6 +17,7 @@ from app.models.trade_proposals import TradeProposal
 from app.schemas.polymarket import TradeProposalCreate
 from app.services.polymarket.credentials import get_clob_client
 from app.services.polymarket.markets import get_market_detail
+from app.services.polymarket.queue import QueuedTradeExecution, enqueue_trade_execution
 
 if TYPE_CHECKING:
     from sqlmodel.ext.asyncio.session import AsyncSession
@@ -115,43 +116,75 @@ async def create_trade_proposal(
     session.add(proposal)
     await session.flush()
 
-    # Create linked Approval (enforced gate)
-    approval = Approval(
-        id=uuid4(),
-        board_id=board_id,
-        agent_id=agent_id,
-        action_type="polymarket_trade",
-        payload={
-            "trade_proposal_id": str(proposal.id),
-            "market_question": market_question,
-            "outcome": outcome_label,
-            "side": params.side.upper(),
-            "size_usdc": params.size_usdc,
-            "price": params.price,
-            "reasoning": params.reasoning,
-            "reason": params.reasoning,
-        },
-        confidence=params.confidence,
-        status="pending",
-        created_at=now,
+    # Check if auto-execution is allowed
+    auto_execute = (
+        risk_config is not None
+        and not risk_config.require_approval
+        and params.size_usdc <= (risk_config.auto_execute_max_size_usdc or 50.0)
+        and params.confidence >= (risk_config.auto_execute_min_confidence or 75.0)
     )
-    session.add(approval)
-    await session.flush()
 
-    proposal.approval_id = approval.id
-    session.add(proposal)
-    await session.flush()
+    if auto_execute:
+        # Auto-approve: skip approval gate, enqueue immediately
+        proposal.status = "approved"
+        session.add(proposal)
+        await session.flush()
 
-    logger.info(
-        "polymarket.trade.proposed",
-        extra={
-            "proposal_id": str(proposal.id),
-            "approval_id": str(approval.id),
-            "market": market_question,
-            "side": params.side,
-            "size": params.size_usdc,
-        },
-    )
+        enqueue_trade_execution(
+            QueuedTradeExecution(
+                trade_proposal_id=proposal.id,
+                organization_id=org_id,
+            )
+        )
+
+        logger.info(
+            "polymarket.trade.auto_approved",
+            extra={
+                "proposal_id": str(proposal.id),
+                "market": market_question,
+                "side": params.side,
+                "size": params.size_usdc,
+                "confidence": params.confidence,
+            },
+        )
+    else:
+        # Create linked Approval (human review required)
+        approval = Approval(
+            id=uuid4(),
+            board_id=board_id,
+            agent_id=agent_id,
+            action_type="polymarket_trade",
+            payload={
+                "trade_proposal_id": str(proposal.id),
+                "market_question": market_question,
+                "outcome": outcome_label,
+                "side": params.side.upper(),
+                "size_usdc": params.size_usdc,
+                "price": params.price,
+                "reasoning": params.reasoning,
+                "reason": params.reasoning,
+            },
+            confidence=params.confidence,
+            status="pending",
+            created_at=now,
+        )
+        session.add(approval)
+        await session.flush()
+
+        proposal.approval_id = approval.id
+        session.add(proposal)
+        await session.flush()
+
+        logger.info(
+            "polymarket.trade.proposed",
+            extra={
+                "proposal_id": str(proposal.id),
+                "approval_id": str(approval.id),
+                "market": market_question,
+                "side": params.side,
+                "size": params.size_usdc,
+            },
+        )
     return proposal
 
 

@@ -5,7 +5,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
-from eth_account import Account
+try:
+    from eth_account import Account
+except ImportError:
+    Account = None  # type: ignore[assignment,misc]
 
 from app.core.config import settings
 from app.core.encryption import decrypt_token, encrypt_token

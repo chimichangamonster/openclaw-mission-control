@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Key, Shield, Trash2, Wallet } from "lucide-react";
+import { Key, Shield, Trash2, Wallet, Zap } from "lucide-react";
 
 import { useAuth } from "@/auth/clerk";
 import { DashboardPageLayout } from "@/components/templates/DashboardPageLayout";
@@ -40,6 +40,9 @@ export default function TradingSettingsPage() {
   const [maxTradeSize, setMaxTradeSize] = useState("100");
   const [dailyLimit, setDailyLimit] = useState("");
   const [weeklyLimit, setWeeklyLimit] = useState("");
+  const [requireApproval, setRequireApproval] = useState(true);
+  const [autoMaxSize, setAutoMaxSize] = useState("50");
+  const [autoMinConfidence, setAutoMinConfidence] = useState("75");
   const [riskSaving, setRiskSaving] = useState(false);
   const [riskSuccess, setRiskSuccess] = useState(false);
 
@@ -53,6 +56,9 @@ export default function TradingSettingsPage() {
         setMaxTradeSize(String(r.max_trade_size_usdc));
         setDailyLimit(r.daily_loss_limit_usdc != null ? String(r.daily_loss_limit_usdc) : "");
         setWeeklyLimit(r.weekly_loss_limit_usdc != null ? String(r.weekly_loss_limit_usdc) : "");
+        setRequireApproval(r.require_approval);
+        setAutoMaxSize(String(r.auto_execute_max_size_usdc ?? 50));
+        setAutoMinConfidence(String(r.auto_execute_min_confidence ?? 75));
       }
     } catch {
       // silent
@@ -103,6 +109,9 @@ export default function TradingSettingsPage() {
         max_trade_size_usdc: parseFloat(maxTradeSize) || 100,
         daily_loss_limit_usdc: dailyLimit ? parseFloat(dailyLimit) : null,
         weekly_loss_limit_usdc: weeklyLimit ? parseFloat(weeklyLimit) : null,
+        require_approval: requireApproval,
+        auto_execute_max_size_usdc: parseFloat(autoMaxSize) || 50,
+        auto_execute_min_confidence: parseFloat(autoMinConfidence) || 75,
       });
       setRisk(updated);
       setRiskSuccess(true);
@@ -211,9 +220,50 @@ export default function TradingSettingsPage() {
                 </div>
               </div>
 
-              <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-xs text-amber-800">
-                Human approval is <strong>always required</strong> for every trade. This cannot be disabled.
-              </div>
+              {/* Auto-Execution Toggle */}
+              <section className="rounded-lg border border-slate-200 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Zap className="h-4 w-4 text-amber-500" />
+                    <span className="text-sm font-semibold text-slate-800">Autonomous Trading</span>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={!requireApproval}
+                    onClick={() => setRequireApproval(!requireApproval)}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${!requireApproval ? "bg-emerald-500" : "bg-slate-200"}`}
+                  >
+                    <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform ${!requireApproval ? "translate-x-5" : "translate-x-0"}`} />
+                  </button>
+                </div>
+                <p className="text-xs text-slate-500">
+                  {requireApproval
+                    ? "All trades require manual approval before execution."
+                    : "Trades that meet the criteria below will execute automatically. Trades that exceed size or fall below confidence still require approval."}
+                </p>
+
+                {!requireApproval && (
+                  <div className="grid gap-3 md:grid-cols-2 pt-1">
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-slate-700">Max auto-execute size (USDC)</label>
+                      <Input value={autoMaxSize} onChange={(e) => setAutoMaxSize(e.target.value)} type="number" step="0.01" />
+                      <p className="text-xs text-slate-400">Trades larger than this still need approval</p>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-slate-700">Min confidence for auto-execute (%)</label>
+                      <Input value={autoMinConfidence} onChange={(e) => setAutoMinConfidence(e.target.value)} type="number" step="1" min="0" max="100" />
+                      <p className="text-xs text-slate-400">Agent must report at least this confidence level</p>
+                    </div>
+                  </div>
+                )}
+
+                {!requireApproval && (
+                  <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-xs text-amber-800">
+                    Auto-execution is <strong>enabled</strong>. Trades under ${autoMaxSize} USDC with confidence above {autoMinConfidence}% will execute without approval. Risk controls (max trade size, daily/weekly limits) still apply.
+                  </div>
+                )}
+              </section>
 
               {riskSuccess ? (
                 <p className="text-sm text-emerald-600">Risk controls saved.</p>

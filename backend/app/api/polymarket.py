@@ -135,7 +135,7 @@ async def update_risk_config(
     ctx: OrganizationContext = ADMIN_DEP,
     session: AsyncSession = SESSION_DEP,
 ) -> PolymarketRiskConfig:
-    """Update risk configuration. require_approval is always enforced as true."""
+    """Update risk configuration including auto-execution settings."""
     from uuid import uuid4
 
     stmt = select(PolymarketRiskConfig).where(
@@ -159,12 +159,13 @@ async def update_risk_config(
         "max_open_positions",
         "market_whitelist",
         "market_blacklist",
+        "require_approval",
+        "auto_execute_max_size_usdc",
+        "auto_execute_min_confidence",
     ):
         value = getattr(payload, field, None)
         if value is not None:
             setattr(config, field, value)
-
-    config.require_approval = True  # ENFORCED — cannot be disabled
     config.updated_at = now
     session.add(config)
     await session.commit()

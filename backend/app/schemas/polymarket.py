@@ -50,6 +50,8 @@ class PolymarketRiskConfigRead(SQLModel):
     market_whitelist: list[str] | None = None
     market_blacklist: list[str] | None = None
     require_approval: bool
+    auto_execute_max_size_usdc: float = 50.0
+    auto_execute_min_confidence: float = 75.0
     created_at: datetime
     updated_at: datetime
 
@@ -63,6 +65,9 @@ class PolymarketRiskConfigUpdate(SQLModel):
     max_open_positions: int | None = None
     market_whitelist: list[str] | None = None
     market_blacklist: list[str] | None = None
+    require_approval: bool | None = None
+    auto_execute_max_size_usdc: float | None = None
+    auto_execute_min_confidence: float | None = None
 
 
 # --- Markets ---
