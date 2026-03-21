@@ -25,6 +25,7 @@ class PaperPortfolio(TenantScoped, table=True):
     name: str = "Default Portfolio"
     starting_balance: float = 10000.0
     cash_balance: float = 10000.0
+    auto_trade: bool = False  # Allow agents to execute trades without approval
     created_at: datetime = Field(default_factory=utcnow)
     updated_at: datetime = Field(default_factory=utcnow)
 
@@ -47,6 +48,18 @@ class PaperPosition(TenantScoped, table=True):
     exit_price: Optional[float] = None
     status: str = "open"  # open, closed
     pnl_realized: float = 0.0
+    total_fees: float = 0.0  # Accumulated fees across all trades for this position
+    trade_count: int = 0  # Number of trades (buys + sells) on this position
+    # Ticker metadata
+    company_name: Optional[str] = None
+    exchange: Optional[str] = None  # TSX, NYSE, NASDAQ, etc.
+    sector: Optional[str] = None
+    # Risk management
+    stop_loss: Optional[float] = None
+    take_profit: Optional[float] = None
+    source_report: Optional[str] = None  # e.g. "10 Bagger Report - March 15, 2026"
+    # Price tracking
+    price_updated_at: Optional[datetime] = None
     created_at: datetime = Field(default_factory=utcnow)
     updated_at: datetime = Field(default_factory=utcnow)
 

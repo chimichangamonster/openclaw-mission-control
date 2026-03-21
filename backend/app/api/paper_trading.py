@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+from collections import defaultdict
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select, func
+from sqlalchemy import select, func, cast, Date
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.deps import get_session, require_org_member
@@ -41,6 +42,7 @@ async def list_portfolios(
             "name": p.name,
             "starting_balance": p.starting_balance,
             "cash_balance": p.cash_balance,
+            "auto_trade": p.auto_trade,
             "open_positions": pos_count,
             "created_at": p.created_at.isoformat(),
         })
@@ -94,6 +96,7 @@ async def get_portfolio(
     positions = (await session.execute(pos_stmt)).scalars().all()
 
     unrealized_pnl = 0.0
+    total_open_fees = 0.0
     positions_value = 0.0
     for pos in positions:
         price = pos.current_price or pos.entry_price
@@ -101,7 +104,8 @@ async def get_portfolio(
             pnl = (price - pos.entry_price) * pos.quantity
         else:
             pnl = (pos.entry_price - price) * pos.quantity
-        unrealized_pnl += pnl
+        unrealized_pnl += pnl - pos.total_fees
+        total_open_fees += pos.total_fees
         positions_value += price * pos.quantity
 
     total_value = portfolio.cash_balance + positions_value
@@ -112,6 +116,7 @@ async def get_portfolio(
         "name": portfolio.name,
         "starting_balance": portfolio.starting_balance,
         "cash_balance": portfolio.cash_balance,
+        "auto_trade": portfolio.auto_trade,
         "positions_value": round(positions_value, 2),
         "total_value": round(total_value, 2),
         "total_return_pct": round(total_return, 2),
@@ -119,6 +124,28 @@ async def get_portfolio(
         "open_positions": len(positions),
         "created_at": portfolio.created_at.isoformat(),
     }
+
+
+@router.patch("/portfolios/{portfolio_id}/auto-trade")
+async def toggle_auto_trade(
+    portfolio_id: UUID,
+    enabled: bool = True,
+    session: AsyncSession = Depends(get_session),
+    org_ctx: OrganizationContext = Depends(require_org_member),
+) -> dict:
+    """Toggle auto-trade on/off for a portfolio."""
+    stmt = select(PaperPortfolio).where(
+        PaperPortfolio.id == portfolio_id,
+        PaperPortfolio.organization_id == org_ctx.organization.id,
+    )
+    portfolio = (await session.execute(stmt)).scalar_one_or_none()
+    if not portfolio:
+        raise HTTPException(status_code=404, detail="Portfolio not found")
+
+    portfolio.auto_trade = enabled
+    portfolio.updated_at = utcnow()
+    await session.commit()
+    return {"id": str(portfolio.id), "auto_trade": portfolio.auto_trade}
 
 
 @router.get("/portfolios/{portfolio_id}/positions")
@@ -140,14 +167,20 @@ async def list_positions(
     for pos in positions:
         price = pos.current_price or pos.entry_price
         if pos.side == "long":
-            pnl = (price - pos.entry_price) * pos.quantity
+            raw_pnl = (price - pos.entry_price) * pos.quantity
         else:
-            pnl = (pos.entry_price - price) * pos.quantity
-        pnl_pct = ((price - pos.entry_price) / pos.entry_price * 100) if pos.entry_price else 0
+            raw_pnl = (pos.entry_price - price) * pos.quantity
+        # Net P&L includes fees for open positions, realized P&L already factored for closed
+        pnl = raw_pnl - pos.total_fees if pos.status == "open" else pos.pnl_realized
+        cost_basis = pos.entry_price * pos.quantity + pos.total_fees
+        pnl_pct = (raw_pnl - pos.total_fees) / cost_basis * 100 if cost_basis > 0 else 0
 
         out.append({
             "id": str(pos.id),
             "symbol": pos.symbol,
+            "company_name": pos.company_name,
+            "exchange": pos.exchange,
+            "sector": pos.sector,
             "asset_type": pos.asset_type,
             "side": pos.side,
             "quantity": pos.quantity,
@@ -155,11 +188,18 @@ async def list_positions(
             "current_price": price,
             "unrealized_pnl": round(pnl, 2),
             "pnl_pct": round(pnl_pct, 2),
+            "stop_loss": pos.stop_loss,
+            "take_profit": pos.take_profit,
+            "source_report": pos.source_report,
             "status": pos.status,
             "entry_date": pos.entry_date.isoformat(),
             "exit_date": pos.exit_date.isoformat() if pos.exit_date else None,
             "exit_price": pos.exit_price,
             "pnl_realized": pos.pnl_realized,
+            "total_fees": pos.total_fees,
+            "trade_count": pos.trade_count,
+            "hold_days": (((pos.exit_date or utcnow()).replace(tzinfo=None) - pos.entry_date.replace(tzinfo=None)).days) if pos.entry_date else 0,
+            "price_updated_at": pos.price_updated_at.isoformat() if pos.price_updated_at else None,
         })
     return out
 
@@ -176,6 +216,12 @@ async def execute_trade(
     price: float = 0.0,
     proposed_by: str = "manual",
     notes: str = "",
+    stop_loss: float | None = None,
+    take_profit: float | None = None,
+    company_name: str | None = None,
+    exchange: str | None = None,
+    sector: str | None = None,
+    source_report: str | None = None,
 ) -> dict:
     # Get portfolio
     stmt = select(PaperPortfolio).where(
@@ -187,7 +233,8 @@ async def execute_trade(
         raise HTTPException(status_code=404, detail="Portfolio not found")
 
     total = quantity * price
-    fees = total * 0.001  # 0.1% simulated commission
+    # Flat $9.99 per trade (realistic Canadian brokerage fee)
+    fees = 9.99
 
     if trade_type == "buy":
         if portfolio.cash_balance < total + fees:
@@ -212,6 +259,21 @@ async def execute_trade(
             position.quantity = new_total_qty
             position.current_price = price
             position.updated_at = utcnow()
+            # Update metadata if provided (don't overwrite with None)
+            if stop_loss is not None:
+                position.stop_loss = stop_loss
+            if take_profit is not None:
+                position.take_profit = take_profit
+            if company_name is not None:
+                position.company_name = company_name
+            if exchange is not None:
+                position.exchange = exchange
+            if sector is not None:
+                position.sector = sector
+            if source_report is not None:
+                position.source_report = source_report
+            position.total_fees += fees
+            position.trade_count += 1
         else:
             position = PaperPosition(
                 portfolio_id=portfolio_id,
@@ -221,6 +283,14 @@ async def execute_trade(
                 quantity=quantity,
                 entry_price=price,
                 current_price=price,
+                stop_loss=stop_loss,
+                take_profit=take_profit,
+                company_name=company_name,
+                exchange=exchange,
+                sector=sector,
+                source_report=source_report,
+                total_fees=fees,
+                trade_count=1,
             )
             session.add(position)
 
@@ -245,6 +315,8 @@ async def execute_trade(
         position.quantity -= quantity
         position.pnl_realized += realized_pnl
         position.current_price = price
+        position.total_fees += fees
+        position.trade_count += 1
         position.updated_at = utcnow()
 
         if position.quantity <= 0:
@@ -363,7 +435,7 @@ async def portfolio_summary(
     open_positions = (await session.execute(open_stmt)).scalars().all()
     positions_value = sum((p.current_price or p.entry_price) * p.quantity for p in open_positions)
     unrealized_pnl = sum(
-        ((p.current_price or p.entry_price) - p.entry_price) * p.quantity
+        ((p.current_price or p.entry_price) - p.entry_price) * p.quantity - p.total_fees
         for p in open_positions
     )
 
@@ -393,4 +465,131 @@ async def portfolio_summary(
             "symbol": worst_trade.symbol,
             "pnl": round(worst_trade.pnl_realized, 2),
         } if worst_trade else None,
+        "avg_win": round(
+            sum(p.pnl_realized for p in winners) / len(winners), 2
+        ) if winners else 0,
+        "avg_loss": round(
+            sum(p.pnl_realized for p in losers) / len(losers), 2
+        ) if losers else 0,
+        "largest_win": round(best_trade.pnl_realized, 2) if best_trade else 0,
+        "largest_loss": round(worst_trade.pnl_realized, 2) if worst_trade else 0,
+        "profit_factor": round(
+            abs(sum(p.pnl_realized for p in winners)) /
+            abs(sum(p.pnl_realized for p in losers)), 2
+        ) if losers and sum(p.pnl_realized for p in losers) != 0 else 0,
+        "total_fees": round(
+            sum(p.total_fees for p in closed) + sum(p.total_fees for p in open_positions), 2
+        ),
+        "avg_hold_days": round(
+            sum((((p.exit_date or utcnow()).replace(tzinfo=None) - p.entry_date.replace(tzinfo=None)).days) for p in closed) / len(closed), 1
+        ) if closed else 0,
     }
+
+
+@router.patch("/portfolios/{portfolio_id}/positions/{position_id}")
+async def update_position(
+    portfolio_id: UUID,
+    position_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    org_ctx: OrganizationContext = Depends(require_org_member),
+    current_price: float | None = None,
+    stop_loss: float | None = None,
+    take_profit: float | None = None,
+    company_name: str | None = None,
+    exchange: str | None = None,
+    sector: str | None = None,
+    source_report: str | None = None,
+) -> dict:
+    """Update position metadata — price, risk levels, or ticker info."""
+    stmt = select(PaperPosition).where(
+        PaperPosition.id == position_id,
+        PaperPosition.portfolio_id == portfolio_id,
+    )
+    position = (await session.execute(stmt)).scalar_one_or_none()
+    if not position:
+        raise HTTPException(status_code=404, detail="Position not found")
+
+    if current_price is not None:
+        position.current_price = current_price
+        position.price_updated_at = utcnow()
+    if stop_loss is not None:
+        position.stop_loss = stop_loss
+    if take_profit is not None:
+        position.take_profit = take_profit
+    if company_name is not None:
+        position.company_name = company_name
+    if exchange is not None:
+        position.exchange = exchange
+    if sector is not None:
+        position.sector = sector
+    if source_report is not None:
+        position.source_report = source_report
+    position.updated_at = utcnow()
+
+    await session.commit()
+    price = position.current_price or position.entry_price
+    pnl = (price - position.entry_price) * position.quantity if position.side == "long" else (position.entry_price - price) * position.quantity
+    return {
+        "id": str(position.id),
+        "symbol": position.symbol,
+        "current_price": price,
+        "stop_loss": position.stop_loss,
+        "take_profit": position.take_profit,
+        "unrealized_pnl": round(pnl, 2),
+        "status": position.status,
+    }
+
+
+@router.get("/portfolios/{portfolio_id}/equity-curve")
+async def equity_curve(
+    portfolio_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    org_ctx: OrganizationContext = Depends(require_org_member),
+) -> list[dict]:
+    """Daily equity curve: starting balance + cumulative realized P&L from trades."""
+    # Verify portfolio
+    stmt = select(PaperPortfolio).where(
+        PaperPortfolio.id == portfolio_id,
+        PaperPortfolio.organization_id == org_ctx.organization.id,
+    )
+    portfolio = (await session.execute(stmt)).scalar_one_or_none()
+    if not portfolio:
+        raise HTTPException(status_code=404, detail="Portfolio not found")
+
+    # Get all trades ordered by date
+    trade_stmt = (
+        select(PaperTrade)
+        .where(PaperTrade.portfolio_id == portfolio_id)
+        .order_by(PaperTrade.executed_at.asc())
+    )
+    trades = (await session.execute(trade_stmt)).scalars().all()
+
+    if not trades:
+        return []
+
+    # Group realized P&L by day
+    daily_pnl: dict[str, float] = defaultdict(float)
+    for t in trades:
+        day = t.executed_at.strftime("%Y-%m-%d")
+        if t.trade_type == "sell":
+            # Look up the position to get entry price for realized P&L
+            pos_stmt = select(PaperPosition).where(PaperPosition.id == t.position_id)
+            pos = (await session.execute(pos_stmt)).scalar_one_or_none()
+            if pos:
+                # Realized P&L for this sell
+                daily_pnl[day] += (t.price - pos.entry_price) * t.quantity
+        # For buys, no realized P&L
+
+    # Build cumulative equity curve
+    cumulative = 0.0
+    curve = []
+    for day in sorted(daily_pnl.keys()):
+        cumulative += daily_pnl[day]
+        curve.append({
+            "date": day,
+            "equity": round(portfolio.starting_balance + cumulative, 2),
+            "daily_pnl": round(daily_pnl[day], 2),
+            "cumulative_pnl": round(cumulative, 2),
+        })
+
+    return curve
