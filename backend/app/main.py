@@ -515,11 +515,26 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
     pool_task = asyncio.create_task(_update_pool_metrics())
 
+    # Background task: check budgets every 5 minutes.
+    async def _check_budgets_loop() -> None:
+        from app.services.budget_monitor import check_budgets
+
+        await asyncio.sleep(60)  # delay to let gateway connect
+        while True:
+            try:
+                await check_budgets()
+            except Exception:  # noqa: BLE001
+                logger.exception("budget_monitor.check_failed")
+            await asyncio.sleep(300)
+
+    budget_task = asyncio.create_task(_check_budgets_loop())
+
     logger.info("app.lifecycle.started")
     try:
         yield
     finally:
         pool_task.cancel()
+        budget_task.cancel()
         if listener_task and not listener_task.done():
             listener_task.cancel()
             try:

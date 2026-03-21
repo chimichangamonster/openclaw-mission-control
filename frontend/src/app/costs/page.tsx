@@ -107,6 +107,7 @@ export default function CostsPage() {
   const [activity, setActivity] = useState<ActivityData | null>(null);
   const [activityPeriod, setActivityPeriod] = useState<"daily" | "weekly" | "monthly">("daily");
   const [activityLoading, setActivityLoading] = useState(false);
+  const [budget, setBudget] = useState<any>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const loadActivity = useCallback(async (period: string) => {
@@ -151,6 +152,11 @@ export default function CostsPage() {
       const modelsRaw: any = await customFetch("/api/v1/cost-tracker/models?filter=configured", { method: "GET" }).catch(() => null);
       const modelsData = modelsRaw?.data ?? modelsRaw;
       if (modelsData?.models) setModels(modelsData.models as ModelInfo[]);
+
+      // Fetch budget status
+      const budgetRaw: any = await customFetch("/api/v1/cost-tracker/budget", { method: "GET" }).catch(() => null);
+      const budgetData = budgetRaw?.data ?? budgetRaw;
+      if (budgetData?.config) setBudget(budgetData);
 
       // Fetch per-model usage + historical activity
       await Promise.all([loadModelUsage(), loadActivity(activityPeriod)]);
@@ -267,6 +273,83 @@ export default function CostsPage() {
                   />
                 </div>
                 <p className="mt-1 text-xs text-slate-400">{usagePct.toFixed(0)}% used • resets {usage.limit_reset}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Budget Controls & Per-Agent Spend */}
+          {budget && (
+            <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+              <div className="border-b border-slate-100 px-4 py-3">
+                <h3 className="text-sm font-semibold text-slate-900">Budget Controls</h3>
+                <p className="text-xs text-slate-500">
+                  Monthly budget: ${budget.config.monthly_budget.toFixed(2)} • Alerts at {budget.config.alert_thresholds.join("%, ")}%
+                </p>
+              </div>
+              <div className="p-4 space-y-4">
+                {/* Monthly progress */}
+                <div>
+                  <div className="flex items-center justify-between text-sm mb-1.5">
+                    <span className="text-slate-600">
+                      Monthly Spend: <span className="font-semibold text-slate-900">${budget.status.monthly_total.toFixed(2)}</span> / ${budget.status.monthly_budget.toFixed(2)}
+                    </span>
+                    <span className={`text-xs font-medium ${
+                      budget.status.monthly_pct > 80 ? "text-red-600" :
+                      budget.status.monthly_pct > 50 ? "text-amber-600" : "text-emerald-600"
+                    }`}>
+                      {budget.status.monthly_pct.toFixed(0)}%
+                    </span>
+                  </div>
+                  <div className="h-2.5 w-full rounded-full bg-slate-100">
+                    <div
+                      className={`h-2.5 rounded-full transition-all ${
+                        budget.status.monthly_pct > 80 ? "bg-red-500" :
+                        budget.status.monthly_pct > 50 ? "bg-amber-500" : "bg-emerald-500"
+                      }`}
+                      style={{ width: `${Math.min(budget.status.monthly_pct, 100)}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between mt-1 text-[10px] text-slate-400">
+                    <span>Remaining: ${budget.status.remaining.toFixed(2)}</span>
+                    <span>Projected: ${budget.status.projected_month_end.toFixed(2)}</span>
+                    <span>Avg: ${budget.status.daily_avg.toFixed(2)}/day</span>
+                  </div>
+                </div>
+
+                {/* Per-agent daily spend */}
+                {budget.agent_today.length > 0 && (
+                  <div>
+                    <h4 className="text-xs font-semibold text-slate-700 mb-2">Agent Spend Today</h4>
+                    <div className="space-y-2">
+                      {budget.agent_today.map((a: any) => {
+                        const limit = a.limit || 0;
+                        const pct = limit > 0 ? (a.cost / limit) * 100 : 0;
+                        return (
+                          <div key={a.agent} className="flex items-center gap-3">
+                            <span className="text-xs font-medium text-slate-700 w-28 truncate">{a.agent}</span>
+                            <div className="flex-1">
+                              <div className="h-2 w-full rounded-full bg-slate-100">
+                                <div
+                                  className={`h-2 rounded-full transition-all ${
+                                    a.exceeded ? "bg-red-500" :
+                                    pct > 80 ? "bg-amber-500" : "bg-emerald-500"
+                                  }`}
+                                  style={{ width: `${Math.min(pct, 100)}%` }}
+                                />
+                              </div>
+                            </div>
+                            <span className={`text-xs font-mono w-24 text-right ${a.exceeded ? "text-red-600 font-semibold" : "text-slate-500"}`}>
+                              ${a.cost.toFixed(4)}{limit > 0 ? ` / $${limit.toFixed(2)}` : ""}
+                            </span>
+                            {a.exceeded && (
+                              <span className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700">EXCEEDED</span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}

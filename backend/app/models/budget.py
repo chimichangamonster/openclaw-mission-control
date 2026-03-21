@@ -1,0 +1,67 @@
+"""Budget configuration and daily agent spend tracking."""
+
+from __future__ import annotations
+
+import json
+import datetime as _dt
+from datetime import date as _date_type
+from datetime import datetime
+from uuid import UUID, uuid4
+
+from sqlalchemy import Column, UniqueConstraint
+from sqlalchemy.types import JSON
+from sqlmodel import Field
+
+from app.core.time import utcnow
+from app.models.base import QueryModel
+
+
+class BudgetConfig(QueryModel, table=True):
+    """Platform-level budget configuration (single row)."""
+
+    __tablename__ = "budget_configs"  # pyright: ignore[reportAssignmentType]
+
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    monthly_budget: float = Field(default=25.0)
+    alert_thresholds_json: str = Field(default="[50, 80, 95]")
+    agent_daily_limits_json: str = Field(
+        default='{"the-claw": 2.0, "market-scout": 1.0, "sports-analyst": 2.0, "stock-analyst": 1.5}'
+    )
+    throttle_to_tier1_on_exceed: bool = Field(default=True)
+    alerts_enabled: bool = Field(default=True)
+    last_alert_month: str = Field(default="")
+    last_alert_thresholds_hit_json: str = Field(default="[]")
+    updated_at: datetime = Field(default_factory=utcnow)
+
+    @property
+    def alert_thresholds(self) -> list[int]:
+        return json.loads(self.alert_thresholds_json)
+
+    @property
+    def agent_daily_limits(self) -> dict[str, float]:
+        return json.loads(self.agent_daily_limits_json)
+
+    @property
+    def last_alert_thresholds_hit(self) -> list[int]:
+        return json.loads(self.last_alert_thresholds_hit_json)
+
+
+class DailyAgentSpend(QueryModel, table=True):
+    """Per-agent daily spend snapshot."""
+
+    __tablename__ = "daily_agent_spends"  # pyright: ignore[reportAssignmentType]
+    __table_args__ = (UniqueConstraint("agent_name", "date", name="uq_agent_date"),)
+
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    agent_name: str = Field(index=True)
+    date: _date_type = Field(index=True)
+    input_tokens: int = Field(default=0)
+    output_tokens: int = Field(default=0)
+    estimated_cost: float = Field(default=0.0)
+    model_breakdown_json: str = Field(default="{}")
+    session_count: int = Field(default=0)
+    created_at: datetime = Field(default_factory=utcnow)
+
+    @property
+    def model_breakdown(self) -> dict[str, float]:
+        return json.loads(self.model_breakdown_json)

@@ -11,6 +11,7 @@ from app.models.board_onboarding import BoardOnboardingSession
 from app.models.board_webhook_payloads import BoardWebhookPayload
 from app.models.board_webhooks import BoardWebhook
 from app.models.boards import Board
+from app.models.budget import BudgetConfig, DailyAgentSpend
 from app.models.crypto_positions import CryptoPosition
 from app.models.crypto_trade_proposals import CryptoTradeProposal
 from app.models.email_accounts import EmailAccount
@@ -56,6 +57,8 @@ __all__ = [
     "BoardOnboardingSession",
     "BoardGroup",
     "Board",
+    "BudgetConfig",
+    "DailyAgentSpend",
     "CryptoPosition",
     "CryptoTradeProposal",
     "EmailAccount",

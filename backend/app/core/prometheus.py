@@ -15,6 +15,16 @@ gateway_listener_connected = Gauge(
     "Whether the gateway WebSocket listener is connected (1=yes, 0=no)",
 )
 
+agent_daily_spend = Gauge(
+    "mc_agent_daily_spend_dollars",
+    "Estimated daily spend per agent in USD",
+    ["agent"],
+)
+monthly_budget_pct = Gauge(
+    "mc_monthly_budget_pct_used",
+    "Percentage of monthly budget consumed",
+)
+
 instrumentator = Instrumentator(
     should_group_status_codes=False,
     should_ignore_untemplated=True,

@@ -1,15 +1,23 @@
-"""Cost tracking endpoints — OpenRouter usage, live model pricing, gateway session data."""
+"""Cost tracking endpoints — OpenRouter usage, live model pricing, gateway session data, budget controls."""
 
 from __future__ import annotations
 
+import json
 import time
+from datetime import date, datetime, UTC
 
 import httpx
 from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel
+from sqlmodel import select
+from sqlalchemy import text
 
 from app.api.deps import ORG_MEMBER_DEP
 from app.core.config import settings
 from app.core.logging import get_logger
+from app.core.time import utcnow
+from app.db.session import async_session_maker
+from app.models.budget import BudgetConfig, DailyAgentSpend
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/cost-tracker", tags=["cost-tracker"])
@@ -405,4 +413,155 @@ def _build_activity_response(rows: list, period: str) -> dict:
         "periods": periods_out,
         "model_totals": totals_out,
         "grand_total": round(grand_total, 6),
+    }
+
+
+# ─── Budget Controls ────────────────────────────────────────────────────────
+
+
+class BudgetConfigUpdate(BaseModel):
+    monthly_budget: float | None = None
+    alert_thresholds: list[int] | None = None
+    agent_daily_limits: dict[str, float] | None = None
+    throttle_to_tier1_on_exceed: bool | None = None
+    alerts_enabled: bool | None = None
+
+
+@router.get("/budget", dependencies=[ORG_MEMBER_DEP])
+async def get_budget():
+    """Get budget config, current month spend, and per-agent daily spend."""
+    async with async_session_maker() as session:
+        result = await session.execute(select(BudgetConfig).limit(1))
+        config = result.scalars().first()
+
+    if not config:
+        config = BudgetConfig()
+
+    current_month = datetime.now(UTC).strftime("%Y-%m")
+    today = date.today()
+
+    async with async_session_maker() as session:
+        # Monthly total
+        result = await session.execute(
+            text(
+                "SELECT COALESCE(SUM(estimated_cost), 0) FROM daily_agent_spends "
+                "WHERE date >= :month_start"
+            ),
+            {"month_start": f"{current_month}-01"},
+        )
+        monthly_total = float(result.scalar() or 0)
+
+        # Per-agent today
+        result = await session.execute(
+            select(DailyAgentSpend).where(DailyAgentSpend.date == today)
+        )
+        today_spends = result.scalars().all()
+
+    # Days elapsed this month
+    days_elapsed = max(today.day, 1)
+    daily_avg = monthly_total / days_elapsed if days_elapsed > 0 else 0
+
+    # Projected month-end
+    import calendar
+    days_in_month = calendar.monthrange(today.year, today.month)[1]
+    projected = daily_avg * days_in_month
+
+    agent_today = [
+        {
+            "agent": s.agent_name,
+            "cost": round(s.estimated_cost, 6),
+            "tokens": s.input_tokens + s.output_tokens,
+            "limit": config.agent_daily_limits.get(s.agent_name),
+            "exceeded": (
+                s.estimated_cost > config.agent_daily_limits.get(s.agent_name, float("inf"))
+            ),
+            "models": s.model_breakdown,
+        }
+        for s in today_spends
+    ]
+
+    return {
+        "config": {
+            "monthly_budget": config.monthly_budget,
+            "alert_thresholds": config.alert_thresholds,
+            "agent_daily_limits": config.agent_daily_limits,
+            "throttle_to_tier1_on_exceed": config.throttle_to_tier1_on_exceed,
+            "alerts_enabled": config.alerts_enabled,
+        },
+        "status": {
+            "monthly_total": round(monthly_total, 4),
+            "monthly_budget": config.monthly_budget,
+            "monthly_pct": round((monthly_total / config.monthly_budget * 100) if config.monthly_budget > 0 else 0, 1),
+            "remaining": round(config.monthly_budget - monthly_total, 4),
+            "projected_month_end": round(projected, 4),
+            "daily_avg": round(daily_avg, 4),
+        },
+        "agent_today": sorted(agent_today, key=lambda x: -x["cost"]),
+    }
+
+
+@router.put("/budget", dependencies=[ORG_MEMBER_DEP])
+async def update_budget(payload: BudgetConfigUpdate):
+    """Update budget configuration."""
+    async with async_session_maker() as session:
+        result = await session.execute(select(BudgetConfig).limit(1))
+        config = result.scalars().first()
+
+        if not config:
+            from uuid import uuid4
+            config = BudgetConfig(id=uuid4(), updated_at=utcnow())
+            session.add(config)
+
+        if payload.monthly_budget is not None:
+            config.monthly_budget = payload.monthly_budget
+            # Reset threshold tracking on budget change
+            config.last_alert_thresholds_hit_json = "[]"
+        if payload.alert_thresholds is not None:
+            config.alert_thresholds_json = json.dumps(payload.alert_thresholds)
+        if payload.agent_daily_limits is not None:
+            config.agent_daily_limits_json = json.dumps(payload.agent_daily_limits)
+        if payload.throttle_to_tier1_on_exceed is not None:
+            config.throttle_to_tier1_on_exceed = payload.throttle_to_tier1_on_exceed
+        if payload.alerts_enabled is not None:
+            config.alerts_enabled = payload.alerts_enabled
+        config.updated_at = utcnow()
+
+        await session.commit()
+
+    return {"ok": True}
+
+
+@router.get("/agent-spend", dependencies=[ORG_MEMBER_DEP])
+async def get_agent_spend(
+    days: int = Query(30, description="Lookback days"),
+    agent: str | None = Query(None, description="Filter by agent name"),
+):
+    """Get historical per-agent spend."""
+    async with async_session_maker() as session:
+        stmt = select(DailyAgentSpend).where(
+            DailyAgentSpend.date >= text(f"CURRENT_DATE - INTERVAL '{days} days'")
+        )
+        if agent:
+            stmt = stmt.where(DailyAgentSpend.agent_name == agent)
+        stmt = stmt.order_by(DailyAgentSpend.date.desc())  # type: ignore[union-attr]
+
+        result = await session.execute(stmt)
+        rows = result.scalars().all()
+
+    return {
+        "days": days,
+        "agent_filter": agent,
+        "spends": [
+            {
+                "agent": r.agent_name,
+                "date": r.date.isoformat(),
+                "cost": round(r.estimated_cost, 6),
+                "input_tokens": r.input_tokens,
+                "output_tokens": r.output_tokens,
+                "tokens": r.input_tokens + r.output_tokens,
+                "models": r.model_breakdown,
+                "sessions": r.session_count,
+            }
+            for r in rows
+        ],
     }
