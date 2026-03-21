@@ -634,6 +634,62 @@ def readyz() -> HealthStatusResponse:
     return HealthStatusResponse(ok=True)
 
 
+@app.get("/status", tags=["health"], summary="Dependency Health Status")
+async def dependency_status():
+    """Check health of all external dependencies with circuit breaker state."""
+    from app.core.resilience import gateway_rpc_breaker, openrouter_breaker
+    from app.core.prometheus import gateway_listener_connected
+
+    checks: dict[str, dict] = {}
+
+    # PostgreSQL
+    try:
+        from app.db.session import async_engine
+        async with async_engine.connect() as conn:
+            await conn.execute(__import__("sqlalchemy").text("SELECT 1"))
+        checks["postgresql"] = {"status": "ok"}
+    except Exception as exc:
+        checks["postgresql"] = {"status": "error", "error": str(exc)[:100]}
+
+    # Redis
+    try:
+        import redis as redis_lib
+        r = redis_lib.Redis.from_url(settings.rate_limit_redis_url or "redis://redis:6379", socket_timeout=2)
+        r.ping()
+        checks["redis"] = {"status": "ok"}
+    except Exception as exc:
+        checks["redis"] = {"status": "error", "error": str(exc)[:100]}
+
+    # Gateway WebSocket listener
+    try:
+        gw_connected = gateway_listener_connected._value.get()  # type: ignore[union-attr]
+        checks["gateway_listener"] = {
+            "status": "ok" if gw_connected == 1 else "disconnected",
+        }
+    except Exception:
+        checks["gateway_listener"] = {"status": "unknown"}
+
+    # Circuit breakers
+    checks["circuit_breakers"] = {
+        "openrouter": {
+            "state": openrouter_breaker.state,
+            "failures": openrouter_breaker._failure_count,
+        },
+        "gateway_rpc": {
+            "state": gateway_rpc_breaker.state,
+            "failures": gateway_rpc_breaker._failure_count,
+        },
+    }
+
+    all_ok = all(
+        c.get("status") == "ok"
+        for k, c in checks.items()
+        if k != "circuit_breakers"
+    )
+
+    return {"ok": all_ok, "dependencies": checks}
+
+
 api_v1 = APIRouter(prefix="/api/v1")
 api_v1.include_router(auth_router)
 api_v1.include_router(agent_router)

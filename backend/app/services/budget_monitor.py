@@ -11,6 +11,7 @@ from sqlmodel import select
 
 from app.api.cost_tracker import _get_model_price, _classify_tier
 from app.core.logging import get_logger
+from app.core.resilience import gateway_rpc_breaker, retry_async
 from app.core.time import utcnow
 from app.db.session import async_session_maker
 from app.models.budget import BudgetConfig, DailyAgentSpend
@@ -58,7 +59,15 @@ async def _aggregate_agent_spend(config: GatewayConfig) -> dict[str, dict]:
         _session_max_date = today
 
     try:
-        sessions_data = await openclaw_call("sessions.list", config=config)
+        sessions_data = await retry_async(
+            openclaw_call,
+            "sessions.list",
+            config=config,
+            retries=2,
+            base_delay=3.0,
+            breaker=gateway_rpc_breaker,
+            label="budget_monitor.sessions",
+        )
     except Exception:
         logger.warning("budget_monitor.sessions_rpc_failed")
         return {}

@@ -15,6 +15,7 @@ from sqlalchemy import text
 from app.api.deps import ORG_MEMBER_DEP
 from app.core.config import settings
 from app.core.logging import get_logger
+from app.core.resilience import openrouter_breaker, retry_async
 from app.core.time import utcnow
 from app.db.session import async_session_maker
 from app.models.budget import BudgetConfig, DailyAgentSpend
@@ -27,6 +28,24 @@ _pricing_cache: dict | None = None
 _pricing_cache_ts: float = 0
 
 
+async def _openrouter_get(url: str, api_key: str) -> dict:
+    """Fetch from OpenRouter with retry and circuit breaker."""
+    async def _fetch() -> dict:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(url, headers={"Authorization": f"Bearer {api_key}"})
+            if resp.status_code != 200:
+                raise httpx.HTTPStatusError(
+                    f"OpenRouter returned {resp.status_code}",
+                    request=resp.request,
+                    response=resp,
+                )
+            return resp.json()
+
+    return await retry_async(
+        _fetch, retries=3, base_delay=2.0, breaker=openrouter_breaker, label="openrouter"
+    )
+
+
 @router.get("/usage", dependencies=[ORG_MEMBER_DEP])
 async def get_usage():
     """Get OpenRouter usage and budget data."""
@@ -34,18 +53,17 @@ async def get_usage():
     if not api_key:
         return {"error": "OpenRouter API key not configured"}
 
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        key_resp = await client.get(
-            "https://openrouter.ai/api/v1/auth/key",
-            headers={"Authorization": f"Bearer {api_key}"},
-        )
-        key_data = key_resp.json().get("data", {}) if key_resp.status_code == 200 else {}
+    try:
+        key_result = await _openrouter_get("https://openrouter.ai/api/v1/auth/key", api_key)
+        key_data = key_result.get("data", {})
+    except Exception:
+        key_data = {}
 
-        credits_resp = await client.get(
-            "https://openrouter.ai/api/v1/credits",
-            headers={"Authorization": f"Bearer {api_key}"},
-        )
-        credits_data = credits_resp.json().get("data", {}) if credits_resp.status_code == 200 else {}
+    try:
+        credits_result = await _openrouter_get("https://openrouter.ai/api/v1/credits", api_key)
+        credits_data = credits_result.get("data", {})
+    except Exception:
+        credits_data = {}
 
     total_credits = credits_data.get("total_credits", 0)
     total_usage = credits_data.get("total_usage", 0)
