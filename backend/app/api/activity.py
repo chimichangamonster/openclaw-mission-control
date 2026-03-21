@@ -389,3 +389,38 @@ async def stream_task_comment_feed(
             await asyncio.sleep(STREAM_POLL_SECONDS)
 
     return EventSourceResponse(event_generator(), ping=15)
+
+
+# ---------------------------------------------------------------------------
+# Live activity stream (real-time gateway events via in-memory broadcast)
+# ---------------------------------------------------------------------------
+
+@router.get("/live/stream")
+async def stream_live_activity(
+    request: Request,
+    token: str | None = Query(default=None),
+    _ctx: OrganizationContext = ORG_MEMBER_DEP,
+) -> EventSourceResponse:
+    """Stream real-time gateway events via SSE.
+
+    Events are pushed from the in-memory broadcast hub populated by
+    the persistent gateway event listener.
+    """
+    from app.services.openclaw.event_broadcast import broadcast as hub
+
+    queue = hub.subscribe()
+
+    async def event_generator() -> AsyncIterator[dict[str, str]]:
+        try:
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    event = await asyncio.wait_for(queue.get(), timeout=1.0)
+                    yield {"event": "activity", "data": json.dumps(event.to_dict())}
+                except TimeoutError:
+                    continue
+        finally:
+            hub.unsubscribe(queue)
+
+    return EventSourceResponse(event_generator(), ping=15)

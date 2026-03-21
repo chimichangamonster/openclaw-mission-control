@@ -12,6 +12,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.api.deps import get_session, require_org_member
 from app.core.logging import get_logger
 from app.core.time import utcnow
+from app.services.notifications import notify
 from app.models.paper_trading import PaperPortfolio, PaperPosition, PaperTrade
 from app.services.organizations import OrganizationContext
 
@@ -349,6 +350,20 @@ async def execute_trade(
     portfolio.updated_at = utcnow()
 
     await session.commit()
+
+    # Notify #notifications channel
+    emoji = "📈" if trade_type == "buy" else "📉"
+    sl_str = f"Stop-loss: ${stop_loss:.2f} | " if stop_loss else ""
+    tp_str = f"Take-profit: ${take_profit:.2f}" if take_profit else ""
+    await notify(
+        session,
+        f"{emoji} TRADE EXECUTED\n\n"
+        f"{trade_type.upper()} {quantity:.0f} {symbol} @ ${price:.2f}\n"
+        f"Total: ${total:.2f} + ${fees:.2f} fee\n"
+        f"{sl_str}{tp_str}\n"
+        f"Cash remaining: ${portfolio.cash_balance:.2f}",
+    )
+
     return {
         "trade_id": str(trade.id),
         "symbol": symbol,

@@ -38,6 +38,7 @@ from app.services.approval_task_links import (
     replace_approval_task_links,
     task_counts_for_board,
 )
+from app.services.notifications import notify
 from app.services.openclaw.gateway_dispatch import GatewayDispatchService
 
 if TYPE_CHECKING:
@@ -428,6 +429,28 @@ async def create_approval(
     await session.commit()
     await session.refresh(approval)
     title_by_id = await _task_titles_by_id(session, task_ids=set(task_ids))
+
+    # Notify #notifications channel for pending approvals.
+    if approval.status == "pending":
+        reason = ""
+        if isinstance(payload.payload, dict):
+            reason = payload.payload.get("reason", "") or payload.payload.get("description", "")
+        agent_name = "Unknown"
+        if payload.agent_id:
+            agent = await session.get(Agent, payload.agent_id)
+            if agent:
+                agent_name = agent.name
+        await notify(
+            session,
+            f"🔔 APPROVAL NEEDED\n\n"
+            f"Action: {approval.action_type}\n"
+            f"Agent: {agent_name}\n"
+            f"Board: {board.name}\n"
+            f"Confidence: {approval.confidence}%\n\n"
+            f"{reason}\n\n"
+            f'Reply: "approve {approval.id}" or "reject {approval.id}"',
+        )
+
     return _approval_to_read(
         approval,
         task_ids=task_ids,

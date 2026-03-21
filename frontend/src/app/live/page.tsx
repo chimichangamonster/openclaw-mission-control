@@ -29,9 +29,21 @@ interface ActivityEvent {
   agent: string;
   channel: string;
   model: string;
-  type: "active" | "idle" | "heartbeat" | "new_session";
+  type: "active" | "idle" | "heartbeat" | "new_session" | "thinking" | "tool_call" | "responded" | "cron" | "approval" | "gateway";
   message: string;
+  fullMessage?: string;
   tokenDelta: number;
+}
+
+interface LiveSSEEvent {
+  id: string;
+  event_type: string;
+  agent_name: string;
+  channel: string;
+  message: string;
+  model: string;
+  metadata: Record<string, unknown>;
+  timestamp: string;
 }
 
 function timeAgo(ts: number): string {
@@ -47,6 +59,7 @@ function agentColor(agent: string): string {
   if (agent.includes("market-scout")) return "bg-purple-500";
   if (agent.includes("sports-analyst")) return "bg-emerald-500";
   if (agent.includes("stock-analyst")) return "bg-amber-500";
+  if (agent.includes("notification")) return "bg-rose-500";
   if (agent.includes("lead") || agent.includes("gateway")) return "bg-slate-400";
   return "bg-slate-500";
 }
@@ -64,6 +77,7 @@ function agentName(agent: string): string {
   if (agent.includes("market-scout")) return "Market Scout";
   if (agent.includes("sports-analyst")) return "Sports Analyst";
   if (agent.includes("stock-analyst")) return "Stock Analyst";
+  if (agent.includes("notification")) return "Notifications";
   if (agent.includes("lead")) return "Lead Agent";
   if (agent.includes("mc-gateway")) return "Gateway Agent";
   return agent;
@@ -75,8 +89,57 @@ export default function LivePage() {
   const [events, setEvents] = useState<ActivityEvent[]>([]);
   const [connected, setConnected] = useState(false);
   const [lastPoll, setLastPoll] = useState(0);
+  const [expandedEvents, setExpandedEvents] = useState<Set<string>>(new Set());
   const prevSessionsRef = useRef<Map<string, AgentSession>>(new Map());
   const eventIdRef = useRef(0);
+
+  // SSE stream for real-time gateway events
+  const sseRef = useRef<EventSource | null>(null);
+  useEffect(() => {
+    if (!isSignedIn) return;
+    const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") || "" : "";
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || "";
+    const url = `${baseUrl}/api/v1/activity/live/stream?token=${encodeURIComponent(token)}`;
+    const es = new EventSource(url);
+    sseRef.current = es;
+
+    es.addEventListener("activity", (e) => {
+      try {
+        const data: LiveSSEEvent = JSON.parse(e.data);
+        const eventType = data.event_type || "";
+        let type: ActivityEvent["type"] = "active";
+        if (eventType.includes("thinking")) type = "thinking";
+        else if (eventType.includes("tool_call")) type = "tool_call";
+        else if (eventType.includes("responded") || eventType.includes("completed")) type = "responded";
+        else if (eventType.includes("cron")) type = "cron";
+        else if (eventType.includes("approval")) type = "approval";
+        else if (eventType.includes("gateway") || eventType.includes("disconnect") || eventType.includes("connect")) type = "gateway";
+        else if (eventType.includes("message_received")) type = "active";
+        else if (eventType.includes("presence")) type = "idle";
+
+        const newEvent: ActivityEvent = {
+          id: data.id || String(eventIdRef.current++),
+          timestamp: data.timestamp ? new Date(data.timestamp).getTime() : Date.now(),
+          agent: data.agent_name || "unknown",
+          channel: data.channel || "",
+          model: data.model || "",
+          type,
+          message: data.message || eventType,
+          tokenDelta: 0,
+        };
+        setEvents((prev) => [newEvent, ...prev].slice(0, 100));
+      } catch { /* ignore parse errors */ }
+    });
+
+    es.onerror = () => {
+      // EventSource auto-reconnects
+    };
+
+    return () => {
+      es.close();
+      sseRef.current = null;
+    };
+  }, [isSignedIn]);
 
   const poll = useCallback(async () => {
     try {
@@ -128,6 +191,34 @@ export default function LivePage() {
         } else if (session.totalTokens !== prev.totalTokens) {
           const delta = session.totalTokens - prev.totalTokens;
           const isActive = Date.now() - session.updatedAt < 30000;
+
+          // Fetch latest chat content (zero LLM cost — just reads session log)
+          let chatMsg = "";
+          let chatFull = "";
+          try {
+            const historyRaw: any = await customFetch(
+              `/api/v1/gateways/sessions/${encodeURIComponent(session.key)}/history?board_id=${boardId}&limit=2`,
+              { method: "GET" }
+            );
+            const history = historyRaw?.data ?? historyRaw;
+            const messages = Array.isArray(history) ? history : (history?.messages || history?.history || []);
+            for (let i = messages.length - 1; i >= 0; i--) {
+              const m = messages[i];
+              const role = m?.role || "";
+              let content = m?.content || m?.text || "";
+              if (Array.isArray(content)) {
+                content = content.filter((p: any) => p?.type === "text").map((p: any) => p?.text || "").join(" ");
+              }
+              if (typeof content === "string" && content.trim()) {
+                const full = content.trim();
+                const prefix = (role === "assistant" || role === "model") ? "💬" : "📩";
+                chatFull = `${prefix} ${full}`;
+                chatMsg = full.length > 500 ? `${prefix} ${full.slice(0, 500)}...` : chatFull;
+                break;
+              }
+            }
+          } catch { /* ignore — chat history is best-effort */ }
+
           newEvents.push({
             id: String(eventIdRef.current++),
             timestamp: session.updatedAt,
@@ -135,9 +226,10 @@ export default function LivePage() {
             channel: session.channel,
             model: session.model,
             type: isActive ? "active" : "idle",
-            message: isActive
+            message: chatMsg || (isActive
               ? `Processing in ${session.channel} (+${delta.toLocaleString()} tokens)`
-              : `Completed task in ${session.channel}`,
+              : `Completed task in ${session.channel}`),
+            fullMessage: chatFull && chatFull !== chatMsg ? chatFull : undefined,
             tokenDelta: delta,
           });
         }
@@ -274,7 +366,7 @@ export default function LivePage() {
         <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-100 px-4 py-3">
             <h3 className="text-sm font-semibold text-slate-900">Activity Timeline</h3>
-            <p className="text-xs text-slate-500">Real-time agent events — detects token changes every 3 seconds</p>
+            <p className="text-xs text-slate-500">Real-time gateway events via SSE + session polling</p>
           </div>
           <div className="max-h-[500px] overflow-y-auto">
             {events.length === 0 ? (
@@ -312,19 +404,56 @@ export default function LivePage() {
                         <span className={cn(
                           "rounded-full px-1.5 py-0.5 text-[10px] font-semibold tracking-wide",
                           event.type === "active" ? "bg-blue-100 text-blue-700" :
+                          event.type === "thinking" ? "bg-yellow-100 text-yellow-700" :
+                          event.type === "tool_call" ? "bg-orange-100 text-orange-700" :
+                          event.type === "responded" ? "bg-emerald-100 text-emerald-700" :
+                          event.type === "cron" ? "bg-indigo-100 text-indigo-700" :
+                          event.type === "approval" ? "bg-pink-100 text-pink-700" :
+                          event.type === "gateway" ? "bg-slate-200 text-slate-600" :
                           event.type === "new_session" ? "bg-purple-100 text-purple-700" :
                           event.type === "idle" ? "bg-emerald-100 text-emerald-700" :
                           "bg-slate-100 text-slate-500"
                         )}>
                           {event.type === "active" ? "WORKING" :
+                           event.type === "thinking" ? "THINKING" :
+                           event.type === "tool_call" ? "TOOL CALL" :
+                           event.type === "responded" ? "RESPONDED" :
+                           event.type === "cron" ? "CRON" :
+                           event.type === "approval" ? "APPROVAL" :
+                           event.type === "gateway" ? "GATEWAY" :
                            event.type === "new_session" ? "NEW SESSION" :
-                           event.type === "idle" ? "COMPLETED" : "HEARTBEAT"}
+                           event.type === "idle" ? "COMPLETED" : "EVENT"}
                         </span>
                         <span className="text-[10px] text-slate-400">
                           {new Date(event.timestamp).toLocaleTimeString()}
                         </span>
                       </div>
-                      <p className="mt-0.5 text-xs text-slate-600">{event.message}</p>
+                      <div
+                        className={cn(
+                          "mt-0.5 text-xs text-slate-600",
+                          event.fullMessage ? "cursor-pointer hover:text-slate-900" : "",
+                        )}
+                        onClick={() => {
+                          if (!event.fullMessage) return;
+                          setExpandedEvents((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(event.id)) next.delete(event.id);
+                            else next.add(event.id);
+                            return next;
+                          });
+                        }}
+                      >
+                        <p className="whitespace-pre-wrap">
+                          {expandedEvents.has(event.id) && event.fullMessage
+                            ? event.fullMessage
+                            : event.message}
+                        </p>
+                        {event.fullMessage && (
+                          <span className="text-[10px] text-blue-500 hover:underline">
+                            {expandedEvents.has(event.id) ? "collapse" : "expand full message"}
+                          </span>
+                        )}
+                      </div>
                       <div className="mt-1 flex items-center gap-3 text-[10px] text-slate-400">
                         <span className="font-mono">{event.model}</span>
                         {event.tokenDelta > 0 && (

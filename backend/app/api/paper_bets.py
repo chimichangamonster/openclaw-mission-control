@@ -11,6 +11,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.api.deps import get_session, require_org_member
 from app.core.logging import get_logger
 from app.core.time import utcnow
+from app.services.notifications import notify
 from app.models.paper_bets import PaperBet
 from app.models.paper_trading import PaperPortfolio
 from app.services.organizations import OrganizationContext
@@ -207,6 +208,17 @@ async def resolve_bet(
     session.add(bet)
     session.add(portfolio)
     await session.commit()
+
+    # Notify #notifications channel
+    emoji = {"won": "✅", "lost": "❌", "push": "↩️", "void": "🚫"}.get(result, "🎲")
+    pnl_str = f"+${bet.pnl:.2f}" if bet.pnl >= 0 else f"-${abs(bet.pnl):.2f}"
+    await notify(
+        session,
+        f"{emoji} BET RESOLVED\n\n"
+        f"{bet.game}: {bet.selection} — {result.upper()}\n"
+        f"Odds: {bet.odds:+d} | Stake: ${bet.stake:.2f} | P&L: {pnl_str}\n"
+        f"Bankroll: ${portfolio.cash_balance:.2f}",
+    )
 
     return {
         "bet_id": str(bet.id),
