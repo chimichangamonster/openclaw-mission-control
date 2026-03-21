@@ -18,6 +18,7 @@ from app.core.logging import get_logger
 from app.core.resilience import openrouter_breaker, retry_async
 from app.core.time import utcnow
 from app.db.session import async_session_maker
+from app.models.activity_events import ActivityEvent
 from app.models.budget import BudgetConfig, DailyAgentSpend
 
 logger = get_logger(__name__)
@@ -583,3 +584,31 @@ async def get_agent_spend(
             for r in rows
         ],
     }
+
+
+@router.get("/errors", dependencies=[ORG_MEMBER_DEP])
+async def get_error_log(
+    limit: int = Query(20, description="Max errors to return"),
+):
+    """Get recent system errors from activity events."""
+    from sqlalchemy import desc as sa_desc
+
+    async with async_session_maker() as session:
+        stmt = (
+            select(ActivityEvent)
+            .where(ActivityEvent.event_type.startswith("system.error"))  # type: ignore[union-attr]
+            .order_by(sa_desc(ActivityEvent.created_at))
+            .limit(min(limit, 100))
+        )
+        result = await session.execute(stmt)
+        rows = result.scalars().all()
+
+    return [
+        {
+            "id": str(r.id),
+            "event_type": r.event_type,
+            "message": r.message,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        }
+        for r in rows
+    ]

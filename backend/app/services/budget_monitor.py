@@ -13,6 +13,7 @@ from app.api.cost_tracker import _get_model_price, _classify_tier
 from app.core.logging import get_logger
 from app.core.resilience import gateway_rpc_breaker, retry_async
 from app.core.time import utcnow
+from app.services.error_tracker import track_error
 from app.db.session import async_session_maker
 from app.models.budget import BudgetConfig, DailyAgentSpend
 from app.models.gateways import Gateway
@@ -68,8 +69,9 @@ async def _aggregate_agent_spend(config: GatewayConfig) -> dict[str, dict]:
             breaker=gateway_rpc_breaker,
             label="budget_monitor.sessions",
         )
-    except Exception:
+    except Exception as exc:
         logger.warning("budget_monitor.sessions_rpc_failed")
+        await track_error("budget_monitor", f"Failed to fetch gateway sessions: {str(exc)[:200]}")
         return {}
 
     raw_sessions = (
@@ -239,9 +241,10 @@ async def _check_thresholds(
             recommendation = "\n\nRecommendation: Throttle exceeded agents to Tier 1 models for remaining tasks today."
         alerts.append(header + body + recommendation)
 
-    # Send alerts
+    # Send alerts and persist to error tracker
     for alert in alerts:
         await _send_discord_alert(gw_config, alert)
+        await track_error("budget", alert[:500], severity="warning")
 
     # Persist updated thresholds
     if alerts:

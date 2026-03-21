@@ -182,6 +182,10 @@ export default function LivePage() {
   const [cronJobs, setCronJobs] = useState<CronJob[]>([]);
   const [cronLoading, setCronLoading] = useState(true);
 
+  // Error log
+  const [errorEvents, setErrorEvents] = useState<any[]>([]);
+  const [showErrors, setShowErrors] = useState(false);
+
   // ─── SSE stream ──────────────────────────────────────────────────────────
 
   const sseRef = useRef<EventSource | null>(null);
@@ -366,15 +370,30 @@ export default function LivePage() {
     }
   }, []);
 
+  // ─── Load error events ─────────────────────────────────────────────────
+
+  const loadErrors = useCallback(async () => {
+    try {
+      const res: any = await customFetch("/api/v1/cost-tracker/errors?limit=20", { method: "GET" });
+      const data = res?.data ?? res;
+      const items = Array.isArray(data) ? data : [];
+      setErrorEvents(items);
+    } catch {
+      setErrorEvents([]);
+    }
+  }, []);
+
   useEffect(() => {
     if (!isSignedIn) return;
     loadModelUsage();
     loadCronJobs();
-    // Refresh model usage every 30s, cron jobs every 60s
+    loadErrors();
+    // Refresh model usage every 30s, cron jobs every 60s, errors every 60s
     const modelInterval = setInterval(loadModelUsage, 30_000);
     const cronInterval = setInterval(loadCronJobs, 60_000);
-    return () => { clearInterval(modelInterval); clearInterval(cronInterval); };
-  }, [isSignedIn, loadModelUsage, loadCronJobs]);
+    const errorInterval = setInterval(loadErrors, 60_000);
+    return () => { clearInterval(modelInterval); clearInterval(cronInterval); clearInterval(errorInterval); };
+  }, [isSignedIn, loadModelUsage, loadCronJobs, loadErrors]);
 
   // ─── Derived data ────────────────────────────────────────────────────────
 
@@ -771,6 +790,63 @@ export default function LivePage() {
             </div>
           )}
         </div>
+
+        {/* ═══ Error Log ═══ */}
+        {errorEvents.length > 0 && (
+          <div className="rounded-xl border border-red-200 bg-white shadow-sm">
+            <button
+              onClick={() => setShowErrors(!showErrors)}
+              className="flex w-full items-center justify-between border-b border-red-100 px-4 py-3 hover:bg-red-50/50 transition"
+            >
+              <div>
+                <h3 className="text-sm font-semibold text-red-900 flex items-center gap-1.5">
+                  <AlertTriangle className="h-4 w-4 text-red-500" />
+                  Error Log
+                  <span className="ml-1.5 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-700">
+                    {errorEvents.length}
+                  </span>
+                </h3>
+                <p className="text-xs text-red-400">Recent system errors and warnings</p>
+              </div>
+              {showErrors ? <ChevronUp className="h-4 w-4 text-red-400" /> : <ChevronDown className="h-4 w-4 text-red-400" />}
+            </button>
+            {showErrors && (
+              <div className="divide-y divide-red-50 max-h-[300px] overflow-y-auto">
+                {errorEvents.map((evt: any, idx: number) => {
+                  const eventType = evt.event_type || "";
+                  const source = eventType.replace("system.error.", "");
+                  const message = evt.message || "";
+                  const isWarning = message.startsWith("[WARNING]");
+                  const cleanMessage = message.replace(/^\[(ERROR|WARNING)\]\s*/, "");
+                  const timestamp = evt.created_at ? new Date(evt.created_at).toLocaleString(undefined, {
+                    month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit",
+                  }) : "";
+
+                  return (
+                    <div key={evt.id || idx} className="flex items-start gap-3 px-4 py-2.5">
+                      <div className={cn(
+                        "mt-1 h-2 w-2 shrink-0 rounded-full",
+                        isWarning ? "bg-amber-400" : "bg-red-500"
+                      )} />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className={cn(
+                            "rounded px-1.5 py-0.5 text-[10px] font-semibold",
+                            isWarning ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"
+                          )}>
+                            {source.toUpperCase()}
+                          </span>
+                          <span className="text-[10px] text-slate-400">{timestamp}</span>
+                        </div>
+                        <p className="mt-0.5 text-xs text-slate-600 whitespace-pre-wrap">{cleanMessage}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ═══ Activity Timeline ═══ */}
         <div className="rounded-xl border border-slate-200 bg-white shadow-sm">

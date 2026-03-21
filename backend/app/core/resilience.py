@@ -49,7 +49,7 @@ class CircuitBreaker:
     def record_failure(self) -> None:
         self._failure_count += 1
         self._last_failure_time = time.time()
-        if self._failure_count >= self.failure_threshold:
+        if self._failure_count >= self.failure_threshold and self._state != "open":
             self._state = "open"
             logger.warning(
                 "circuit_breaker.opened name=%s failures=%d cooldown=%ss",
@@ -57,6 +57,17 @@ class CircuitBreaker:
                 self._failure_count,
                 self.cooldown_seconds,
             )
+            # Persist circuit breaker trip to activity events (fire-and-forget)
+            try:
+                import asyncio
+                from app.services.error_tracker import track_error
+                asyncio.ensure_future(track_error(
+                    source="circuit_breaker",
+                    message=f"Circuit breaker '{self.name}' opened after {self._failure_count} consecutive failures. Cooldown: {self.cooldown_seconds}s.",
+                    severity="warning",
+                ))
+            except Exception:  # noqa: BLE001
+                pass
 
     @property
     def is_open(self) -> bool:

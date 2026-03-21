@@ -115,6 +115,16 @@ class RequestIdMiddleware:
                     }
                     if status_code >= 500:
                         logger.error("http.request.complete", extra=extra)
+                        # Persist 5xx errors to activity events for MC visibility
+                        try:
+                            import asyncio
+                            from app.services.error_tracker import track_error
+                            asyncio.ensure_future(track_error(
+                                source="http",
+                                message=f"{method} {path} returned {status_code} ({duration_ms}ms)",
+                            ))
+                        except Exception:  # noqa: BLE001
+                            pass
                     elif status_code >= 400:
                         logger.warning("http.request.complete", extra=extra)
                     else:
