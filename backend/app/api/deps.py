@@ -98,6 +98,52 @@ async def require_user_or_agent(
 ACTOR_DEP = Depends(require_user_or_agent)
 
 
+async def require_org_from_actor(
+    request: Request,
+    session: AsyncSession = SESSION_DEP,
+) -> OrganizationContext:
+    """Resolve organization context from either a user or an agent caller.
+
+    For users: resolves via org membership (same as require_org_member).
+    For agents: resolves via agent -> board -> organization chain.
+    """
+    actor = await require_user_or_agent(request, session)
+
+    if actor.actor_type == "user" and actor.user is not None:
+        member = await get_active_membership(session, actor.user)
+        if member is None:
+            member = await ensure_member_for_user(session, actor.user)
+        if member is None:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
+        organization = await Organization.objects.by_id(member.organization_id).first(session)
+        if organization is None:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
+        return OrganizationContext(organization=organization, member=member)
+
+    if actor.actor_type == "agent" and actor.agent is not None:
+        if not actor.agent.board_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Agent has no board assignment.")
+        board = await Board.objects.by_id(actor.agent.board_id).first(session)
+        if board is None:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
+        organization = await Organization.objects.by_id(board.organization_id).first(session)
+        if organization is None:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
+        # Create a synthetic member context for the agent (operator-level access)
+        from app.models.organization_members import OrganizationMember
+        synthetic_member = OrganizationMember(
+            organization_id=organization.id,
+            user_id=organization.id,  # placeholder — agent doesn't have a user_id
+            role="operator",
+        )
+        return OrganizationContext(organization=organization, member=synthetic_member)
+
+    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
+
+
+ORG_ACTOR_DEP = Depends(require_org_from_actor)
+
+
 async def require_org_member(
     auth: AuthContext = AUTH_DEP,
     session: AsyncSession = SESSION_DEP,
