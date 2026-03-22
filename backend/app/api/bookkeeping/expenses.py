@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile
 from pydantic import BaseModel
 from sqlmodel import select
 
@@ -127,6 +127,64 @@ async def update_expense(expense_id: str, payload: ExpenseUpdate, org_ctx: Organ
         for field, value in payload.model_dump(exclude_none=True).items():
             setattr(expense, field, value)
         expense.updated_at = utcnow()
+        await session.commit()
+        await session.refresh(expense)
+        return _serialize(expense)
+
+
+@router.post("/receipt", status_code=201)
+async def upload_receipt(
+    file: UploadFile,
+    job_id: str | None = Query(default=None),
+    worker_id: str | None = Query(default=None),
+    org_ctx: OrganizationContext = ORG_ACTOR_DEP,
+):
+    """Upload a receipt image → OCR extraction → auto-categorize → create expense."""
+    import json as json_mod
+    from app.services.bookkeeping_ocr import process_receipt
+    from app.services.bookkeeping_categorization import categorize_expense
+
+    image_bytes = await file.read()
+    if len(image_bytes) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Receipt image too large (max 10MB)")
+
+    # OCR extraction
+    ocr_data = await process_receipt(image_bytes, org_ctx.organization.id)
+
+    # Auto-categorize
+    category = ocr_data.get("category_suggestion") or categorize_expense(
+        ocr_data.get("vendor"),
+        ocr_data.get("items", []),
+    )
+
+    # Parse amounts
+    total = ocr_data.get("total", 0)
+    gst = ocr_data.get("gst", 0)
+    expense_date_str = ocr_data.get("date")
+    expense_date_val = date.today()
+    if expense_date_str:
+        try:
+            expense_date_val = date.fromisoformat(expense_date_str)
+        except (ValueError, TypeError):
+            pass
+
+    async with async_session_maker() as session:
+        expense = BkExpense(
+            id=uuid4(),
+            organization_id=org_ctx.organization.id,
+            worker_id=worker_id,
+            job_id=job_id,
+            amount=total,
+            gst_amount=gst,
+            category=category,
+            vendor=ocr_data.get("vendor"),
+            description=f"Receipt: {ocr_data.get('vendor', 'unknown')}",
+            ocr_data_json=json_mod.dumps(ocr_data),
+            expense_date=expense_date_val,
+            created_at=utcnow(),
+            updated_at=utcnow(),
+        )
+        session.add(expense)
         await session.commit()
         await session.refresh(expense)
         return _serialize(expense)
