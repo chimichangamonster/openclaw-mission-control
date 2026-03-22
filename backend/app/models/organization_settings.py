@@ -25,6 +25,7 @@ DEFAULT_FEATURE_FLAGS = {
     "approvals": True,
     "document_generation": True,
     "microsoft_graph": False,
+    "bookkeeping": True,
 }
 
 

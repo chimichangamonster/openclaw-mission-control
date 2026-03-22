@@ -1,6 +1,17 @@
 """Model exports for SQLAlchemy/SQLModel metadata discovery."""
 
 from app.models.activity_events import ActivityEvent
+from app.models.bookkeeping import (
+    BkClient,
+    BkExpense,
+    BkInvoice,
+    BkInvoiceLine,
+    BkJob,
+    BkPlacement,
+    BkTimesheet,
+    BkTransaction,
+    BkWorker,
+)
 from app.models.agents import Agent
 from app.models.approval_task_links import ApprovalTaskLink
 from app.models.approvals import Approval
@@ -93,4 +104,13 @@ __all__ = [
     "PaperPosition",
     "PaperTrade",
     "WatchlistItem",
+    "BkClient",
+    "BkExpense",
+    "BkInvoice",
+    "BkInvoiceLine",
+    "BkJob",
+    "BkPlacement",
+    "BkTimesheet",
+    "BkTransaction",
+    "BkWorker",
 ]
