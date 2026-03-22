@@ -3,6 +3,7 @@
 export const dynamic = "force-dynamic";
 
 import { useCallback, useEffect, useState } from "react";
+import { FeatureGate } from "@/components/molecules/FeatureGate";
 import {
   BarChart3,
   TrendingUp,
@@ -264,6 +265,7 @@ export default function PaperTradingPage() {
   const pendingBets = bets.filter((b) => b.status === "pending");
 
   return (
+    <FeatureGate flag="paper_trading" label="Paper Trading">
     <DashboardPageLayout
       signedOut={{
         message: "Sign in to view paper trading portfolios.",
@@ -544,6 +546,7 @@ export default function PaperTradingPage() {
                               <tr>
                                 <th className="px-5 py-3">Selection</th>
                                 <th className="px-5 py-3">Game</th>
+                                <th className="px-5 py-3">Game Date</th>
                                 <th className="px-5 py-3">Sport</th>
                                 <th className="px-5 py-3 text-right">Odds</th>
                                 <th className="px-5 py-3 text-right">Stake</th>
@@ -558,6 +561,9 @@ export default function PaperTradingPage() {
                                   <tr key={b.id} className="hover:bg-slate-50/50">
                                     <td className="px-5 py-3 font-medium text-slate-800">{b.selection}</td>
                                     <td className="px-5 py-3 text-slate-500">{b.game}</td>
+                                    <td className="px-5 py-3 text-slate-500 text-xs tabular-nums">
+                                      {b.game_date ? new Date(b.game_date).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "—"}
+                                    </td>
                                     <td className="px-5 py-3">
                                       <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 uppercase">{b.sport}</span>
                                     </td>
@@ -801,6 +807,10 @@ export default function PaperTradingPage() {
                                         <div className="font-medium text-slate-700">{b.bet_type}{b.player ? ` — ${b.player}` : ""}</div>
                                       </div>
                                       <div>
+                                        <span className="text-slate-400">Game Date</span>
+                                        <div className="font-medium text-slate-700">{b.game_date ? new Date(b.game_date).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "—"}</div>
+                                      </div>
+                                      <div>
                                         <span className="text-slate-400">Line</span>
                                         <div className="font-medium text-slate-700">{b.line ?? "—"}</div>
                                       </div>
@@ -812,6 +822,12 @@ export default function PaperTradingPage() {
                                         <span className="text-slate-400">Agent</span>
                                         <div className="font-medium text-slate-700">{b.proposed_by || "manual"}</div>
                                       </div>
+                                      {b.settled_at && (
+                                        <div>
+                                          <span className="text-slate-400">Settled</span>
+                                          <div className="font-medium text-slate-700">{new Date(b.settled_at).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</div>
+                                        </div>
+                                      )}
                                       {b.kelly_pct != null && (
                                         <div>
                                           <span className="text-slate-400">Kelly %</span>
@@ -853,6 +869,7 @@ export default function PaperTradingPage() {
         </div>
       )}
     </DashboardPageLayout>
+    </FeatureGate>
   );
 }
 

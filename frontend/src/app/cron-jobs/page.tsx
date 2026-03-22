@@ -7,6 +7,7 @@ import { Clock, Play, Pause, Trash2, Zap, Timer, Bot } from "lucide-react";
 
 import { useAuth } from "@/auth/clerk";
 import { DashboardPageLayout } from "@/components/templates/DashboardPageLayout";
+import { FeatureGate } from "@/components/molecules/FeatureGate";
 import { cn } from "@/lib/utils";
 import { customFetch } from "@/api/mutator";
 
@@ -81,6 +82,7 @@ export default function CronJobsPage() {
   }, [isSignedIn, loadJobs]);
 
   return (
+    <FeatureGate flag="cron_jobs" label="Scheduled Tasks">
     <DashboardPageLayout
       signedOut={{ message: "Sign in to view scheduled tasks.", forceRedirectUrl: "/cron-jobs", signUpForceRedirectUrl: "/cron-jobs" }}
       title="Scheduled Tasks"
@@ -219,5 +221,6 @@ export default function CronJobsPage() {
         </div>
       )}
     </DashboardPageLayout>
+    </FeatureGate>
   );
 }

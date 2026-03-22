@@ -8,12 +8,16 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.api.deps import require_org_member
+from app.api.deps import ORG_RATE_LIMIT_DEP, require_feature, require_org_member
 from app.core.logging import get_logger
 from app.services.organizations import OrganizationContext
 
 logger = get_logger(__name__)
-router = APIRouter(prefix="/cron-jobs", tags=["cron-jobs"])
+router = APIRouter(
+    prefix="/cron-jobs",
+    tags=["cron-jobs"],
+    dependencies=[Depends(require_feature("cron_jobs")), ORG_RATE_LIMIT_DEP],
+)
 
 CRON_JOBS_FILE = Path("/app/gateway-cron/jobs.json")
 

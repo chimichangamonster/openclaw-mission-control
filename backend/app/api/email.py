@@ -8,7 +8,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 
-from app.api.deps import ORG_MEMBER_DEP, SESSION_DEP
+from app.api.deps import ORG_MEMBER_DEP, ORG_RATE_LIMIT_DEP, SESSION_DEP, require_feature
 from app.core.logging import get_logger
 from app.core.time import utcnow
 from app.models.email_accounts import EmailAccount
@@ -33,7 +33,11 @@ if TYPE_CHECKING:
     from sqlmodel.ext.asyncio.session import AsyncSession
 
 logger = get_logger(__name__)
-router = APIRouter(prefix="/email", tags=["email"])
+router = APIRouter(
+    prefix="/email",
+    tags=["email"],
+    dependencies=[Depends(require_feature("email")), ORG_RATE_LIMIT_DEP],
+)
 
 
 # ---------------------------------------------------------------------------

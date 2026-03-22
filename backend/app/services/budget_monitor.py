@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from datetime import date, datetime, UTC
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from sqlalchemy import text
 from sqlmodel import select
@@ -26,24 +26,28 @@ _session_max_tokens: dict[str, tuple[int, int]] = {}
 _session_max_date: str = ""
 
 
-async def _get_gateway_config() -> GatewayConfig | None:
-    """Resolve the first configured gateway."""
+async def _get_gateway_config_for_org(org_id: UUID) -> GatewayConfig | None:
+    """Resolve the gateway for a specific organization."""
     async with async_session_maker() as session:
-        result = await session.execute(select(Gateway).limit(1))
+        result = await session.execute(
+            select(Gateway).where(Gateway.organization_id == org_id).limit(1)
+        )
         gateway = result.scalars().first()
     if not gateway or not gateway.url:
         return None
     return GatewayConfig(url=gateway.url, token=gateway.token)
 
 
-async def _get_or_create_budget_config() -> BudgetConfig:
-    """Get the budget config, creating a default if none exists."""
+async def _get_or_create_budget_config(org_id: UUID) -> BudgetConfig:
+    """Get the budget config for an org, creating a default if none exists."""
     async with async_session_maker() as session:
-        result = await session.execute(select(BudgetConfig).limit(1))
+        result = await session.execute(
+            select(BudgetConfig).where(BudgetConfig.organization_id == org_id)
+        )
         config = result.scalars().first()
         if config:
             return config
-        config = BudgetConfig(id=uuid4(), updated_at=utcnow())
+        config = BudgetConfig(id=uuid4(), organization_id=org_id, updated_at=utcnow())
         session.add(config)
         await session.commit()
         await session.refresh(config)
@@ -125,13 +129,14 @@ async def _aggregate_agent_spend(config: GatewayConfig) -> dict[str, dict]:
     return agent_agg
 
 
-async def _upsert_daily_spend(agent_agg: dict[str, dict]) -> None:
-    """Persist per-agent daily spend snapshots."""
+async def _upsert_daily_spend(org_id: UUID, agent_agg: dict[str, dict]) -> None:
+    """Persist per-agent daily spend snapshots for an organization."""
     today = date.today()
     async with async_session_maker() as session:
         for agent_name, agg in agent_agg.items():
             result = await session.execute(
                 select(DailyAgentSpend).where(
+                    DailyAgentSpend.organization_id == org_id,
                     DailyAgentSpend.agent_name == agent_name,
                     DailyAgentSpend.date == today,
                 )
@@ -148,6 +153,7 @@ async def _upsert_daily_spend(agent_agg: dict[str, dict]) -> None:
             else:
                 spend = DailyAgentSpend(
                     id=uuid4(),
+                    organization_id=org_id,
                     agent_name=agent_name,
                     date=today,
                     input_tokens=agg["input_tokens"],
@@ -179,11 +185,12 @@ async def _send_discord_alert(gw_config: GatewayConfig, message: str) -> None:
 
 
 async def _check_thresholds(
+    org_id: UUID,
     agent_agg: dict[str, dict],
     budget_config: BudgetConfig,
     gw_config: GatewayConfig,
 ) -> None:
-    """Check monthly and daily thresholds, send alerts if crossed."""
+    """Check monthly and daily thresholds for an org, send alerts if crossed."""
     if not budget_config.alerts_enabled:
         return
 
@@ -196,14 +203,14 @@ async def _check_thresholds(
 
     already_hit = set(budget_config.last_alert_thresholds_hit)
 
-    # Get monthly total from database
+    # Get monthly total for this org from database
     async with async_session_maker() as session:
         result = await session.execute(
             text(
                 "SELECT COALESCE(SUM(estimated_cost), 0) FROM daily_agent_spends "
-                "WHERE date >= :month_start"
+                "WHERE organization_id = :org_id AND date >= :month_start"
             ),
-            {"month_start": f"{current_month}-01"},
+            {"org_id": str(org_id), "month_start": f"{current_month}-01"},
         )
         monthly_total = float(result.scalar() or 0)
 
@@ -249,7 +256,9 @@ async def _check_thresholds(
     # Persist updated thresholds
     if alerts:
         async with async_session_maker() as session:
-            result = await session.execute(select(BudgetConfig).limit(1))
+            result = await session.execute(
+                select(BudgetConfig).where(BudgetConfig.organization_id == org_id)
+            )
             config = result.scalars().first()
             if config:
                 config.last_alert_thresholds_hit_json = json.dumps(sorted(already_hit))
@@ -273,35 +282,59 @@ async def _update_prometheus_gauges(agent_agg: dict[str, dict], monthly_total: f
 
 
 async def check_budgets() -> None:
-    """Main budget check — called every 5 minutes from lifespan."""
-    gw_config = await _get_gateway_config()
-    if not gw_config:
-        return
+    """Main budget check — called every 5 minutes from lifespan.
 
-    budget_config = await _get_or_create_budget_config()
-    agent_agg = await _aggregate_agent_spend(gw_config)
-    if not agent_agg:
-        return
+    Iterates over all organizations with a configured gateway and checks
+    each org's budget independently.
+    """
+    from app.models.organizations import Organization
 
-    await _upsert_daily_spend(agent_agg)
-    await _check_thresholds(agent_agg, budget_config, gw_config)
-
-    # Monthly total for Prometheus
-    current_month = datetime.now(UTC).strftime("%Y-%m")
+    # Get all orgs that have a gateway configured
     async with async_session_maker() as session:
         result = await session.execute(
-            text(
-                "SELECT COALESCE(SUM(estimated_cost), 0) FROM daily_agent_spends "
-                "WHERE date >= :month_start"
-            ),
-            {"month_start": f"{current_month}-01"},
+            select(Gateway.organization_id).where(Gateway.url.isnot(None)).distinct()  # type: ignore[union-attr]
         )
-        monthly_total = float(result.scalar() or 0)
+        org_ids = [row[0] for row in result.all()]
 
-    await _update_prometheus_gauges(agent_agg, monthly_total, budget_config.monthly_budget)
+    if not org_ids:
+        return
+
+    total_agents = 0
+    total_monthly = 0.0
+
+    for org_id in org_ids:
+        gw_config = await _get_gateway_config_for_org(org_id)
+        if not gw_config:
+            continue
+
+        budget_config = await _get_or_create_budget_config(org_id)
+        agent_agg = await _aggregate_agent_spend(gw_config)
+        if not agent_agg:
+            continue
+
+        await _upsert_daily_spend(org_id, agent_agg)
+        await _check_thresholds(org_id, agent_agg, budget_config, gw_config)
+
+        # Monthly total for Prometheus
+        current_month = datetime.now(UTC).strftime("%Y-%m")
+        async with async_session_maker() as session:
+            result = await session.execute(
+                text(
+                    "SELECT COALESCE(SUM(estimated_cost), 0) FROM daily_agent_spends "
+                    "WHERE organization_id = :org_id AND date >= :month_start"
+                ),
+                {"org_id": str(org_id), "month_start": f"{current_month}-01"},
+            )
+            monthly_total = float(result.scalar() or 0)
+
+        await _update_prometheus_gauges(agent_agg, monthly_total, budget_config.monthly_budget)
+
+        total_agents += len(agent_agg)
+        total_monthly += monthly_total
 
     logger.info(
-        "budget_monitor.check_complete agents=%d monthly=%.4f",
-        len(agent_agg),
-        monthly_total,
+        "budget_monitor.check_complete orgs=%d agents=%d monthly=%.4f",
+        len(org_ids),
+        total_agents,
+        total_monthly,
     )

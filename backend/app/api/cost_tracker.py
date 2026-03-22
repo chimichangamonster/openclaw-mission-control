@@ -12,7 +12,8 @@ from pydantic import BaseModel
 from sqlmodel import select
 from sqlalchemy import text
 
-from app.api.deps import ORG_MEMBER_DEP
+from app.api.deps import ORG_MEMBER_DEP, ORG_RATE_LIMIT_DEP, require_feature, require_org_member
+from app.services.organizations import OrganizationContext
 from app.core.config import settings
 from app.core.logging import get_logger
 from app.core.resilience import openrouter_breaker, retry_async
@@ -22,7 +23,11 @@ from app.models.activity_events import ActivityEvent
 from app.models.budget import BudgetConfig, DailyAgentSpend
 
 logger = get_logger(__name__)
-router = APIRouter(prefix="/cost-tracker", tags=["cost-tracker"])
+router = APIRouter(
+    prefix="/cost-tracker",
+    tags=["cost-tracker"],
+    dependencies=[Depends(require_feature("cost_tracker")), ORG_RATE_LIMIT_DEP],
+)
 
 # Cache live pricing for 1 hour to avoid hammering OpenRouter
 _pricing_cache: dict | None = None
@@ -47,10 +52,15 @@ async def _openrouter_get(url: str, api_key: str) -> dict:
     )
 
 
-@router.get("/usage", dependencies=[ORG_MEMBER_DEP])
-async def get_usage():
+@router.get("/usage")
+async def get_usage(
+    org_ctx: OrganizationContext = Depends(require_org_member),
+):
     """Get OpenRouter usage and budget data."""
-    api_key = settings.openrouter_api_key
+    from app.services.openrouter_keys import get_openrouter_key_for_org
+
+    async with async_session_maker() as session:
+        api_key = await get_openrouter_key_for_org(session, org_ctx.organization.id)
     if not api_key:
         return {"error": "OpenRouter API key not configured"}
 
@@ -82,8 +92,9 @@ async def get_usage():
     }
 
 
-@router.get("/models", dependencies=[ORG_MEMBER_DEP])
+@router.get("/models")
 async def get_model_pricing(
+    org_ctx: OrganizationContext = Depends(require_org_member),
     filter: str = Query("configured", description="'configured' = only models in our gateway, 'all' = everything on OpenRouter"),
 ):
     """Get live model pricing from OpenRouter. Cached for 1 hour."""
@@ -104,8 +115,21 @@ async def get_model_pricing(
             return {"error": "Failed to fetch models from OpenRouter", "status": resp.status_code}
         data = resp.json()
 
-    # Our configured models (from openclaw.json)
-    configured_ids = {
+    # Check org settings for configured models, fall back to platform defaults
+    from app.models.organization_settings import OrganizationSettings
+    org_configured: list[str] = []
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(OrganizationSettings).where(
+                OrganizationSettings.organization_id == org_ctx.organization.id
+            )
+        )
+        org_settings = result.scalars().first()
+        if org_settings:
+            org_configured = org_settings.configured_models
+
+    # Default configured models if org hasn't customized
+    configured_ids = set(org_configured) if org_configured else {
         "anthropic/claude-sonnet-4",
         "anthropic/claude-sonnet-4.6",
         "anthropic/claude-opus-4-6",
@@ -115,25 +139,15 @@ async def get_model_pricing(
         "google/gemini-2.5-flash-lite",
         "x-ai/grok-4",
         "x-ai/grok-4-fast",
-        "x-ai/grok-3",
         "openai/gpt-5-nano",
         "openai/gpt-5.4",
         "google/gemini-3-pro-preview",
-        "minimax/minimax-m2.7",
-        "moonshotai/kimi-k2.5",
         "qwen/qwen3-coder",
         "openrouter/auto",
     }
 
-    # Agent assignments
-    agent_usage = {
-        "anthropic/claude-sonnet-4": ["The Claw", "Sports Analyst"],
-        "deepseek/deepseek-v3.2": ["Stock Analyst", "Market Scout"],
-        "x-ai/grok-4": ["Sentiment (subagent)"],
-        "x-ai/grok-4-fast": ["Quick lookups (Tier 1)"],
-        "google/gemini-2.5-flash": ["Fallback"],
-        "openai/gpt-5-nano": ["Heartbeat"],
-    }
+    # Agent assignments derived from session data (no hardcoding)
+    agent_usage: dict[str, list[str]] = {}
 
     models = []
     for m in data.get("data", []):
@@ -203,17 +217,21 @@ def _get_model_price(short_model: str) -> tuple[float, float]:
     return fb if fb else (0.0, 0.0)
 
 
-@router.get("/usage-by-model", dependencies=[ORG_MEMBER_DEP])
-async def get_usage_by_model():
+@router.get("/usage-by-model")
+async def get_usage_by_model(
+    org_ctx: OrganizationContext = Depends(require_org_member),
+):
     """Aggregate gateway session tokens by model and compute cost using live pricing."""
     from app.services.openclaw.gateway_rpc import GatewayConfig, openclaw_call
     from sqlmodel import select
     from app.db.session import async_session_maker
     from app.models.gateways import Gateway
 
-    # Find gateway
+    # Find gateway for this org
     async with async_session_maker() as db_session:
-        result = await db_session.execute(select(Gateway).limit(1))
+        result = await db_session.execute(
+            select(Gateway).where(Gateway.organization_id == org_ctx.organization.id).limit(1)
+        )
         gateway = result.scalars().first()
 
     if not gateway or not gateway.url:
@@ -279,30 +297,6 @@ async def get_usage_by_model():
             "tier": _classify_tier(prompt_pm),
         })
 
-    # Include configured models with no active sessions for a complete leaderboard
-    configured_short_names = {
-        "claude-sonnet-4": ["The Claw", "Sports Analyst"],
-        "deepseek-v3.2": ["Stock Analyst", "Market Scout"],
-        "grok-4": ["Sentiment (subagent)"],
-        "grok-4-fast": ["Quick lookups"],
-        "gemini-2.5-flash": ["Fallback"],
-        "gpt-5-nano": ["Heartbeat"],
-    }
-    seen = {m["model"] for m in models_out}
-    for model_name, agents in configured_short_names.items():
-        if model_name not in seen:
-            prompt_pm, _ = _get_model_price(model_name)
-            models_out.append({
-                "model": model_name,
-                "input_tokens": 0,
-                "output_tokens": 0,
-                "total_tokens": 0,
-                "estimated_cost": 0,
-                "session_count": 0,
-                "agents": agents,
-                "tier": _classify_tier(prompt_pm),
-            })
-
     # Sort by cost descending, then alphabetically for zero-cost
     models_out.sort(key=lambda x: (-x["estimated_cost"], x["model"]))
 
@@ -314,14 +308,20 @@ _activity_cache: dict | None = None
 _activity_cache_ts: float = 0
 
 
-@router.get("/activity", dependencies=[ORG_MEMBER_DEP])
+@router.get("/activity")
 async def get_activity(
+    org_ctx: OrganizationContext = Depends(require_org_member),
     period: str = Query("daily", description="'daily' = per-day rows, 'weekly' = aggregated by week, 'monthly' = aggregated by month"),
 ):
     """Get historical per-model spending from OpenRouter activity API (last 30 days)."""
     global _activity_cache, _activity_cache_ts
 
-    mgmt_key = settings.openrouter_management_key or settings.openrouter_api_key
+    from app.services.openrouter_keys import get_management_key_for_org, get_openrouter_key_for_org
+
+    async with async_session_maker() as session:
+        mgmt_key = await get_management_key_for_org(session, org_ctx.organization.id)
+        if not mgmt_key:
+            mgmt_key = await get_openrouter_key_for_org(session, org_ctx.organization.id)
     if not mgmt_key:
         return {"error": "OpenRouter API key not configured"}
 
@@ -446,33 +446,42 @@ class BudgetConfigUpdate(BaseModel):
     alerts_enabled: bool | None = None
 
 
-@router.get("/budget", dependencies=[ORG_MEMBER_DEP])
-async def get_budget():
+@router.get("/budget")
+async def get_budget(
+    org_ctx: OrganizationContext = Depends(require_org_member),
+):
     """Get budget config, current month spend, and per-agent daily spend."""
+    org_id = org_ctx.organization.id
+
     async with async_session_maker() as session:
-        result = await session.execute(select(BudgetConfig).limit(1))
+        result = await session.execute(
+            select(BudgetConfig).where(BudgetConfig.organization_id == org_id)
+        )
         config = result.scalars().first()
 
     if not config:
-        config = BudgetConfig()
+        config = BudgetConfig(organization_id=org_id)
 
     current_month = datetime.now(UTC).strftime("%Y-%m")
     today = date.today()
 
     async with async_session_maker() as session:
-        # Monthly total
+        # Monthly total for this org
         result = await session.execute(
             text(
                 "SELECT COALESCE(SUM(estimated_cost), 0) FROM daily_agent_spends "
-                "WHERE date >= :month_start"
+                "WHERE organization_id = :org_id AND date >= :month_start"
             ),
-            {"month_start": f"{current_month}-01"},
+            {"org_id": str(org_id), "month_start": f"{current_month}-01"},
         )
         monthly_total = float(result.scalar() or 0)
 
-        # Per-agent today
+        # Per-agent today for this org
         result = await session.execute(
-            select(DailyAgentSpend).where(DailyAgentSpend.date == today)
+            select(DailyAgentSpend).where(
+                DailyAgentSpend.organization_id == org_id,
+                DailyAgentSpend.date == today,
+            )
         )
         today_spends = result.scalars().all()
 
@@ -519,16 +528,23 @@ async def get_budget():
     }
 
 
-@router.put("/budget", dependencies=[ORG_MEMBER_DEP])
-async def update_budget(payload: BudgetConfigUpdate):
-    """Update budget configuration."""
+@router.put("/budget")
+async def update_budget(
+    payload: BudgetConfigUpdate,
+    org_ctx: OrganizationContext = Depends(require_org_member),
+):
+    """Update budget configuration for the current organization."""
+    org_id = org_ctx.organization.id
+
     async with async_session_maker() as session:
-        result = await session.execute(select(BudgetConfig).limit(1))
+        result = await session.execute(
+            select(BudgetConfig).where(BudgetConfig.organization_id == org_id)
+        )
         config = result.scalars().first()
 
         if not config:
             from uuid import uuid4
-            config = BudgetConfig(id=uuid4(), updated_at=utcnow())
+            config = BudgetConfig(id=uuid4(), organization_id=org_id, updated_at=utcnow())
             session.add(config)
 
         if payload.monthly_budget is not None:
@@ -550,15 +566,19 @@ async def update_budget(payload: BudgetConfigUpdate):
     return {"ok": True}
 
 
-@router.get("/agent-spend", dependencies=[ORG_MEMBER_DEP])
+@router.get("/agent-spend")
 async def get_agent_spend(
+    org_ctx: OrganizationContext = Depends(require_org_member),
     days: int = Query(30, description="Lookback days"),
     agent: str | None = Query(None, description="Filter by agent name"),
 ):
-    """Get historical per-agent spend."""
+    """Get historical per-agent spend for the current organization."""
+    org_id = org_ctx.organization.id
+
     async with async_session_maker() as session:
         stmt = select(DailyAgentSpend).where(
-            DailyAgentSpend.date >= text(f"CURRENT_DATE - INTERVAL '{days} days'")
+            DailyAgentSpend.organization_id == org_id,
+            DailyAgentSpend.date >= text(f"CURRENT_DATE - INTERVAL '{days} days'"),
         )
         if agent:
             stmt = stmt.where(DailyAgentSpend.agent_name == agent)

@@ -25,6 +25,7 @@ import {
 
 import { useAuth } from "@/auth/clerk";
 import { ApiError } from "@/api/mutator";
+import { useFeatureFlags } from "@/lib/use-feature-flags";
 import { useOrganizationMembership } from "@/lib/use-organization-membership";
 import {
   type healthzHealthzGetResponse,
@@ -36,6 +37,7 @@ export function DashboardSidebar() {
   const pathname = usePathname();
   const { isSignedIn } = useAuth();
   const { isAdmin } = useOrganizationMembership(isSignedIn);
+  const { isFeatureEnabled } = useFeatureFlags(Boolean(isSignedIn));
   const healthQuery = useHealthzHealthzGet<healthzHealthzGetResponse, ApiError>(
     {
       query: {
@@ -114,11 +116,13 @@ export function DashboardSidebar() {
             </div>
           </div>
 
+          {(isFeatureEnabled("paper_trading") || isFeatureEnabled("watchlist") || isFeatureEnabled("polymarket")) ? (
           <div>
             <p className="px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
               Trading
             </p>
             <div className="mt-1 space-y-1">
+              {isFeatureEnabled("paper_trading") ? (
               <Link
                 href="/paper-trading"
                 className={cn(
@@ -131,6 +135,8 @@ export function DashboardSidebar() {
                 <BarChart3 className="h-4 w-4" />
                 Paper Trading
               </Link>
+              ) : null}
+              {isFeatureEnabled("watchlist") ? (
               <Link
                 href="/watchlist"
                 className={cn(
@@ -143,6 +149,8 @@ export function DashboardSidebar() {
                 <Star className="h-4 w-4" />
                 Watchlist
               </Link>
+              ) : null}
+              {isFeatureEnabled("polymarket") ? (
               <Link
                 href="/trading"
                 className={cn(
@@ -155,14 +163,17 @@ export function DashboardSidebar() {
                 <TrendingUp className="h-4 w-4" />
                 Prediction Markets
               </Link>
+              ) : null}
             </div>
           </div>
+          ) : null}
 
           <div>
             <p className="px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
               Business
             </p>
             <div className="mt-1 space-y-1">
+              {isFeatureEnabled("email") ? (
               <Link
                 href="/email"
                 className={cn(
@@ -175,6 +186,7 @@ export function DashboardSidebar() {
                 <Mail className="h-4 w-4" />
                 Email
               </Link>
+              ) : null}
               <Link
                 href="/documents"
                 className={cn(
@@ -207,6 +219,7 @@ export function DashboardSidebar() {
                 <Folder className="h-4 w-4" />
                 Memory
               </Link>
+              {isFeatureEnabled("cron_jobs") ? (
               <Link
                 href="/cron-jobs"
                 className={cn(
@@ -219,6 +232,8 @@ export function DashboardSidebar() {
                 <Clock className="h-4 w-4" />
                 Scheduled Tasks
               </Link>
+              ) : null}
+              {isFeatureEnabled("cost_tracker") ? (
               <Link
                 href="/costs"
                 className={cn(
@@ -230,6 +245,19 @@ export function DashboardSidebar() {
               >
                 <Folder className="h-4 w-4" />
                 Cost & Usage
+              </Link>
+              ) : null}
+              <Link
+                href="/org-settings"
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-slate-700 transition",
+                  pathname.startsWith("/org-settings")
+                    ? "bg-blue-100 text-blue-800 font-medium"
+                    : "hover:bg-slate-100",
+                )}
+              >
+                <Building2 className="h-4 w-4" />
+                Org Settings
               </Link>
             </div>
           </div>
@@ -275,6 +303,7 @@ export function DashboardSidebar() {
                 <Tags className="h-4 w-4" />
                 Tags
               </Link>
+              {isFeatureEnabled("approvals") ? (
               <Link
                 href="/approvals"
                 className={cn(
@@ -287,6 +316,7 @@ export function DashboardSidebar() {
                 <CheckCircle2 className="h-4 w-4" />
                 Approvals
               </Link>
+              ) : null}
               {isAdmin ? (
                 <Link
                   href="/custom-fields"

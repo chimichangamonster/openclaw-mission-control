@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.api.deps import get_session, require_org_member
+from app.api.deps import ORG_RATE_LIMIT_DEP, PORTFOLIO_DEP, get_session, require_feature, require_org_member
 from app.core.logging import get_logger
 from app.core.time import utcnow
 from app.models.paper_trading import PaperPortfolio
@@ -16,7 +16,11 @@ from app.models.watchlist import WatchlistItem
 from app.services.organizations import OrganizationContext
 
 logger = get_logger(__name__)
-router = APIRouter(prefix="/watchlist", tags=["watchlist"])
+router = APIRouter(
+    prefix="/watchlist",
+    tags=["watchlist"],
+    dependencies=[Depends(require_feature("watchlist")), ORG_RATE_LIMIT_DEP],
+)
 
 
 def _item_to_dict(item: WatchlistItem) -> dict:
@@ -48,13 +52,12 @@ def _item_to_dict(item: WatchlistItem) -> dict:
 
 @router.get("/portfolios/{portfolio_id}/items")
 async def list_watchlist(
-    portfolio_id: UUID,
     session: AsyncSession = Depends(get_session),
-    org_ctx: OrganizationContext = Depends(require_org_member),
+    portfolio: PaperPortfolio = PORTFOLIO_DEP,
     status_filter: str = Query("watching", alias="status"),
 ) -> list[dict]:
     stmt = select(WatchlistItem).where(
-        WatchlistItem.portfolio_id == portfolio_id,
+        WatchlistItem.portfolio_id == portfolio.id,
     )
     if status_filter != "all":
         stmt = stmt.where(WatchlistItem.status == status_filter)
@@ -122,10 +125,9 @@ async def add_watchlist_item(
 
 @router.patch("/portfolios/{portfolio_id}/items/{item_id}")
 async def update_watchlist_item(
-    portfolio_id: UUID,
     item_id: UUID,
     session: AsyncSession = Depends(get_session),
-    org_ctx: OrganizationContext = Depends(require_org_member),
+    portfolio: PaperPortfolio = PORTFOLIO_DEP,
     current_price: float | None = None,
     rsi: float | None = None,
     volume_ratio: float | None = None,
@@ -140,7 +142,7 @@ async def update_watchlist_item(
 ) -> dict:
     stmt = select(WatchlistItem).where(
         WatchlistItem.id == item_id,
-        WatchlistItem.portfolio_id == portfolio_id,
+        WatchlistItem.portfolio_id == portfolio.id,
     )
     item = (await session.execute(stmt)).scalar_one_or_none()
     if not item:
@@ -177,14 +179,13 @@ async def update_watchlist_item(
 
 @router.delete("/portfolios/{portfolio_id}/items/{item_id}", status_code=204)
 async def remove_watchlist_item(
-    portfolio_id: UUID,
     item_id: UUID,
     session: AsyncSession = Depends(get_session),
-    org_ctx: OrganizationContext = Depends(require_org_member),
+    portfolio: PaperPortfolio = PORTFOLIO_DEP,
 ) -> None:
     stmt = select(WatchlistItem).where(
         WatchlistItem.id == item_id,
-        WatchlistItem.portfolio_id == portfolio_id,
+        WatchlistItem.portfolio_id == portfolio.id,
     )
     item = (await session.execute(stmt)).scalar_one_or_none()
     if not item:
@@ -196,35 +197,34 @@ async def remove_watchlist_item(
 
 @router.get("/portfolios/{portfolio_id}/items/summary")
 async def watchlist_summary(
-    portfolio_id: UUID,
     session: AsyncSession = Depends(get_session),
-    org_ctx: OrganizationContext = Depends(require_org_member),
+    portfolio: PaperPortfolio = PORTFOLIO_DEP,
 ) -> dict:
     """Quick summary: counts by status, any active alerts."""
     watching = (await session.execute(
         select(func.count()).where(
-            WatchlistItem.portfolio_id == portfolio_id,
+            WatchlistItem.portfolio_id == portfolio.id,
             WatchlistItem.status == "watching",
         )
     )).scalar() or 0
 
     alerting = (await session.execute(
         select(func.count()).where(
-            WatchlistItem.portfolio_id == portfolio_id,
+            WatchlistItem.portfolio_id == portfolio.id,
             WatchlistItem.status == "alerting",
         )
     )).scalar() or 0
 
     bought = (await session.execute(
         select(func.count()).where(
-            WatchlistItem.portfolio_id == portfolio_id,
+            WatchlistItem.portfolio_id == portfolio.id,
             WatchlistItem.status == "bought",
         )
     )).scalar() or 0
 
     # Get alerting items for quick view
     alert_stmt = select(WatchlistItem).where(
-        WatchlistItem.portfolio_id == portfolio_id,
+        WatchlistItem.portfolio_id == portfolio.id,
         WatchlistItem.status == "alerting",
     ).order_by(WatchlistItem.rsi.asc())
     alerts = (await session.execute(alert_stmt)).scalars().all()

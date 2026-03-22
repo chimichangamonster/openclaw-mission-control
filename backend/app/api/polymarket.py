@@ -8,7 +8,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 
-from app.api.deps import ORG_MEMBER_DEP, SESSION_DEP, require_org_admin
+from app.api.deps import ORG_MEMBER_DEP, ORG_RATE_LIMIT_DEP, SESSION_DEP, require_feature, require_org_admin
 from app.core.logging import get_logger
 from app.core.time import utcnow
 from app.models.polymarket_positions import PolymarketPosition
@@ -35,7 +35,11 @@ if TYPE_CHECKING:
     from sqlmodel.ext.asyncio.session import AsyncSession
 
 logger = get_logger(__name__)
-router = APIRouter(prefix="/polymarket", tags=["trading"])
+router = APIRouter(
+    prefix="/polymarket",
+    tags=["trading"],
+    dependencies=[Depends(require_feature("polymarket")), ORG_RATE_LIMIT_DEP],
+)
 
 ADMIN_DEP = Depends(require_org_admin)
 

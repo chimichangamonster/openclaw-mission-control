@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select, func
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.api.deps import get_session, require_org_member
+from app.api.deps import ORG_RATE_LIMIT_DEP, PORTFOLIO_DEP, get_session, require_feature, require_org_member
 from app.core.logging import get_logger
 from app.core.time import utcnow
 from app.services.notifications import notify
@@ -17,7 +17,11 @@ from app.models.paper_trading import PaperPortfolio
 from app.services.organizations import OrganizationContext
 
 logger = get_logger(__name__)
-router = APIRouter(prefix="/paper-bets", tags=["paper-bets"])
+router = APIRouter(
+    prefix="/paper-bets",
+    tags=["paper-bets"],
+    dependencies=[Depends(require_feature("paper_bets")), ORG_RATE_LIMIT_DEP],
+)
 
 
 def _american_to_decimal(odds: int) -> float:
@@ -72,11 +76,20 @@ async def place_bet(
         raise HTTPException(status_code=400, detail="Odds required")
 
     now = utcnow()
+    # Parse game_date if provided, otherwise default to now
+    parsed_game_date = now
+    if game_date:
+        try:
+            from datetime import datetime as _dt
+            parsed_game_date = _dt.fromisoformat(game_date.replace("Z", "+00:00"))
+        except (ValueError, AttributeError):
+            parsed_game_date = now
+
     bet = PaperBet(
         portfolio_id=portfolio_id,
         sport=sport.lower(),
         game=game,
-        game_date=now,
+        game_date=parsed_game_date,
         bet_type=bet_type.lower(),
         selection=selection,
         player=player,
@@ -120,14 +133,13 @@ async def place_bet(
 
 @router.get("/portfolios/{portfolio_id}/bets")
 async def list_bets(
-    portfolio_id: UUID,
     session: AsyncSession = Depends(get_session),
-    org_ctx: OrganizationContext = Depends(require_org_member),
+    portfolio: PaperPortfolio = PORTFOLIO_DEP,
     status_filter: str = Query("all", alias="status"),
     limit: int = Query(50, le=200),
 ) -> list[dict]:
     """List paper bets for a portfolio."""
-    stmt = select(PaperBet).where(PaperBet.portfolio_id == portfolio_id)
+    stmt = select(PaperBet).where(PaperBet.portfolio_id == portfolio.id)
     if status_filter != "all":
         stmt = stmt.where(PaperBet.status == status_filter)
     stmt = stmt.order_by(PaperBet.created_at.desc()).limit(limit)
@@ -163,16 +175,15 @@ async def list_bets(
 
 @router.patch("/portfolios/{portfolio_id}/bets/{bet_id}")
 async def resolve_bet(
-    portfolio_id: UUID,
     bet_id: UUID,
     session: AsyncSession = Depends(get_session),
-    org_ctx: OrganizationContext = Depends(require_org_member),
+    portfolio: PaperPortfolio = PORTFOLIO_DEP,
     result: str = "won",  # won, lost, push, void
 ) -> dict:
     """Resolve a pending bet. Updates bankroll accordingly."""
     stmt = select(PaperBet).where(
         PaperBet.id == bet_id,
-        PaperBet.portfolio_id == portfolio_id,
+        PaperBet.portfolio_id == portfolio.id,
     )
     bet = (await session.execute(stmt)).scalar_one_or_none()
     if not bet:
@@ -181,11 +192,6 @@ async def resolve_bet(
         raise HTTPException(status_code=400, detail=f"Bet already resolved: {bet.status}")
     if result not in ("won", "lost", "push", "void"):
         raise HTTPException(status_code=400, detail="Result must be won, lost, push, or void")
-
-    # Get portfolio for bankroll update
-    portfolio = (await session.get(PaperPortfolio, portfolio_id))
-    if not portfolio:
-        raise HTTPException(status_code=404, detail="Portfolio not found")
 
     now = utcnow()
     bet.status = result
@@ -231,21 +237,20 @@ async def resolve_bet(
 
 @router.get("/portfolios/{portfolio_id}/bets/summary")
 async def bet_summary(
-    portfolio_id: UUID,
     session: AsyncSession = Depends(get_session),
-    org_ctx: OrganizationContext = Depends(require_org_member),
+    portfolio: PaperPortfolio = PORTFOLIO_DEP,
 ) -> dict:
     """Performance summary for sports betting."""
     # All resolved bets
     stmt = select(PaperBet).where(
-        PaperBet.portfolio_id == portfolio_id,
+        PaperBet.portfolio_id == portfolio.id,
         PaperBet.status.in_(["won", "lost", "push"]),
     )
     resolved = (await session.execute(stmt)).scalars().all()
 
     # Pending bets
     pending_stmt = select(PaperBet).where(
-        PaperBet.portfolio_id == portfolio_id,
+        PaperBet.portfolio_id == portfolio.id,
         PaperBet.status == "pending",
     )
     pending = (await session.execute(pending_stmt)).scalars().all()

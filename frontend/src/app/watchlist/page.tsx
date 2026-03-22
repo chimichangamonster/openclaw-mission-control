@@ -14,6 +14,7 @@ import {
 
 import { useAuth } from "@/auth/clerk";
 import { DashboardPageLayout } from "@/components/templates/DashboardPageLayout";
+import { FeatureGate } from "@/components/molecules/FeatureGate";
 import { cn } from "@/lib/utils";
 import { customFetch } from "@/api/mutator";
 
@@ -172,6 +173,7 @@ export default function WatchlistPage() {
   const alertCount = summary?.alerting ?? 0;
 
   return (
+    <FeatureGate flag="watchlist" label="Watchlist">
     <DashboardPageLayout
       signedOut={{
         message: "Sign in to view your watchlist.",
@@ -440,5 +442,6 @@ export default function WatchlistPage() {
         </p>
       )}
     </DashboardPageLayout>
+    </FeatureGate>
   );
 }

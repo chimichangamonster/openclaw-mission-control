@@ -235,3 +235,9 @@ webhook_ingest_limiter: RateLimiter = create_rate_limiter(
     max_requests=60,
     window_seconds=60.0,
 )
+# Per-org API rate limit: 600 requests per 60 seconds per organization.
+org_api_limiter: RateLimiter = create_rate_limiter(
+    namespace="org_api",
+    max_requests=600,
+    window_seconds=60.0,
+)

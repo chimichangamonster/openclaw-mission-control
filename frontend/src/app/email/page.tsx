@@ -16,6 +16,7 @@ import {
 
 import { useAuth } from "@/auth/clerk";
 import { DashboardPageLayout } from "@/components/templates/DashboardPageLayout";
+import { FeatureGate } from "@/components/molecules/FeatureGate";
 import { Button } from "@/components/ui/button";
 import {
   type EmailAccount,
@@ -113,6 +114,7 @@ export default function EmailPage() {
   ];
 
   return (
+    <FeatureGate flag="email" label="Email">
     <DashboardPageLayout
       signedOut={{
         message: "Sign in to view your email.",
@@ -314,5 +316,6 @@ export default function EmailPage() {
         </div>
       )}
     </DashboardPageLayout>
+    </FeatureGate>
   );
 }

@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select, func, cast, Date
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.api.deps import get_session, require_org_member
+from app.api.deps import ORG_RATE_LIMIT_DEP, PORTFOLIO_DEP, get_session, require_feature, require_org_member
 from app.core.logging import get_logger
 from app.core.time import utcnow
 from app.services.notifications import notify
@@ -17,7 +17,11 @@ from app.models.paper_trading import PaperPortfolio, PaperPosition, PaperTrade
 from app.services.organizations import OrganizationContext
 
 logger = get_logger(__name__)
-router = APIRouter(prefix="/paper-trading", tags=["paper-trading"])
+router = APIRouter(
+    prefix="/paper-trading",
+    tags=["paper-trading"],
+    dependencies=[Depends(require_feature("paper_trading")), ORG_RATE_LIMIT_DEP],
+)
 
 
 @router.get("/portfolios")
@@ -151,13 +155,12 @@ async def toggle_auto_trade(
 
 @router.get("/portfolios/{portfolio_id}/positions")
 async def list_positions(
-    portfolio_id: UUID,
     session: AsyncSession = Depends(get_session),
-    org_ctx: OrganizationContext = Depends(require_org_member),
+    portfolio: PaperPortfolio = PORTFOLIO_DEP,
     status_filter: str = Query("open", alias="status"),
 ) -> list[dict]:
     stmt = select(PaperPosition).where(
-        PaperPosition.portfolio_id == portfolio_id,
+        PaperPosition.portfolio_id == portfolio.id,
     )
     if status_filter != "all":
         stmt = stmt.where(PaperPosition.status == status_filter)
@@ -378,14 +381,13 @@ async def execute_trade(
 
 @router.get("/portfolios/{portfolio_id}/trades")
 async def list_trades(
-    portfolio_id: UUID,
     session: AsyncSession = Depends(get_session),
-    org_ctx: OrganizationContext = Depends(require_org_member),
+    portfolio: PaperPortfolio = PORTFOLIO_DEP,
     limit: int = Query(50, le=200),
 ) -> list[dict]:
     stmt = (
         select(PaperTrade)
-        .where(PaperTrade.portfolio_id == portfolio_id)
+        .where(PaperTrade.portfolio_id == portfolio.id)
         .order_by(PaperTrade.executed_at.desc())
         .limit(limit)
     )
@@ -503,10 +505,9 @@ async def portfolio_summary(
 
 @router.patch("/portfolios/{portfolio_id}/positions/{position_id}")
 async def update_position(
-    portfolio_id: UUID,
     position_id: UUID,
     session: AsyncSession = Depends(get_session),
-    org_ctx: OrganizationContext = Depends(require_org_member),
+    portfolio: PaperPortfolio = PORTFOLIO_DEP,
     current_price: float | None = None,
     stop_loss: float | None = None,
     take_profit: float | None = None,
@@ -518,7 +519,7 @@ async def update_position(
     """Update position metadata — price, risk levels, or ticker info."""
     stmt = select(PaperPosition).where(
         PaperPosition.id == position_id,
-        PaperPosition.portfolio_id == portfolio_id,
+        PaperPosition.portfolio_id == portfolio.id,
     )
     position = (await session.execute(stmt)).scalar_one_or_none()
     if not position:

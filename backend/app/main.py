@@ -29,6 +29,7 @@ from app.api.email import router as email_router
 from app.api.email_oauth import router as email_oauth_router
 from app.api.gateway import router as gateway_router
 from app.api.cost_tracker import router as cost_tracker_router
+from app.api.organization_settings import router as org_settings_router
 from app.api.cron_jobs import router as cron_jobs_router
 from app.api.paper_bets import router as paper_bets_router
 from app.api.paper_trading import router as paper_trading_router
@@ -529,12 +530,27 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
     budget_task = asyncio.create_task(_check_budgets_loop())
 
+    # Background task: check for stale cron tasks every 10 minutes.
+    async def _cron_watchdog_loop() -> None:
+        from app.services.cron_watchdog import check_stale_cron_tasks
+
+        await asyncio.sleep(120)  # delay to let gateway connect + first crons finish
+        while True:
+            try:
+                await check_stale_cron_tasks()
+            except Exception:  # noqa: BLE001
+                logger.exception("cron_watchdog.check_failed")
+            await asyncio.sleep(600)
+
+    watchdog_task = asyncio.create_task(_cron_watchdog_loop())
+
     logger.info("app.lifecycle.started")
     try:
         yield
     finally:
         pool_task.cancel()
         budget_task.cancel()
+        watchdog_task.cancel()
         if listener_task and not listener_task.done():
             listener_task.cancel()
             try:
@@ -716,6 +732,7 @@ api_v1.include_router(crypto_trading_router)
 api_v1.include_router(paper_trading_router)
 api_v1.include_router(paper_bets_router)
 api_v1.include_router(cost_tracker_router)
+api_v1.include_router(org_settings_router)
 api_v1.include_router(cron_jobs_router)
 api_v1.include_router(board_memory_router)
 api_v1.include_router(board_webhooks_router)

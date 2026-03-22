@@ -8,6 +8,7 @@ import { Search, TrendingUp, BarChart3 } from "lucide-react";
 
 import { useAuth } from "@/auth/clerk";
 import { DashboardPageLayout } from "@/components/templates/DashboardPageLayout";
+import { FeatureGate } from "@/components/molecules/FeatureGate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { type MarketSearchResult, searchMarkets } from "@/lib/polymarket-api";
@@ -67,6 +68,7 @@ export default function TradingPage() {
   };
 
   return (
+    <FeatureGate flag="polymarket" label="Prediction Markets">
     <DashboardPageLayout
       signedOut={{
         message: "Sign in to browse prediction markets.",
@@ -267,5 +269,6 @@ export default function TradingPage() {
         )}
       </div>
     </DashboardPageLayout>
+    </FeatureGate>
   );
 }

@@ -19,16 +19,19 @@ of re-implementing permission checks in the router.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Callable, Literal
 from uuid import UUID
 
 from fastapi import Depends, HTTPException, Request, status
+from sqlmodel import select
 
 from app.core.agent_auth import get_agent_auth_context_optional
 from app.core.auth import AuthContext, get_auth_context, get_auth_context_optional
 from app.db.session import get_session
 from app.models.boards import Board
+from app.models.organization_settings import DEFAULT_FEATURE_FLAGS, OrganizationSettings
 from app.models.organizations import Organization
+from app.models.paper_trading import PaperPortfolio
 from app.models.tasks import Task
 from app.services.admin_access import require_user_actor
 from app.services.organizations import (
@@ -116,6 +119,57 @@ async def require_org_member(
 
 
 ORG_MEMBER_DEP = Depends(require_org_member)
+
+
+def require_feature(flag: str) -> Callable:
+    """Factory that returns a FastAPI dependency enforcing a feature flag.
+
+    Usage: ``router = APIRouter(dependencies=[Depends(require_feature("paper_trading"))])``
+
+    Resolves the caller's organization, loads OrganizationSettings, and raises
+    403 if the flag is disabled.
+    """
+
+    async def _check(
+        org_ctx: OrganizationContext = ORG_MEMBER_DEP,
+        session: AsyncSession = SESSION_DEP,
+    ) -> None:
+        result = await session.execute(
+            select(OrganizationSettings).where(
+                OrganizationSettings.organization_id == org_ctx.organization.id
+            )
+        )
+        settings = result.scalars().first()
+        if settings:
+            flags = settings.feature_flags
+        else:
+            flags = dict(DEFAULT_FEATURE_FLAGS)
+
+        if not flags.get(flag, False):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Feature '{flag}' is not enabled for this organization.",
+            )
+
+    return _check
+
+
+async def check_org_rate_limit(
+    org_ctx: OrganizationContext = ORG_MEMBER_DEP,
+) -> None:
+    """Enforce per-org API rate limiting (600 req/min)."""
+    from app.core.rate_limit import org_api_limiter
+
+    key = str(org_ctx.organization.id)
+    if not await org_api_limiter.is_allowed(key):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Rate limit exceeded for this organization. Try again shortly.",
+            headers={"Retry-After": "60"},
+        )
+
+
+ORG_RATE_LIMIT_DEP = Depends(check_org_rate_limit)
 
 
 async def require_org_admin(
@@ -207,6 +261,27 @@ async def get_board_for_user_write(
 
 
 BOARD_READ_DEP = Depends(get_board_for_actor_read)
+
+
+async def get_portfolio_for_org(
+    portfolio_id: UUID,
+    session: AsyncSession = SESSION_DEP,
+    org_ctx: OrganizationContext = ORG_MEMBER_DEP,
+) -> PaperPortfolio:
+    """Load a portfolio and verify it belongs to the caller's organization."""
+    result = await session.execute(
+        select(PaperPortfolio).where(
+            PaperPortfolio.id == portfolio_id,
+            PaperPortfolio.organization_id == org_ctx.organization.id,
+        )
+    )
+    portfolio = result.scalars().first()
+    if portfolio is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    return portfolio
+
+
+PORTFOLIO_DEP = Depends(get_portfolio_for_org)
 
 
 async def get_task_or_404(

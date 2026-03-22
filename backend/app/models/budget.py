@@ -17,11 +17,13 @@ from app.models.base import QueryModel
 
 
 class BudgetConfig(QueryModel, table=True):
-    """Platform-level budget configuration (single row)."""
+    """Per-organization budget configuration."""
 
     __tablename__ = "budget_configs"  # pyright: ignore[reportAssignmentType]
+    __table_args__ = (UniqueConstraint("organization_id", name="uq_budget_configs_org"),)
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
+    organization_id: UUID = Field(foreign_key="organizations.id", index=True)
     monthly_budget: float = Field(default=25.0)
     alert_thresholds_json: str = Field(default="[50, 80, 95]")
     agent_daily_limits_json: str = Field(
@@ -47,12 +49,13 @@ class BudgetConfig(QueryModel, table=True):
 
 
 class DailyAgentSpend(QueryModel, table=True):
-    """Per-agent daily spend snapshot."""
+    """Per-agent daily spend snapshot, scoped to organization."""
 
     __tablename__ = "daily_agent_spends"  # pyright: ignore[reportAssignmentType]
-    __table_args__ = (UniqueConstraint("agent_name", "date", name="uq_agent_date"),)
+    __table_args__ = (UniqueConstraint("organization_id", "agent_name", "date", name="uq_org_agent_date"),)
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
+    organization_id: UUID = Field(foreign_key="organizations.id", index=True)
     agent_name: str = Field(index=True)
     date: _date_type = Field(index=True)
     input_tokens: int = Field(default=0)

@@ -3,10 +3,11 @@
 export const dynamic = "force-dynamic";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { DollarSign, TrendingUp, AlertTriangle, Zap, BarChart3, RefreshCw, Calendar } from "lucide-react";
+import { DollarSign, TrendingUp, AlertTriangle, Zap, BarChart3, RefreshCw, Calendar, Settings, X, Save } from "lucide-react";
 
 import { useAuth } from "@/auth/clerk";
 import { DashboardPageLayout } from "@/components/templates/DashboardPageLayout";
+import { FeatureGate } from "@/components/molecules/FeatureGate";
 import { customFetch } from "@/api/mutator";
 
 interface UsageData {
@@ -108,6 +109,9 @@ export default function CostsPage() {
   const [activityPeriod, setActivityPeriod] = useState<"daily" | "weekly" | "monthly">("daily");
   const [activityLoading, setActivityLoading] = useState(false);
   const [budget, setBudget] = useState<any>(null);
+  const [editingBudget, setEditingBudget] = useState(false);
+  const [budgetForm, setBudgetForm] = useState({ monthly_budget: 25, alert_thresholds: "50, 80, 95", agent_daily_limits: "{}", throttle_to_tier1_on_exceed: true, alerts_enabled: true });
+  const [savingBudget, setSavingBudget] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const loadActivity = useCallback(async (period: string) => {
@@ -219,6 +223,7 @@ export default function CostsPage() {
   const totalSessionCost = sessions.reduce((sum, s) => sum + s.estimatedCost, 0);
 
   return (
+    <FeatureGate flag="cost_tracker" label="Cost & Usage">
     <DashboardPageLayout
       signedOut={{ message: "Sign in to view costs.", forceRedirectUrl: "/costs", signUpForceRedirectUrl: "/costs" }}
       title="Cost & Usage"
@@ -280,12 +285,127 @@ export default function CostsPage() {
           {/* Budget Controls & Per-Agent Spend */}
           {budget && (
             <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-              <div className="border-b border-slate-100 px-4 py-3">
-                <h3 className="text-sm font-semibold text-slate-900">Budget Controls</h3>
-                <p className="text-xs text-slate-500">
-                  Monthly budget: ${budget.config.monthly_budget.toFixed(2)} • Alerts at {budget.config.alert_thresholds.join("%, ")}%
-                </p>
+              <div className="border-b border-slate-100 px-4 py-3 flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-900">Budget Controls</h3>
+                  <p className="text-xs text-slate-500">
+                    Monthly budget: ${budget.config.monthly_budget.toFixed(2)} • Alerts at {budget.config.alert_thresholds.join("%, ")}%
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    if (!editingBudget) {
+                      setBudgetForm({
+                        monthly_budget: budget.config.monthly_budget,
+                        alert_thresholds: budget.config.alert_thresholds.join(", "),
+                        agent_daily_limits: JSON.stringify(budget.config.agent_daily_limits, null, 2),
+                        throttle_to_tier1_on_exceed: budget.config.throttle_to_tier1_on_exceed,
+                        alerts_enabled: budget.config.alerts_enabled,
+                      });
+                    }
+                    setEditingBudget(!editingBudget);
+                  }}
+                  className="rounded-lg p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
+                >
+                  {editingBudget ? <X className="h-4 w-4" /> : <Settings className="h-4 w-4" />}
+                </button>
               </div>
+
+              {/* Budget Editor */}
+              {editingBudget && (
+                <div className="border-b border-slate-100 bg-slate-50/50 p-4 space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">Monthly Budget ($)</label>
+                      <input
+                        type="number"
+                        step="5"
+                        min="0"
+                        value={budgetForm.monthly_budget}
+                        onChange={(e) => setBudgetForm({ ...budgetForm, monthly_budget: parseFloat(e.target.value) || 0 })}
+                        className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-800 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">Alert Thresholds (%)</label>
+                      <input
+                        type="text"
+                        value={budgetForm.alert_thresholds}
+                        onChange={(e) => setBudgetForm({ ...budgetForm, alert_thresholds: e.target.value })}
+                        placeholder="50, 80, 95"
+                        className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-800 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Agent Daily Limits (JSON)</label>
+                    <textarea
+                      value={budgetForm.agent_daily_limits}
+                      onChange={(e) => setBudgetForm({ ...budgetForm, agent_daily_limits: e.target.value })}
+                      rows={4}
+                      className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-mono text-slate-800 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none"
+                    />
+                  </div>
+                  <div className="flex items-center gap-6">
+                    <label className="flex items-center gap-2 text-xs text-slate-600">
+                      <input
+                        type="checkbox"
+                        checked={budgetForm.alerts_enabled}
+                        onChange={(e) => setBudgetForm({ ...budgetForm, alerts_enabled: e.target.checked })}
+                        className="rounded border-slate-300"
+                      />
+                      Discord Alerts
+                    </label>
+                    <label className="flex items-center gap-2 text-xs text-slate-600">
+                      <input
+                        type="checkbox"
+                        checked={budgetForm.throttle_to_tier1_on_exceed}
+                        onChange={(e) => setBudgetForm({ ...budgetForm, throttle_to_tier1_on_exceed: e.target.checked })}
+                        className="rounded border-slate-300"
+                      />
+                      Throttle to Tier 1 on Exceed
+                    </label>
+                  </div>
+                  <div className="flex justify-end">
+                    <button
+                      disabled={savingBudget}
+                      onClick={async () => {
+                        try {
+                          setSavingBudget(true);
+                          const thresholds = budgetForm.alert_thresholds.split(",").map((s: string) => parseInt(s.trim())).filter((n: number) => !isNaN(n));
+                          let agentLimits: Record<string, number>;
+                          try { agentLimits = JSON.parse(budgetForm.agent_daily_limits); } catch { agentLimits = budget.config.agent_daily_limits; }
+                          await customFetch("/api/v1/cost-tracker/budget", {
+                            method: "PUT",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              monthly_budget: budgetForm.monthly_budget,
+                              alert_thresholds: thresholds,
+                              agent_daily_limits: agentLimits,
+                              throttle_to_tier1_on_exceed: budgetForm.throttle_to_tier1_on_exceed,
+                              alerts_enabled: budgetForm.alerts_enabled,
+                            }),
+                          });
+                          setEditingBudget(false);
+                          // Reload budget data
+                          const budgetRaw: any = await customFetch("/api/v1/cost-tracker/budget", { method: "GET" }).catch(() => null);
+                          const budgetData = budgetRaw?.data ?? budgetRaw;
+                          if (budgetData?.config) setBudget(budgetData);
+                        } catch {
+                          // ignore
+                        } finally {
+                          setSavingBudget(false);
+                        }
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50 transition"
+                    >
+                      <Save className="h-3.5 w-3.5" />
+                      {savingBudget ? "Saving..." : "Save"}
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="p-4 space-y-4">
                 {/* Monthly progress */}
                 <div>
@@ -719,5 +839,6 @@ export default function CostsPage() {
         </div>
       )}
     </DashboardPageLayout>
+    </FeatureGate>
   );
 }
