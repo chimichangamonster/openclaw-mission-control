@@ -34,6 +34,8 @@ interface OrgSettings {
     allow_email_content_to_llm: boolean;
     log_llm_inputs: boolean;
   };
+  timezone: string;
+  location: string;
   member_role: string;
   is_admin: boolean;
 }
@@ -97,6 +99,11 @@ export default function OrgSettingsPage() {
   const [logLlmInputs, setLogLlmInputs] = useState(false);
   const [savingPolicy, setSavingPolicy] = useState(false);
 
+  // Timezone & location
+  const [editTimezone, setEditTimezone] = useState("America/Edmonton");
+  const [editLocation, setEditLocation] = useState("");
+  const [savingLocale, setSavingLocale] = useState(false);
+
   // Microsoft Graph state
   const [connectingGraph, setConnectingGraph] = useState(false);
 
@@ -122,6 +129,9 @@ export default function OrgSettingsPage() {
           setAllowEmailToLlm(sData.data_policy.allow_email_content_to_llm ?? true);
           setLogLlmInputs(sData.data_policy.log_llm_inputs ?? false);
         }
+        // Sync timezone & location
+        if (sData.timezone) setEditTimezone(sData.timezone);
+        if (sData.location !== undefined) setEditLocation(sData.location);
       }
       const aData = auditRaw?.data ?? auditRaw;
       if (aData?.entries) setAuditLog(aData.entries as AuditEntry[]);
@@ -577,6 +587,83 @@ export default function OrgSettingsPage() {
                     </button>
                   </div>
                 )}
+              </div>
+            </div>
+
+            {/* Timezone & Location */}
+            <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+              <div className="border-b border-slate-100 px-5 py-3">
+                <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                  <Globe className="h-4 w-4" /> Timezone & Location
+                </h2>
+                <p className="text-xs text-slate-500">Used for scheduling, cron jobs, and date formatting across the platform.</p>
+              </div>
+              <div className="p-5 space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Timezone</label>
+                    <select
+                      value={editTimezone}
+                      onChange={(e) => setEditTimezone(e.target.value)}
+                      className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none"
+                    >
+                      <optgroup label="North America">
+                        <option value="America/Edmonton">Mountain Time (Edmonton)</option>
+                        <option value="America/Vancouver">Pacific Time (Vancouver)</option>
+                        <option value="America/Winnipeg">Central Time (Winnipeg)</option>
+                        <option value="America/Toronto">Eastern Time (Toronto)</option>
+                        <option value="America/Halifax">Atlantic Time (Halifax)</option>
+                        <option value="America/St_Johns">Newfoundland (St. John&apos;s)</option>
+                        <option value="America/New_York">Eastern Time (New York)</option>
+                        <option value="America/Chicago">Central Time (Chicago)</option>
+                        <option value="America/Denver">Mountain Time (Denver)</option>
+                        <option value="America/Los_Angeles">Pacific Time (Los Angeles)</option>
+                      </optgroup>
+                      <optgroup label="International">
+                        <option value="Europe/London">GMT (London)</option>
+                        <option value="Europe/Paris">CET (Paris)</option>
+                        <option value="Europe/Berlin">CET (Berlin)</option>
+                        <option value="Asia/Dubai">GST (Dubai)</option>
+                        <option value="Asia/Singapore">SGT (Singapore)</option>
+                        <option value="Asia/Tokyo">JST (Tokyo)</option>
+                        <option value="Australia/Sydney">AEST (Sydney)</option>
+                        <option value="Pacific/Auckland">NZST (Auckland)</option>
+                      </optgroup>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Location</label>
+                    <input
+                      type="text"
+                      value={editLocation}
+                      onChange={(e) => setEditLocation(e.target.value)}
+                      placeholder="Calgary, AB, Canada"
+                      className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none"
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end">
+                  <button
+                    onClick={async () => {
+                      try {
+                        setSavingLocale(true);
+                        await customFetch("/api/v1/organization-settings", {
+                          method: "PUT",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ timezone: editTimezone, location: editLocation }),
+                        });
+                        await loadData();
+                      } catch { /* ignore */ } finally {
+                        setSavingLocale(false);
+                      }
+                    }}
+                    disabled={savingLocale}
+                    className="inline-flex items-center gap-2 rounded-lg bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50 transition"
+                  >
+                    <Save className="h-3 w-3" />
+                    {savingLocale ? "Saving..." : "Save"}
+                  </button>
+                </div>
               </div>
             </div>
 

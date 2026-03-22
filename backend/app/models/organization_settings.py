@@ -72,6 +72,10 @@ class OrganizationSettings(QueryModel, table=True):
     # Industry template
     industry_template_id: str | None = Field(default=None)  # "construction", "staffing", etc.
 
+    # Timezone and location
+    timezone: str = Field(default="America/Edmonton")
+    location: str = Field(default="")
+
     # Branding / org context
     branding_json: str = Field(default="{}")
 

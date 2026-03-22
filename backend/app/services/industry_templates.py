@@ -78,6 +78,14 @@ TEMPLATES: dict[str, IndustryTemplate] = {
                 ConfigItem("dump_truck", "Dump Truck", {"rate_per_hour": 95.00, "rate_per_day": 650.00}),
                 ConfigItem("crane", "Crane", {"rate_per_hour": 250.00, "rate_per_day": 1800.00}),
             ],
+            "brand_voice": [
+                ConfigItem("tone", "Tone", {"value": "Professional, confident, results-driven"}),
+                ConfigItem("voice", "Voice", {"value": "We're the experts who get it done right the first time"}),
+                ConfigItem("audience", "Audience", {"value": "Project managers, general contractors, property developers"}),
+                ConfigItem("avoid", "Avoid", {"value": "Jargon overload, salesy language, exclamation marks"}),
+                ConfigItem("keywords", "Keywords", {"value": "quality, precision, on-time, on-budget, trusted partner"}),
+                ConfigItem("location", "Location", {"value": "Calgary, AB"}),
+            ],
         },
         onboarding_steps=[
             OnboardingStep("review_cost_codes", "Review and customize cost codes", "Default construction cost codes have been added. Modify codes, rates, and categories to match your accounting.", 1),
@@ -125,6 +133,14 @@ TEMPLATES: dict[str, IndustryTemplate] = {
                     "location": "Edmonton, AB",
                 }),
             ],
+            "brand_voice": [
+                ConfigItem("tone", "Tone", {"value": "Practical, community-focused, environmentally conscious"}),
+                ConfigItem("voice", "Voice", {"value": "Straightforward experts who care about doing it right"}),
+                ConfigItem("audience", "Audience", {"value": "Municipalities, commercial property managers, construction companies"}),
+                ConfigItem("avoid", "Avoid", {"value": "Preachy environmentalism, corporate speak"}),
+                ConfigItem("keywords", "Keywords", {"value": "reliable, clean, efficient, sustainable, local"}),
+                ConfigItem("location", "Location", {"value": "Edmonton, AB"}),
+            ],
         },
         onboarding_steps=[
             OnboardingStep("review_services", "Review service catalog", "Default services and pricing have been added. Adjust to your rates.", 1),
@@ -159,6 +175,14 @@ TEMPLATES: dict[str, IndustryTemplate] = {
                 ConfigItem("net15", "Net 15", {"days": 15}),
                 ConfigItem("net30", "Net 30", {"days": 30}),
                 ConfigItem("net45", "Net 45", {"days": 45}),
+            ],
+            "brand_voice": [
+                ConfigItem("tone", "Tone", {"value": "Approachable, reliable, energetic"}),
+                ConfigItem("voice", "Voice", {"value": "We connect great people with great work"}),
+                ConfigItem("audience", "Audience", {"value": "Job seekers, hiring managers, HR departments"}),
+                ConfigItem("avoid", "Avoid", {"value": "Generic recruiter language, overpromising"}),
+                ConfigItem("keywords", "Keywords", {"value": "opportunity, team, growth, flexible, skilled"}),
+                ConfigItem("location", "Location", {"value": "Calgary, AB"}),
             ],
         },
         onboarding_steps=[

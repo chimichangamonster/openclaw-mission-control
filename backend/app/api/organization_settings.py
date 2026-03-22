@@ -129,6 +129,9 @@ async def get_settings(
         "custom_llm_endpoint_url": settings.custom_llm_endpoint.get("api_url"),
         # Data policy
         "data_policy": settings.data_policy,
+        # Timezone and location
+        "timezone": settings.timezone,
+        "location": settings.location,
         # Caller's role context
         "member_role": org_ctx.member.role,
         "is_admin": org_ctx.member.role in {"admin", "owner"},
@@ -148,6 +151,8 @@ class SettingsUpdate(BaseModel):
     agent_defaults: dict | None = None
     branding: dict | None = None
     data_policy: DataPolicyUpdate | None = None
+    timezone: str | None = None
+    location: str | None = None
 
 
 @router.put("")
@@ -197,6 +202,12 @@ async def update_settings(
                 current["log_llm_inputs"] = payload.data_policy.log_llm_inputs
             settings.data_policy_json = json.dumps(current)
             changes["data_policy"] = True
+        if payload.timezone is not None:
+            changes["timezone"] = {"old": settings.timezone, "new": payload.timezone}
+            settings.timezone = payload.timezone
+        if payload.location is not None:
+            changes["location"] = {"old": settings.location, "new": payload.location}
+            settings.location = payload.location
 
         settings.updated_at = utcnow()
         await session.commit()

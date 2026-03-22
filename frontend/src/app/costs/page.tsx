@@ -521,15 +521,15 @@ export default function CostsPage() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-slate-100 text-left text-xs text-slate-500">
-                        <th className="px-4 py-2 w-8">#</th>
-                        <th className="px-4 py-2">Model</th>
-                        <th className="px-4 py-2">Tier</th>
-                        {hasHistory && <th className="px-4 py-2 text-right">30d Cost</th>}
-                        <th className="px-4 py-2 text-right">{hasHistory ? "Live Cost" : "Est. Cost"}</th>
-                        <th className="px-4 py-2 text-right">Tokens</th>
-                        <th className="px-4 py-2 text-right">{hasHistory ? "Requests" : "Sessions"}</th>
-                        <th className="px-4 py-2">Agents</th>
-                        <th className="px-4 py-2 w-[25%]"></th>
+                        <th className="px-2 sm:px-4 py-2 w-8">#</th>
+                        <th className="px-2 sm:px-4 py-2">Model</th>
+                        <th className="hidden sm:table-cell px-2 sm:px-4 py-2">Tier</th>
+                        {hasHistory && <th className="hidden md:table-cell px-2 sm:px-4 py-2 text-right">30d Cost</th>}
+                        <th className="px-2 sm:px-4 py-2 text-right">{hasHistory ? "Cost" : "Est. Cost"}</th>
+                        <th className="hidden lg:table-cell px-2 sm:px-4 py-2 text-right">Tokens</th>
+                        <th className="hidden lg:table-cell px-2 sm:px-4 py-2 text-right">{hasHistory ? "Requests" : "Sessions"}</th>
+                        <th className="hidden md:table-cell px-2 sm:px-4 py-2">Agents</th>
+                        <th className="hidden sm:table-cell px-2 sm:px-4 py-2 w-[20%]"></th>
                       </tr>
                     </thead>
                     <tbody>
@@ -542,7 +542,7 @@ export default function CostsPage() {
                         const isTop3 = i < 3;
                         return (
                           <tr key={m.model} className={`border-b border-slate-50 hover:bg-slate-50 ${isTop3 ? "bg-slate-25" : ""}`}>
-                            <td className="px-4 py-2.5">
+                            <td className="px-2 sm:px-4 py-2.5">
                               <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
                                 i === 0 ? "bg-amber-100 text-amber-700" :
                                 i === 1 ? "bg-slate-200 text-slate-600" :
@@ -552,10 +552,18 @@ export default function CostsPage() {
                                 {i + 1}
                               </span>
                             </td>
-                            <td className="px-4 py-2.5">
-                              <span className="font-mono font-medium text-slate-800">{m.model}</span>
+                            <td className="px-2 sm:px-4 py-2.5">
+                              <span className="font-mono font-medium text-slate-800 text-xs sm:text-sm">{m.model}</span>
+                              <span className={`sm:hidden ml-1.5 rounded px-1 py-0.5 text-[9px] font-medium ${
+                                m.tier.includes("4") ? "bg-red-100 text-red-700" :
+                                m.tier.includes("3") ? "bg-purple-100 text-purple-700" :
+                                m.tier.includes("2") ? "bg-blue-100 text-blue-700" :
+                                "bg-emerald-100 text-emerald-700"
+                              }`}>
+                                {m.tier.replace("Tier ", "T").replace(" — ", " ").split(" ")[0]}
+                              </span>
                             </td>
-                            <td className="px-4 py-2.5">
+                            <td className="hidden sm:table-cell px-2 sm:px-4 py-2.5">
                               <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
                                 m.tier.includes("4") ? "bg-red-100 text-red-700" :
                                 m.tier.includes("3") ? "bg-purple-100 text-purple-700" :
@@ -566,20 +574,20 @@ export default function CostsPage() {
                               </span>
                             </td>
                             {hasHistory && (
-                              <td className="px-4 py-2.5 text-right font-mono text-xs font-semibold text-slate-900">
+                              <td className="hidden md:table-cell px-2 sm:px-4 py-2.5 text-right font-mono text-xs font-semibold text-slate-900">
                                 ${m.hist_cost.toFixed(4)}
                               </td>
                             )}
-                            <td className={`px-4 py-2.5 text-right font-mono text-xs ${hasHistory ? "text-slate-500" : "font-semibold text-slate-900"}`}>
+                            <td className={`px-2 sm:px-4 py-2.5 text-right font-mono text-xs ${hasHistory ? "text-slate-500" : "font-semibold text-slate-900"}`}>
                               {m.live_cost > 0 ? `$${m.live_cost.toFixed(4)}` : "—"}
                             </td>
-                            <td className="px-4 py-2.5 text-right font-mono text-xs text-slate-500">
+                            <td className="hidden lg:table-cell px-2 sm:px-4 py-2.5 text-right font-mono text-xs text-slate-500">
                               {(m.hist_tokens + m.live_tokens).toLocaleString()}
                             </td>
-                            <td className="px-4 py-2.5 text-right font-mono text-xs text-slate-500">
+                            <td className="hidden lg:table-cell px-2 sm:px-4 py-2.5 text-right font-mono text-xs text-slate-500">
                               {hasHistory && m.hist_requests > 0 ? m.hist_requests.toLocaleString() : m.sessions > 0 ? m.sessions : "—"}
                             </td>
-                            <td className="px-4 py-2.5">
+                            <td className="hidden md:table-cell px-2 sm:px-4 py-2.5">
                               {m.agents.length > 0 ? (
                                 <div className="flex flex-wrap gap-1">
                                   {m.agents.map((a) => (
@@ -588,7 +596,7 @@ export default function CostsPage() {
                                 </div>
                               ) : null}
                             </td>
-                            <td className="px-4 py-2.5">
+                            <td className="hidden sm:table-cell px-2 sm:px-4 py-2.5">
                               <div className="h-2 w-full rounded-full bg-slate-100">
                                 <div className={`h-2 rounded-full transition-all ${tierColor}`} style={{ width: `${Math.max(pct, 2)}%` }} />
                               </div>
@@ -717,35 +725,35 @@ export default function CostsPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-slate-100 text-left text-xs text-slate-500">
-                    <th className="px-4 py-2">Channel</th>
-                    <th className="px-4 py-2">Agent</th>
-                    <th className="px-4 py-2">Model</th>
-                    <th className="px-4 py-2 text-right">Input</th>
-                    <th className="px-4 py-2 text-right">Output</th>
-                    <th className="px-4 py-2 text-right">Total</th>
-                    <th className="px-4 py-2 text-right">Est. Cost</th>
+                    <th className="hidden sm:table-cell px-2 sm:px-4 py-2">Channel</th>
+                    <th className="px-2 sm:px-4 py-2">Agent</th>
+                    <th className="px-2 sm:px-4 py-2">Model</th>
+                    <th className="hidden md:table-cell px-2 sm:px-4 py-2 text-right">Input</th>
+                    <th className="hidden md:table-cell px-2 sm:px-4 py-2 text-right">Output</th>
+                    <th className="hidden sm:table-cell px-2 sm:px-4 py-2 text-right">Total</th>
+                    <th className="px-2 sm:px-4 py-2 text-right">Est. Cost</th>
                   </tr>
                 </thead>
                 <tbody>
                   {sessions.map((s, i) => (
                     <tr key={i} className="border-b border-slate-50 hover:bg-slate-50">
-                      <td className="px-4 py-2 font-medium text-slate-900">{s.channel}</td>
-                      <td className="px-4 py-2 text-slate-600">{s.agent}</td>
-                      <td className="px-4 py-2">
+                      <td className="hidden sm:table-cell px-2 sm:px-4 py-2 font-medium text-slate-900">{s.channel}</td>
+                      <td className="px-2 sm:px-4 py-2 text-slate-600">{s.agent}</td>
+                      <td className="px-2 sm:px-4 py-2">
                         <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-mono text-slate-600">
                           {s.model}
                         </span>
                       </td>
-                      <td className="px-4 py-2 text-right font-mono text-xs text-slate-500">
+                      <td className="hidden md:table-cell px-2 sm:px-4 py-2 text-right font-mono text-xs text-slate-500">
                         {s.inputTokens.toLocaleString()}
                       </td>
-                      <td className="px-4 py-2 text-right font-mono text-xs text-slate-500">
+                      <td className="hidden md:table-cell px-2 sm:px-4 py-2 text-right font-mono text-xs text-slate-500">
                         {s.outputTokens.toLocaleString()}
                       </td>
-                      <td className="px-4 py-2 text-right font-mono text-xs text-slate-700">
+                      <td className="hidden sm:table-cell px-2 sm:px-4 py-2 text-right font-mono text-xs text-slate-700">
                         {s.totalTokens.toLocaleString()}
                       </td>
-                      <td className="px-4 py-2 text-right font-mono text-xs font-semibold text-slate-900">
+                      <td className="px-2 sm:px-4 py-2 text-right font-mono text-xs font-semibold text-slate-900">
                         ${s.estimatedCost.toFixed(4)}
                       </td>
                     </tr>

@@ -562,7 +562,7 @@ export default function PaperTradingPage() {
                                     <td className="px-5 py-3 font-medium text-slate-800">{b.selection}</td>
                                     <td className="px-5 py-3 text-slate-500">{b.game}</td>
                                     <td className="px-5 py-3 text-slate-500 text-xs tabular-nums">
-                                      {b.game_date ? new Date(b.game_date).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "—"}
+                                      {b.game_date ? new Date(b.game_date).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "—"}
                                     </td>
                                     <td className="px-5 py-3">
                                       <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 uppercase">{b.sport}</span>
@@ -653,7 +653,7 @@ export default function PaperTradingPage() {
                             <div key={t.id}>
                               <button
                                 onClick={() => setExpandedTrade(isExpanded ? null : t.id)}
-                                className="flex w-full items-center gap-3 px-5 py-3 text-left hover:bg-slate-50/50 transition"
+                                className="flex w-full items-center gap-2 sm:gap-3 px-3 sm:px-5 py-3 text-left hover:bg-slate-50/50 transition flex-wrap sm:flex-nowrap"
                               >
                                 {isExpanded ? (
                                   <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />
@@ -666,9 +666,9 @@ export default function PaperTradingPage() {
                                 )}>
                                   {t.trade_type.toUpperCase()}
                                 </span>
-                                <span className="min-w-[80px] font-medium text-slate-800 text-sm">{t.symbol}</span>
+                                <span className="font-medium text-slate-800 text-sm">{t.symbol}</span>
                                 <span className="text-xs text-slate-500">{t.quantity} @ ${t.price.toFixed(2)}</span>
-                                <span className="ml-auto text-xs text-slate-400">
+                                <span className="ml-auto text-xs text-slate-400 hidden sm:inline">
                                   {new Date(t.executed_at).toLocaleDateString()} {new Date(t.executed_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                                 </span>
                                 <span className="text-xs text-slate-500 font-medium">{fmtMoney(t.total)}</span>
@@ -676,8 +676,8 @@ export default function PaperTradingPage() {
                               {isExpanded && (() => {
                                 const pos = positions.find((p) => p.symbol === t.symbol);
                                 return (
-                                  <div className="bg-slate-50/50 px-12 pb-4 pt-1">
-                                    <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-xs sm:grid-cols-5">
+                                  <div className="bg-slate-50/50 px-4 sm:px-12 pb-4 pt-1">
+                                    <div className="grid grid-cols-2 gap-x-4 sm:gap-x-8 gap-y-2 text-xs sm:grid-cols-5">
                                       <div>
                                         <span className="text-slate-400">Asset</span>
                                         <div className="font-medium text-slate-700">{t.asset_type}</div>
@@ -772,7 +772,7 @@ export default function PaperTradingPage() {
                               <div key={b.id}>
                                 <button
                                   onClick={() => setExpandedBet(isExp ? null : b.id)}
-                                  className="flex w-full items-center gap-3 px-5 py-3 text-left hover:bg-slate-50/50 transition"
+                                  className="flex w-full items-center gap-2 sm:gap-3 px-3 sm:px-5 py-3 text-left hover:bg-slate-50/50 transition flex-wrap sm:flex-nowrap"
                                 >
                                   {isExp ? (
                                     <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />
@@ -789,8 +789,8 @@ export default function PaperTradingPage() {
                                     {b.status.toUpperCase()}
                                   </span>
                                   <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-600 uppercase">{b.sport}</span>
-                                  <span className="min-w-[120px] font-medium text-slate-800 text-sm">{b.selection}</span>
-                                  <span className="text-xs text-slate-500">{b.game}</span>
+                                  <span className="font-medium text-slate-800 text-sm truncate">{b.selection}</span>
+                                  <span className="text-xs text-slate-500 hidden sm:inline truncate">{b.game}</span>
                                   <span className="ml-auto text-xs font-mono text-slate-500">{b.odds >= 0 ? "+" : ""}{b.odds}</span>
                                   <span className="text-xs font-medium text-slate-700">{fmtMoney(b.stake)}</span>
                                   {b.status !== "pending" && (
@@ -800,15 +800,15 @@ export default function PaperTradingPage() {
                                   )}
                                 </button>
                                 {isExp && (
-                                  <div className="bg-slate-50/50 px-12 pb-4 pt-1">
-                                    <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-xs sm:grid-cols-4">
+                                  <div className="bg-slate-50/50 px-4 sm:px-12 pb-4 pt-1">
+                                    <div className="grid grid-cols-2 gap-x-4 sm:gap-x-8 gap-y-2 text-xs sm:grid-cols-4">
                                       <div>
                                         <span className="text-slate-400">Type</span>
                                         <div className="font-medium text-slate-700">{b.bet_type}{b.player ? ` — ${b.player}` : ""}</div>
                                       </div>
                                       <div>
                                         <span className="text-slate-400">Game Date</span>
-                                        <div className="font-medium text-slate-700">{b.game_date ? new Date(b.game_date).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "—"}</div>
+                                        <div className="font-medium text-slate-700">{b.game_date ? new Date(b.game_date).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "—"}</div>
                                       </div>
                                       <div>
                                         <span className="text-slate-400">Line</span>
@@ -943,18 +943,18 @@ function PositionsTable({
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
             <tr>
-              <th className="px-5 py-3">Symbol</th>
-              <th className="px-5 py-3">Side</th>
-              <th className="px-5 py-3 text-right">Qty</th>
-              <th className="px-5 py-3 text-right">Entry</th>
-              <th className="px-5 py-3 text-right">{showRealized ? "Exit" : "Current"}</th>
-              {!showRealized && <th className="px-5 py-3 text-right">Stop Loss</th>}
-              {!showRealized && <th className="px-5 py-3 text-right">Target</th>}
-              <th className="px-5 py-3 text-right">P&L</th>
-              <th className="px-5 py-3 text-right">P&L %</th>
-              <th className="px-5 py-3 text-right">Fees</th>
-              <th className="px-5 py-3 text-right">Days</th>
-              {showRealized && <th className="px-5 py-3">Closed</th>}
+              <th className="px-3 py-3 md:px-5">Symbol</th>
+              <th className="hidden sm:table-cell px-3 py-3 md:px-5">Side</th>
+              <th className="px-3 py-3 md:px-5 text-right">Qty</th>
+              <th className="px-3 py-3 md:px-5 text-right">Entry</th>
+              <th className="px-3 py-3 md:px-5 text-right">{showRealized ? "Exit" : "Current"}</th>
+              {!showRealized && <th className="hidden lg:table-cell px-3 py-3 md:px-5 text-right">Stop Loss</th>}
+              {!showRealized && <th className="hidden lg:table-cell px-3 py-3 md:px-5 text-right">Target</th>}
+              <th className="px-3 py-3 md:px-5 text-right">P&L</th>
+              <th className="hidden sm:table-cell px-3 py-3 md:px-5 text-right">P&L %</th>
+              <th className="hidden md:table-cell px-3 py-3 md:px-5 text-right">Fees</th>
+              <th className="hidden md:table-cell px-3 py-3 md:px-5 text-right">Days</th>
+              {showRealized && <th className="hidden sm:table-cell px-3 py-3 md:px-5">Closed</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -965,27 +965,28 @@ function PositionsTable({
               const tpDistance = pos.take_profit && pos.current_price ? ((pos.take_profit - pos.current_price) / pos.current_price * 100) : null;
               return (
                 <tr key={pos.id} className="hover:bg-slate-50/50">
-                  <td className="px-5 py-3">
+                  <td className="px-3 py-3 md:px-5">
                     <div className="font-medium text-slate-800">{pos.symbol}</div>
-                    {pos.company_name && <div className="text-xs text-slate-400 truncate max-w-[160px]">{pos.company_name}</div>}
+                    {pos.company_name && <div className="text-xs text-slate-400 truncate max-w-[120px] md:max-w-[160px]">{pos.company_name}</div>}
                     <div className="flex gap-1 mt-0.5">
-                      {pos.exchange && <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500">{pos.exchange}</span>}
-                      {pos.sector && <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-500">{pos.sector}</span>}
+                      <span className={cn("rounded-full px-1.5 py-0.5 text-[10px] font-medium sm:hidden", pos.side === "long" ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700")}>{pos.side}</span>
+                      {pos.exchange && <span className="hidden sm:inline rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500">{pos.exchange}</span>}
+                      {pos.sector && <span className="hidden md:inline rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-500">{pos.sector}</span>}
                     </div>
                   </td>
-                  <td className="px-5 py-3">
+                  <td className="hidden sm:table-cell px-3 py-3 md:px-5">
                     <span className={cn("rounded-full px-2 py-0.5 text-xs font-medium", pos.side === "long" ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700")}>
                       {pos.side}
                     </span>
                   </td>
-                  <td className="px-5 py-3 text-right tabular-nums">{pos.quantity}</td>
-                  <td className="px-5 py-3 text-right tabular-nums">${pos.entry_price.toFixed(2)}</td>
-                  <td className="px-5 py-3 text-right">
+                  <td className="px-3 py-3 md:px-5 text-right tabular-nums">{pos.quantity}</td>
+                  <td className="px-3 py-3 md:px-5 text-right tabular-nums">${pos.entry_price.toFixed(2)}</td>
+                  <td className="px-3 py-3 md:px-5 text-right">
                     <div className="tabular-nums">${displayPrice.toFixed(2)}</div>
-                    {pos.price_updated_at && <div className="text-[10px] text-slate-400">{new Date(pos.price_updated_at).toLocaleDateString()}</div>}
+                    {pos.price_updated_at && <div className="hidden md:block text-[10px] text-slate-400">{new Date(pos.price_updated_at).toLocaleDateString()}</div>}
                   </td>
                   {!showRealized && (
-                    <td className="px-5 py-3 text-right">
+                    <td className="hidden lg:table-cell px-3 py-3 md:px-5 text-right">
                       {pos.stop_loss ? (
                         <div>
                           <div className="tabular-nums text-red-600">${pos.stop_loss.toFixed(2)}</div>
@@ -995,7 +996,7 @@ function PositionsTable({
                     </td>
                   )}
                   {!showRealized && (
-                    <td className="px-5 py-3 text-right">
+                    <td className="hidden lg:table-cell px-3 py-3 md:px-5 text-right">
                       {pos.take_profit ? (
                         <div>
                           <div className="tabular-nums text-emerald-600">${pos.take_profit.toFixed(2)}</div>
@@ -1004,21 +1005,24 @@ function PositionsTable({
                       ) : <span className="text-slate-300">—</span>}
                     </td>
                   )}
-                  <td className={cn("px-5 py-3 text-right font-medium tabular-nums", pnlColor(pnl))}>
+                  <td className={cn("px-3 py-3 md:px-5 text-right font-medium tabular-nums", pnlColor(pnl))}>
                     {fmtPnl(pnl)}
+                    <div className={cn("sm:hidden text-[10px] font-normal", pnlColor(pos.pnl_pct))}>
+                      {pos.pnl_pct >= 0 ? "+" : ""}{pos.pnl_pct.toFixed(1)}%
+                    </div>
                   </td>
-                  <td className={cn("px-5 py-3 text-right font-medium tabular-nums", pnlColor(pos.pnl_pct))}>
+                  <td className={cn("hidden sm:table-cell px-3 py-3 md:px-5 text-right font-medium tabular-nums", pnlColor(pos.pnl_pct))}>
                     {pos.pnl_pct >= 0 ? "+" : ""}{pos.pnl_pct.toFixed(1)}%
                   </td>
-                  <td className="px-5 py-3 text-right tabular-nums text-xs text-slate-500">
+                  <td className="hidden md:table-cell px-3 py-3 md:px-5 text-right tabular-nums text-xs text-slate-500">
                     {pos.total_fees > 0 ? `$${pos.total_fees.toFixed(2)}` : "—"}
                     {pos.trade_count > 1 && <div className="text-[10px] text-slate-400">{pos.trade_count} trades</div>}
                   </td>
-                  <td className="px-5 py-3 text-right tabular-nums text-xs text-slate-500">
+                  <td className="hidden md:table-cell px-3 py-3 md:px-5 text-right tabular-nums text-xs text-slate-500">
                     {pos.hold_days}d
                   </td>
                   {showRealized && (
-                    <td className="px-5 py-3 text-xs text-slate-400">
+                    <td className="hidden sm:table-cell px-3 py-3 md:px-5 text-xs text-slate-400">
                       {pos.exit_date ? new Date(pos.exit_date).toLocaleDateString() : "—"}
                     </td>
                   )}
