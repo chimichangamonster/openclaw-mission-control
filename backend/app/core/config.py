@@ -92,6 +92,11 @@ class Settings(BaseSettings):
     microsoft_oauth_redirect_uri: str = ""
     microsoft_oauth_tenant_id: str = "common"
 
+    # Google Calendar OAuth
+    google_oauth_client_id: str = ""
+    google_oauth_client_secret: str = ""
+    google_oauth_redirect_uri: str = ""
+
     # Encryption (Fernet key — shared across email, polymarket, etc.)
     encryption_key: str = ""
     email_token_encryption_key: str = ""  # legacy alias, use ENCRYPTION_KEY instead

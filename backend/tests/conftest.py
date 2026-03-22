@@ -14,3 +14,5 @@ if str(ROOT) not in sys.path:
 os.environ["AUTH_MODE"] = "local"
 os.environ["LOCAL_AUTH_TOKEN"] = "test-local-token-0123456789-0123456789-0123456789x"
 os.environ["BASE_URL"] = "http://localhost:8000"
+# Use SQLite for E2E tests that import app.db.session (avoids psycopg dependency)
+os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")

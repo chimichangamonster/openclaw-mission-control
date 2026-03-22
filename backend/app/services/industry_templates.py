@@ -52,7 +52,7 @@ TEMPLATES: dict[str, IndustryTemplate] = {
             "cron_jobs": True,
             "approvals": True,
         },
-        skills=["bookkeeping", "job-costing", "staffing", "expense-capture", "doc-gen"],
+        skills=["bookkeeping", "job-costing", "staffing", "expense-capture", "doc-gen", "competitor-intel"],
         default_config={
             "cost_codes": [
                 ConfigItem("labour", "Labour", {"code": "CC-100", "unit": "hour"}),
@@ -100,7 +100,7 @@ TEMPLATES: dict[str, IndustryTemplate] = {
             "email": True,
             "cron_jobs": True,
         },
-        skills=["bookkeeping", "expense-capture", "doc-gen"],
+        skills=["bookkeeping", "expense-capture", "doc-gen", "competitor-intel"],
         default_config={
             "service_catalog": [
                 ConfigItem("bin_rental_20yd", "20 Yard Bin Rental", {"price": 350.00, "unit": "per_haul", "description": "20 yard roll-off bin"}),
@@ -115,6 +115,15 @@ TEMPLATES: dict[str, IndustryTemplate] = {
                 ConfigItem("vehicle_maintenance", "Vehicle Maintenance", {"code": "WM-300", "unit": "each"}),
                 ConfigItem("bin_repair", "Bin Repair/Replacement", {"code": "WM-400", "unit": "each"}),
                 ConfigItem("labour", "Labour", {"code": "WM-500", "unit": "hour"}),
+            ],
+            "competitors": [
+                ConfigItem("example_competitor", "Example Competitor", {
+                    "name": "Example Waste Co",
+                    "website": "https://example.com",
+                    "blog_url": "",
+                    "keywords": ["junk removal", "waste management", "bin rental"],
+                    "location": "Edmonton, AB",
+                }),
             ],
         },
         onboarding_steps=[

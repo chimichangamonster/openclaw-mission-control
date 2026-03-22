@@ -36,6 +36,7 @@ from app.api.paper_trading import router as paper_trading_router
 from app.api.polymarket import router as polymarket_router
 from app.api.document_gen import router as document_gen_router
 from app.api.microsoft_graph import router as microsoft_graph_router
+from app.api.google_calendar import router as google_calendar_router
 from app.api.file_serve import router as file_serve_router
 from app.api.invoice_pdf import router as invoice_pdf_router
 from app.api.legal import router as legal_router
@@ -734,6 +735,7 @@ api_v1.include_router(polymarket_router)
 api_v1.include_router(agent_polymarket_router)
 api_v1.include_router(document_gen_router)
 api_v1.include_router(microsoft_graph_router)
+api_v1.include_router(google_calendar_router)
 api_v1.include_router(file_serve_router)
 api_v1.include_router(invoice_pdf_router)
 api_v1.include_router(legal_router)
