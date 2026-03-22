@@ -1,6 +1,7 @@
 """Model exports for SQLAlchemy/SQLModel metadata discovery."""
 
 from app.models.activity_events import ActivityEvent
+from app.models.org_config import OrgConfigData, OrgOnboardingStep
 from app.models.bookkeeping import (
     BkClient,
     BkExpense,
@@ -113,4 +114,6 @@ __all__ = [
     "BkTimesheet",
     "BkTransaction",
     "BkWorker",
+    "OrgConfigData",
+    "OrgOnboardingStep",
 ]

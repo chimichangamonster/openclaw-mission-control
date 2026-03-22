@@ -52,6 +52,8 @@ from app.api.tasks import router as tasks_router
 from app.api.users import router as users_router
 from app.api.watchlist import router as watchlist_router
 from app.api.bookkeeping import router as bookkeeping_router
+from app.api.org_config import router as org_config_router
+from app.api.industry_templates import router as industry_templates_router
 from app.core.config import settings
 from app.core.error_handling import install_error_handling
 from app.core.logging import configure_logging, get_logger
@@ -753,6 +755,8 @@ api_v1.include_router(tags_router)
 api_v1.include_router(users_router)
 api_v1.include_router(watchlist_router)
 api_v1.include_router(bookkeeping_router)
+api_v1.include_router(org_config_router)
+api_v1.include_router(industry_templates_router)
 app.include_router(api_v1)
 
 add_pagination(app)

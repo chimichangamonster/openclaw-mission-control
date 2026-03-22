@@ -68,6 +68,9 @@ class OrganizationSettings(QueryModel, table=True):
         default='{"redaction_level":"moderate","allow_email_content_to_llm":true,"log_llm_inputs":false}'
     )
 
+    # Industry template
+    industry_template_id: str | None = Field(default=None)  # "construction", "staffing", etc.
+
     # Branding / org context
     branding_json: str = Field(default="{}")
 
