@@ -135,12 +135,19 @@ async def get_settings(
     }
 
 
+class DataPolicyUpdate(BaseModel):
+    redaction_level: str | None = None  # "off", "moderate", "strict"
+    allow_email_content_to_llm: bool | None = None
+    log_llm_inputs: bool | None = None
+
+
 class SettingsUpdate(BaseModel):
     default_model_tier_max: int | None = None
     configured_models: list[str] | None = None
     feature_flags: dict[str, bool] | None = None
     agent_defaults: dict | None = None
     branding: dict | None = None
+    data_policy: DataPolicyUpdate | None = None
 
 
 @router.put("")
@@ -177,6 +184,19 @@ async def update_settings(
         if payload.branding is not None:
             settings.branding_json = json.dumps(payload.branding)
             changes["branding"] = True
+        if payload.data_policy is not None:
+            valid_levels = {"off", "moderate", "strict"}
+            current = settings.data_policy
+            if payload.data_policy.redaction_level is not None:
+                if payload.data_policy.redaction_level not in valid_levels:
+                    raise HTTPException(status_code=400, detail=f"redaction_level must be one of: {', '.join(valid_levels)}")
+                current["redaction_level"] = payload.data_policy.redaction_level
+            if payload.data_policy.allow_email_content_to_llm is not None:
+                current["allow_email_content_to_llm"] = payload.data_policy.allow_email_content_to_llm
+            if payload.data_policy.log_llm_inputs is not None:
+                current["log_llm_inputs"] = payload.data_policy.log_llm_inputs
+            settings.data_policy_json = json.dumps(current)
+            changes["data_policy"] = True
 
         settings.updated_at = utcnow()
         await session.commit()
