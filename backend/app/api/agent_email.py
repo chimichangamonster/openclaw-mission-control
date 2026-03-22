@@ -10,6 +10,8 @@ from sqlalchemy import select
 
 from app.core.agent_auth import AgentAuthContext, get_agent_auth_context
 from app.core.logging import get_logger
+from app.core.redact import RedactionLevel, redact_email_content
+from app.core.sanitize import sanitize_text
 from app.core.time import utcnow
 from app.db.session import get_session
 from app.models.email_accounts import EmailAccount
@@ -32,6 +34,29 @@ router = APIRouter(prefix="/agent/email", tags=["agent"])
 
 SESSION_DEP = Depends(get_session)
 AGENT_CTX_DEP = Depends(get_agent_auth_context)
+
+
+def _redact_message(msg: EmailMessage, level: RedactionLevel = RedactionLevel.MODERATE) -> EmailMessage:
+    """Apply sanitization + redaction to email content before returning to agents.
+
+    Modifies the ORM object in-place (detached from session) to avoid
+    accidental persistence of redacted content.
+    """
+    msg.body_text = sanitize_text(msg.body_text)
+    msg.body_html = sanitize_text(msg.body_html)
+
+    if level != RedactionLevel.OFF:
+        text, html, count, categories = redact_email_content(
+            msg.body_text, msg.body_html, level=level,
+        )
+        msg.body_text = text
+        msg.body_html = html
+        if count > 0:
+            logger.info(
+                "agent_email.redacted message_id=%s count=%d categories=%s",
+                msg.id, count, ",".join(sorted(categories)),
+            )
+    return msg
 
 
 async def _get_org_id(agent_ctx: AgentAuthContext) -> UUID:
@@ -107,7 +132,8 @@ async def agent_list_email_messages(
         stmt = stmt.where(EmailMessage.folder == folder)
 
     result = await session.execute(stmt)
-    return list(result.scalars().all())
+    messages = list(result.scalars().all())
+    return [_redact_message(m) for m in messages]
 
 
 @router.get("/messages/{message_id}", response_model=EmailMessageDetail)
@@ -130,7 +156,7 @@ async def agent_get_email_message(
     msg = await session.get(EmailMessage, message_id)
     if msg is None or msg.organization_id != board.organization_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
-    return msg
+    return _redact_message(msg)
 
 
 @router.patch("/messages/{message_id}", response_model=EmailMessageRead)

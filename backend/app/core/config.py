@@ -106,6 +106,13 @@ class Settings(BaseSettings):
     polymarket_chain_id: int = 137
     polymarket_queue_name: str = "trade_execution"
 
+    # File serving (gateway workspace access)
+    gateway_workspace_path: str = ""
+
+    # Adobe PDF Services (platform-level fallback for BYOK)
+    adobe_pdf_client_id: str = ""
+    adobe_pdf_client_secret: str = ""
+
     # OpenRouter (for cost tracking)
     openrouter_api_key: str = ""
     openrouter_management_key: str = ""

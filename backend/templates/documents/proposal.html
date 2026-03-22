@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ title }}</title>
+<style>
+  @page {
+    size: letter;
+    margin: 1in 0.75in;
+    @top-center { content: "{{ company_name | default('') }}"; font-size: 8pt; color: #999; }
+    @bottom-center { content: "Page " counter(page) " of " counter(pages); font-size: 8pt; color: #999; }
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Helvetica Neue', Arial, sans-serif; color: #333; line-height: 1.6; }
+  .cover { page-break-after: always; display: flex; flex-direction: column; justify-content: center; min-height: 90vh; padding: 2in 0; }
+  .cover h1 { font-size: 36pt; color: #1a1a2e; margin-bottom: 0.3em; border-bottom: 4px solid #e63946; padding-bottom: 0.3em; }
+  .cover .subtitle { font-size: 14pt; color: #555; margin-bottom: 1em; }
+  .cover .meta { font-size: 10pt; color: #888; }
+  .cover .meta span { display: block; margin-bottom: 4px; }
+  .cover .logo { max-width: 200px; max-height: 80px; margin-bottom: 1.5em; }
+  h2 { font-size: 18pt; color: #1a1a2e; margin: 1.5em 0 0.5em; border-left: 4px solid #e63946; padding-left: 12px; }
+  h3 { font-size: 13pt; color: #444; margin: 1em 0 0.4em; }
+  p { margin-bottom: 0.8em; font-size: 10.5pt; }
+  ul, ol { margin: 0.5em 0 1em 1.5em; font-size: 10.5pt; }
+  li { margin-bottom: 0.3em; }
+  table { width: 100%; border-collapse: collapse; margin: 1em 0; font-size: 10pt; }
+  th { background: #1a1a2e; color: white; padding: 8px 12px; text-align: left; font-weight: 600; }
+  td { padding: 6px 12px; border-bottom: 1px solid #e0e0e0; }
+  tr:nth-child(even) td { background: #f8f8f8; }
+  .highlight-box { background: #f0f7ff; border-left: 4px solid #2196f3; padding: 12px 16px; margin: 1em 0; border-radius: 0 4px 4px 0; }
+  .highlight-box.success { background: #f0fff4; border-color: #4caf50; }
+  .highlight-box.warning { background: #fffbe6; border-color: #ff9800; }
+  .metric { display: inline-block; text-align: center; padding: 16px 24px; margin: 8px; background: #f8f8f8; border-radius: 8px; }
+  .metric .value { font-size: 24pt; font-weight: 700; color: #1a1a2e; }
+  .metric .label { font-size: 9pt; color: #888; text-transform: uppercase; }
+  .page-break { page-break-before: always; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  {% if logo_url %}<img src="{{ logo_url }}" alt="{{ company_name | default('Logo') }}" class="logo">{% endif %}
+  <h1>{{ title }}</h1>
+  {% if subtitle %}<div class="subtitle">{{ subtitle }}</div>{% endif %}
+  <div class="meta">
+    {% if company_name %}<span><strong>Prepared by:</strong> {{ company_name }}</span>{% endif %}
+    {% if prepared_for %}<span><strong>Prepared for:</strong> {{ prepared_for }}</span>{% endif %}
+    {% if date %}<span><strong>Date:</strong> {{ date }}</span>{% endif %}
+    {% if version %}<span><strong>Version:</strong> {{ version }}</span>{% endif %}
+  </div>
+</div>
+
+{% if executive_summary %}
+<h2>Executive Summary</h2>
+{{ executive_summary | safe }}
+{% endif %}
+
+{% for section in sections %}
+{% if section.page_break %}<div class="page-break"></div>{% endif %}
+<h2>{{ section.heading }}</h2>
+{{ section.content | safe }}
+{% endfor %}
+
+{% if metrics %}
+<h2>Key Metrics</h2>
+<div style="text-align: center; margin: 1em 0;">
+  {% for metric in metrics %}
+  <div class="metric">
+    <div class="value">{{ metric.value }}</div>
+    <div class="label">{{ metric.label }}</div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if next_steps %}
+<h2>Next Steps</h2>
+<ol>
+  {% for step in next_steps %}
+  <li>{{ step }}</li>
+  {% endfor %}
+</ol>
+{% endif %}
+
+</body>
+</html>

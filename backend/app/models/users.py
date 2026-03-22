@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from uuid import UUID, uuid4
 
 from sqlmodel import Field
 
 from app.models.base import QueryModel
+
+# Bump this when terms change — users must re-accept
+CURRENT_TERMS_VERSION = "2026.1"
 
 
 class User(QueryModel, table=True):
@@ -29,3 +33,7 @@ class User(QueryModel, table=True):
         foreign_key="organizations.id",
         index=True,
     )
+    # Terms & conditions acceptance
+    terms_accepted_version: str | None = Field(default=None)
+    terms_accepted_at: datetime | None = Field(default=None)
+    privacy_accepted_at: datetime | None = Field(default=None)

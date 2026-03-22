@@ -181,6 +181,31 @@ async def require_org_admin(
     return ctx
 
 
+def require_org_role(minimum_role: str) -> Callable:
+    """Factory that returns a FastAPI dependency enforcing a minimum org role.
+
+    Role hierarchy: viewer < member < operator < admin < owner
+
+    Usage: ``Depends(require_org_role("operator"))``
+    """
+    from app.services.organizations import ROLE_RANK
+
+    min_rank = ROLE_RANK.get(minimum_role, 0)
+
+    async def _check(
+        ctx: OrganizationContext = ORG_MEMBER_DEP,
+    ) -> OrganizationContext:
+        member_rank = ROLE_RANK.get(ctx.member.role, 0)
+        if member_rank < min_rank:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Requires '{minimum_role}' role or higher.",
+            )
+        return ctx
+
+    return _check
+
+
 async def get_board_or_404(
     board_id: str,
     session: AsyncSession = SESSION_DEP,

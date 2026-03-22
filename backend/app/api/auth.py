@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.core.auth import AuthContext, get_auth_context
+from app.core.time import utcnow
+from app.db.session import async_session_maker
+from app.models.users import CURRENT_TERMS_VERSION
 from app.schemas.errors import LLMErrorResponse
 from app.schemas.users import UserRead
 
@@ -60,3 +65,48 @@ async def bootstrap_user(auth: AuthContext = AUTH_CONTEXT_DEP) -> UserRead:
     if auth.actor_type != "user" or auth.user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
     return UserRead.model_validate(auth.user)
+
+
+@router.get("/terms-status", summary="Check terms acceptance status")
+async def terms_status(auth: AuthContext = AUTH_CONTEXT_DEP) -> dict[str, Any]:
+    """Check if the user has accepted the current terms version."""
+    if auth.actor_type != "user" or auth.user is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
+
+    user = auth.user
+    accepted = user.terms_accepted_version == CURRENT_TERMS_VERSION
+    return {
+        "terms_accepted": accepted,
+        "current_version": CURRENT_TERMS_VERSION,
+        "accepted_version": user.terms_accepted_version,
+        "accepted_at": user.terms_accepted_at.isoformat() if user.terms_accepted_at else None,
+        "privacy_accepted_at": user.privacy_accepted_at.isoformat() if user.privacy_accepted_at else None,
+    }
+
+
+@router.post("/accept-terms", summary="Accept terms of service and privacy policy")
+async def accept_terms(auth: AuthContext = AUTH_CONTEXT_DEP) -> dict[str, Any]:
+    """Record the user's acceptance of the current terms version."""
+    if auth.actor_type != "user" or auth.user is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
+
+    now = utcnow()
+    async with async_session_maker() as session:
+        from sqlmodel import select
+        from app.models.users import User
+
+        user = (await session.execute(
+            select(User).where(User.id == auth.user.id)
+        )).scalar_one()
+
+        user.terms_accepted_version = CURRENT_TERMS_VERSION
+        user.terms_accepted_at = now
+        user.privacy_accepted_at = now
+        session.add(user)
+        await session.commit()
+
+    return {
+        "ok": True,
+        "terms_version": CURRENT_TERMS_VERSION,
+        "accepted_at": now.isoformat(),
+    }

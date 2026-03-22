@@ -23,6 +23,8 @@ DEFAULT_FEATURE_FLAGS = {
     "cost_tracker": True,
     "cron_jobs": True,
     "approvals": True,
+    "document_generation": True,
+    "microsoft_graph": False,
 }
 
 
@@ -39,6 +41,15 @@ class OrganizationSettings(QueryModel, table=True):
     openrouter_api_key_encrypted: str | None = Field(default=None)
     openrouter_management_key_encrypted: str | None = Field(default=None)
 
+    # Adobe PDF Services (client_id + client_secret, both Fernet-encrypted)
+    adobe_pdf_client_id_encrypted: str | None = Field(default=None)
+    adobe_pdf_client_secret_encrypted: str | None = Field(default=None)
+
+    # Custom LLM endpoint (enterprise — self-hosted models)
+    # JSON: {"api_url": "https://llm.corp.internal/v1", "api_key_encrypted": "...", "models": ["llama-3.1-70b"], "name": "Corp LLM"}
+    custom_llm_endpoint_json: str = Field(default="{}")
+    custom_llm_api_key_encrypted: str | None = Field(default=None)
+
     # Model configuration
     default_model_tier_max: int = Field(default=3)
     configured_models_json: str = Field(default="[]")
@@ -50,6 +61,11 @@ class OrganizationSettings(QueryModel, table=True):
 
     # Agent defaults (identity_profile template for new agents)
     agent_defaults_json: str = Field(default="{}")
+
+    # Data privacy policy
+    data_policy_json: str = Field(
+        default='{"redaction_level":"moderate","allow_email_content_to_llm":true,"log_llm_inputs":false}'
+    )
 
     # Branding / org context
     branding_json: str = Field(default="{}")
@@ -70,6 +86,14 @@ class OrganizationSettings(QueryModel, table=True):
     @property
     def agent_defaults(self) -> dict:
         return json.loads(self.agent_defaults_json)
+
+    @property
+    def custom_llm_endpoint(self) -> dict:
+        return json.loads(self.custom_llm_endpoint_json)
+
+    @property
+    def data_policy(self) -> dict:
+        return json.loads(self.data_policy_json)
 
     @property
     def branding(self) -> dict:

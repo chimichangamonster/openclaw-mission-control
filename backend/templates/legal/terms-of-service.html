@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>OpenClaw Platform — Terms of Service</title>
+<style>
+  body { font-family: 'Segoe UI', system-ui, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; color: #333; line-height: 1.7; }
+  h1 { color: #1a1a2e; border-bottom: 3px solid #e63946; padding-bottom: 8px; }
+  h2 { color: #1a1a2e; margin-top: 2em; }
+  h3 { color: #444; margin-top: 1.5em; }
+  .banner { background: #fff3cd; border: 1px solid #ffc107; padding: 12px 16px; border-radius: 6px; margin: 20px 0; font-size: 0.9em; }
+  .banner strong { color: #856404; }
+  .effective { color: #666; font-size: 0.9em; }
+  ul { margin: 0.5em 0 1em; }
+  li { margin-bottom: 0.4em; }
+  table { width: 100%; border-collapse: collapse; margin: 1em 0; font-size: 0.95em; }
+  th { background: #f5f5f5; padding: 8px 12px; text-align: left; border-bottom: 2px solid #ddd; }
+  td { padding: 8px 12px; border-bottom: 1px solid #eee; }
+  .highlight { background: #f0f7ff; border-left: 4px solid #2196f3; padding: 10px 14px; margin: 1em 0; }
+</style>
+</head>
+<body>
+
+<h1>Terms of Service</h1>
+<p class="effective">Version 2026.1 — Effective March 22, 2026</p>
+
+<div class="banner">
+  <strong>DRAFT — PENDING LEGAL REVIEW.</strong> This document has been prepared for informational purposes and will be reviewed by qualified legal counsel before enforcement. By using the Platform, you acknowledge that these terms may be updated.
+</div>
+
+<h2>1. Definitions</h2>
+<ul>
+  <li><strong>"Platform"</strong> — The OpenClaw Business Platform, including Mission Control, AI agents, connected services, and all associated APIs.</li>
+  <li><strong>"Organization"</strong> — A business entity or team registered on the Platform.</li>
+  <li><strong>"Member"</strong> — Any individual granted access to an Organization's data on the Platform.</li>
+  <li><strong>"Platform Owner"</strong> — The administrator who operates the Platform infrastructure.</li>
+  <li><strong>"Agent"</strong> — An AI-powered assistant operating on behalf of an Organization.</li>
+  <li><strong>"LLM Provider"</strong> — A third-party large language model service used to process text.</li>
+  <li><strong>"Processing"</strong> — Sending data to an LLM Provider's API for analysis, generation, or classification.</li>
+</ul>
+
+<h2>2. Acceptance</h2>
+<p>By accessing or using the Platform, you agree to these Terms of Service and our Privacy Policy. If you use the Platform on behalf of an Organization, you represent that you have authority to bind that Organization.</p>
+<p>If you do not agree, do not use the Platform.</p>
+
+<h2>3. Service Description</h2>
+<p>The Platform provides AI-powered business operations including email management, document generation, market analysis, paper trading simulation, invoicing, and workflow automation.</p>
+<p>The Platform uses AI agents that process your data using third-party LLM providers. This is a core function of the service, not a side effect.</p>
+
+<h2>4. Data Processing and AI Disclosure</h2>
+
+<div class="highlight">
+<strong>Key disclosure:</strong> When you use this Platform, your business data is sent to third-party AI companies for processing. This happens regardless of where the Platform itself is hosted. The sections below explain exactly what data goes where and how you can control it.
+</div>
+
+<h3>4.1 What Data Is Processed by LLMs</h3>
+<p>The following types of data may be sent to LLM providers during normal Platform operation:</p>
+<ul>
+  <li>Email content submitted for triage, classification, or response drafting</li>
+  <li>Documents uploaded for analysis (PDFs, images, text files)</li>
+  <li>Instructions and queries sent to agents via Discord or the API</li>
+  <li>Business data referenced during agent operations (watchlist items, trade history, contact information)</li>
+  <li>Generated documents, reports, and proposals during creation</li>
+</ul>
+
+<h3>4.2 Service Tiers and Data Flow</h3>
+<p>The Platform offers three deployment tiers with different data flow characteristics:</p>
+<table>
+  <tr><th>Tier</th><th>Data Flow</th><th>Data Leaves Your Control?</th></tr>
+  <tr><td><strong>SaaS / Dedicated</strong></td><td>Your data → Platform → OpenRouter (US) → LLM Provider</td><td>Yes — processed by third-party LLM providers</td></tr>
+  <tr><td><strong>Private Cloud</strong></td><td>Your data → Platform → Your dedicated GPU server → Self-hosted LLM</td><td>No — data stays on infrastructure you control</td></tr>
+  <tr><td><strong>Enterprise On-Premises</strong></td><td>Your data → Your Platform instance → Your LLM server</td><td>No — nothing leaves your network</td></tr>
+</table>
+
+<p><strong>SaaS / Dedicated tier:</strong> Data flows through the following path:</p>
+<ol>
+  <li><strong>Your input</strong> → Platform server (processes and prepares the request)</li>
+  <li><strong>Platform server</strong> → OpenRouter API (US-based routing service that directs requests to LLM providers)</li>
+  <li><strong>OpenRouter</strong> → LLM Provider API (the AI company that processes your text and generates a response)</li>
+  <li><strong>LLM response</strong> → Platform server → You</li>
+</ol>
+<p>At minimum, your data passes through <strong>three jurisdictions</strong>: your location, the OpenRouter intermediary (United States), and the LLM provider's infrastructure.</p>
+
+<p><strong>Private Cloud and Enterprise tiers:</strong> Your Organization configures a custom LLM endpoint hosted on infrastructure you control. Data flows directly from the Platform to your LLM server without passing through OpenRouter or any third-party provider. The Platform Owner can deploy a private LLM (such as Llama, Mistral, or Qwen) on GPU servers in the jurisdiction of your choice.</p>
+
+<h3>4.3 LLM Providers and Jurisdictions</h3>
+<table>
+  <tr><th>Provider</th><th>Jurisdiction</th><th>Data Residency</th><th>Default Usage</th></tr>
+  <tr><td>Anthropic (Claude)</td><td>United States</td><td>US data centers</td><td>Primary reasoning, complex analysis</td></tr>
+  <tr><td>DeepSeek</td><td>China</td><td>Chinese data centers</td><td>Technical analysis, report parsing</td></tr>
+  <tr><td>xAI (Grok)</td><td>United States</td><td>US data centers</td><td>Social sentiment analysis</td></tr>
+  <tr><td>Google (Gemini)</td><td>United States</td><td>Global data centers</td><td>Fallback processing</td></tr>
+  <tr><td>OpenAI (GPT)</td><td>United States</td><td>US data centers</td><td>Quick lookups, notifications</td></tr>
+</table>
+
+<p><strong>Provider control:</strong> Your Organization can restrict which LLM providers may process its data through the Organization Settings page. If you have concerns about specific jurisdictions or providers, you may disable them. The Platform Owner can also configure provider restrictions at the platform level.</p>
+
+<h3>4.4 What We Do Before Data Reaches LLMs</h3>
+<p>The Platform applies automatic protections before sending data to LLM providers:</p>
+<ul>
+  <li><strong>Prompt injection defense:</strong> All user-supplied text is scanned and filtered for patterns that could manipulate AI agents.</li>
+  <li><strong>Sensitive data redaction:</strong> Passwords, API keys, authentication tokens, credit card numbers, bank account numbers, and government ID numbers are automatically stripped from content before it reaches any LLM provider.</li>
+  <li><strong>Configurable redaction:</strong> Organizations can set their redaction level to "strict" (also removes phone numbers, addresses, dates of birth) or "moderate" (credentials and financial data only).</li>
+  <li><strong>Email folder scoping:</strong> Organizations can restrict which email folders agents may access and block specific senders from agent processing.</li>
+</ul>
+
+<h3>4.5 What We Cannot Control</h3>
+<p>Once data is sent to an LLM provider's API:</p>
+<ul>
+  <li>The provider processes it on their infrastructure under their own terms of service</li>
+  <li>Providers may temporarily log or cache data for abuse monitoring or debugging</li>
+  <li>We cannot verify what happens to data inside the provider's systems</li>
+  <li>Data processed by a provider cannot be "recalled" or deleted from their logs after the fact</li>
+</ul>
+<p>We select providers that commit to not training on customer data (Anthropic, OpenAI via API). However, their policies may change without our control. Organizations should review provider terms independently.</p>
+
+<h3>4.6 Platform Infrastructure</h3>
+<p>The Platform's own infrastructure (database, file storage, application servers) is currently hosted in the United States. This means your stored data (emails, documents, settings, trade history) resides on US-based servers even when not being processed by LLMs. The Platform Owner may migrate infrastructure to other jurisdictions at their discretion.</p>
+
+<h2>5. Data Sovereignty</h2>
+<h3>5.1 SaaS / Dedicated Tier</h3>
+<p>On the SaaS and Dedicated tiers, your data is processed by third-party LLM providers in jurisdictions outside your control. <strong>There is no configuration on these tiers that guarantees data stays within a specific country.</strong></p>
+
+<h3>5.2 Private Cloud and Enterprise Tiers</h3>
+<p>On the Private Cloud and Enterprise tiers, <strong>full data sovereignty is achievable.</strong> The Platform supports custom LLM endpoints, allowing your Organization to:</p>
+<ul>
+  <li>Deploy open-source AI models (Llama, Mistral, Qwen, etc.) on GPU servers in the jurisdiction of your choice</li>
+  <li>Configure the Platform to route all AI processing to your self-hosted endpoint</li>
+  <li>Verify via the Platform's health check and routing APIs that no data flows to third-party providers</li>
+  <li>Deploy the entire Platform stack on your own infrastructure for full air-gapped operation</li>
+</ul>
+<p>The Platform Owner maintains a GPU Hosting Playbook covering compliant deployment options in Canada, United States, European Union, United Kingdom, Australia, Middle East, and Asia Pacific.</p>
+
+<h3>5.3 Your Responsibility</h3>
+<p>Regardless of tier, your Organization is responsible for determining whether the Platform's data processing practices meet your regulatory requirements. Use the checklist below to assess readiness before onboarding.</p>
+
+<h3>5.4 Pre-Onboarding Compliance Checklist</h3>
+<p>Before using the Platform with business or personal data, your Organization should verify the following:</p>
+
+<table>
+  <tr><th>#</th><th>Question</th><th>If YES</th><th>If NO</th></tr>
+  <tr>
+    <td>1</td>
+    <td><strong>Does your data include personal information (names, emails, phone numbers of clients/employees)?</strong></td>
+    <td>You must inform those individuals that their data may be processed by AI. Configure "strict" redaction level in Organization Settings.</td>
+    <td>Standard "moderate" redaction is sufficient.</td>
+  </tr>
+  <tr>
+    <td>2</td>
+    <td><strong>Does your industry have data residency requirements (healthcare, government, financial services)?</strong></td>
+    <td>You likely need the Private Cloud or Enterprise tier with a self-hosted LLM in your required jurisdiction. SaaS tier is not appropriate.</td>
+    <td>Any tier is suitable.</td>
+  </tr>
+  <tr>
+    <td>3</td>
+    <td><strong>Are you subject to PIPEDA, PIPA, Quebec Law 25, or equivalent privacy legislation?</strong></td>
+    <td>Ensure your employees/clients are informed that data is processed by AI services. Review the Privacy Policy's cross-border transfer disclosures. Consider Canadian-hosted infrastructure.</td>
+    <td>Review applicable local privacy laws.</td>
+  </tr>
+  <tr>
+    <td>4</td>
+    <td><strong>Do you have concerns about data being processed in specific countries (e.g., China)?</strong></td>
+    <td>Disable those LLM providers in Organization Settings (e.g., disable DeepSeek). On Private Cloud/Enterprise tier, no third-party providers are used.</td>
+    <td>Default provider configuration is acceptable.</td>
+  </tr>
+  <tr>
+    <td>5</td>
+    <td><strong>Will you connect email accounts that receive sensitive information (passwords, financial data, HR communications)?</strong></td>
+    <td>Configure email folder scoping to exclude sensitive folders (e.g., block HR, Payroll, Finance folders). Use blocked senders list for sensitive contacts. The Platform automatically redacts passwords, API keys, and credit card numbers.</td>
+    <td>Default email configuration is sufficient.</td>
+  </tr>
+  <tr>
+    <td>6</td>
+    <td><strong>Do multiple people in your organization need access to the Platform?</strong></td>
+    <td>Use role-based access control: assign Viewer (read-only), Member, Operator (can execute trades/actions), or Admin (manages settings). Only Admins can modify API keys and data policies.</td>
+    <td>Single-user access is available with any role.</td>
+  </tr>
+  <tr>
+    <td>7</td>
+    <td><strong>Do you need to prove to auditors or regulators what data was processed and when?</strong></td>
+    <td>Enable "log_llm_inputs" in your Organization's data policy. All agent interactions are logged in the audit trail. Request periodic data exports for your records.</td>
+    <td>Standard audit logging (settings changes, member actions) is enabled by default.</td>
+  </tr>
+  <tr>
+    <td>8</td>
+    <td><strong>Will you use the Platform to generate documents (proposals, reports) for external clients?</strong></td>
+    <td>Review all AI-generated documents before distribution. The Platform provides templates with your Organization's branding, but content accuracy is your responsibility.</td>
+    <td>No additional action needed.</td>
+  </tr>
+  <tr>
+    <td>9</td>
+    <td><strong>Do you require a Data Processing Agreement (DPA) or similar contract?</strong></td>
+    <td>Contact the Platform Owner to arrange a DPA before onboarding. Enterprise tier includes a custom DPA.</td>
+    <td>These Terms of Service and Privacy Policy govern data processing.</td>
+  </tr>
+  <tr>
+    <td>10</td>
+    <td><strong>Have you consulted your legal/compliance team about using AI services with your business data?</strong></td>
+    <td>Proceed with onboarding using the tier and configuration that meets their requirements.</td>
+    <td>We strongly recommend doing so before connecting any data sources.</td>
+  </tr>
+</table>
+
+<p>This checklist is provided for guidance only and does not constitute legal advice. Your Organization's legal and compliance team should review these terms and your specific regulatory obligations before use.</p>
+
+<h2>6. Regulated Industries</h2>
+<p><strong>SaaS / Dedicated tier:</strong> The Platform is <strong>not designed</strong> for use with:</p>
+<ul>
+  <li>Protected health information under HIPAA (US) or PHIPA (Ontario) or similar healthcare privacy laws</li>
+  <li>Government classified or controlled information</li>
+  <li>Data subject to financial regulations that prohibit third-party AI processing</li>
+  <li>Personal information of minors under the age of consent</li>
+</ul>
+<p><strong>Private Cloud / Enterprise tier:</strong> Organizations in regulated industries may be able to use the Platform with a self-hosted LLM deployment that meets their regulatory requirements. This requires:</p>
+<ul>
+  <li>Deployment on compliant infrastructure (e.g., AWS GovCloud, HIPAA-eligible regions with signed BAA)</li>
+  <li>Use of a self-hosted LLM endpoint — no data flows to third-party AI providers</li>
+  <li>Appropriate data redaction level configured for the Organization</li>
+  <li>Independent compliance assessment by the Organization's legal/compliance team</li>
+</ul>
+<p>The Platform Owner does not warrant compliance with any specific regulatory framework. Organizations are solely responsible for ensuring their deployment configuration meets applicable requirements.</p>
+
+<h2>7. Organization Responsibilities</h2>
+<ul>
+  <li>You are responsible for the data you and your Members submit to the Platform.</li>
+  <li>You must not submit data that you do not have the right to process with third-party AI services.</li>
+  <li>You must configure appropriate data policies, redaction levels, and provider restrictions for your Organization.</li>
+  <li>You must inform your employees and Members that their data will be processed by AI services as described in these terms.</li>
+  <li>Organization administrators are responsible for managing member access and roles.</li>
+  <li>You must obtain necessary consents from individuals whose personal information you submit to the Platform.</li>
+</ul>
+
+<h2>8. Account Security</h2>
+<ul>
+  <li>You are responsible for maintaining the security of your authentication credentials.</li>
+  <li>Notify the Platform Owner immediately if you suspect unauthorized access.</li>
+  <li>API keys provided via BYOK (Bring Your Own Key) are encrypted at rest using industry-standard encryption, but you remain responsible for the underlying service accounts.</li>
+</ul>
+
+<h2>9. Acceptable Use</h2>
+<p>You agree not to:</p>
+<ul>
+  <li>Use the Platform for any unlawful purpose</li>
+  <li>Attempt to access data belonging to other Organizations</li>
+  <li>Submit content designed to manipulate or exploit AI agents</li>
+  <li>Use the Platform to generate content that is illegal, harassing, or fraudulent</li>
+  <li>Resell or sublicense Platform access without authorization</li>
+</ul>
+
+<h2>10. AI-Generated Content Disclaimer</h2>
+<p><strong>AI agents may produce inaccurate, incomplete, or inappropriate content.</strong> They are tools, not professionals.</p>
+<ul>
+  <li><strong>Trading/Betting:</strong> All analysis is for simulation and educational purposes. Not financial or gambling advice.</li>
+  <li><strong>Documents:</strong> AI-generated proposals, reports, and correspondence should be reviewed by qualified professionals before distribution.</li>
+  <li><strong>Legal/Tax/Medical:</strong> AI-generated content must not be relied upon for professional advice in these domains.</li>
+</ul>
+
+<h2>11. Limitation of Liability</h2>
+<p>TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE PLATFORM IS PROVIDED "AS IS." THE PLATFORM OWNER SHALL NOT BE LIABLE FOR INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES ARISING FROM YOUR USE OF THE PLATFORM, INCLUDING DAMAGES CAUSED BY AI-GENERATED CONTENT, DATA PROCESSED BY THIRD-PARTY LLM PROVIDERS, OR CROSS-BORDER DATA TRANSFERS.</p>
+
+<h2>12. Termination</h2>
+<p>Either party may terminate at any time. Upon termination:</p>
+<ul>
+  <li>Platform access is revoked</li>
+  <li>Organization data is retained for 30 days, then permanently deleted</li>
+  <li>Data already sent to LLM providers cannot be recalled</li>
+  <li>You may request a data export prior to termination</li>
+</ul>
+
+<h2>13. Changes to Terms</h2>
+<p>We may update these terms. Material changes require re-acceptance. The current terms version is displayed in the Platform and must be accepted before use.</p>
+
+<h2>14. Governing Law</h2>
+<p>These terms are governed by the laws of the Province of Alberta and the federal laws of Canada applicable therein.</p>
+
+<h2>15. Contact</h2>
+<p>For questions about these terms, contact the Platform Owner at the email address provided during your Organization's onboarding.</p>
+
+</body>
+</html>

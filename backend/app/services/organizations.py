@@ -59,8 +59,10 @@ DEFAULT_INSTALLER_SKILL_PACKS = (
         "Marketing frameworks that AI actually executes. Use for Claude Code, OpenClaw, etc.",
     ),
 )
+VALID_ROLES = {"viewer", "member", "operator", "admin", "owner"}
 ADMIN_ROLES = {"owner", "admin"}
-ROLE_RANK = {"member": 0, "admin": 1, "owner": 2}
+OPERATOR_ROLES = {"owner", "admin", "operator"}
+ROLE_RANK = {"viewer": 0, "member": 1, "operator": 2, "admin": 3, "owner": 4}
 
 
 @dataclass(frozen=True)

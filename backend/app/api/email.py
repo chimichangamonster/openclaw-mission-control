@@ -10,6 +10,8 @@ from sqlalchemy import func, select
 
 from app.api.deps import ORG_MEMBER_DEP, ORG_RATE_LIMIT_DEP, SESSION_DEP, require_feature
 from app.core.logging import get_logger
+from app.core.redact import RedactionLevel, redact_email_content
+from app.core.sanitize import sanitize_text
 from app.core.time import utcnow
 from app.models.email_accounts import EmailAccount
 from app.models.email_attachments import EmailAttachment
@@ -190,7 +192,10 @@ async def list_email_messages(
         stmt = stmt.where(EmailMessage.is_read == is_read)
 
     result = await session.execute(stmt)
-    return list(result.scalars().all())
+    messages = list(result.scalars().all())
+    for msg in messages:
+        msg.body_text = sanitize_text(msg.body_text)
+    return messages
 
 
 @router.get("/accounts/{account_id}/messages/{message_id}", response_model=EmailMessageDetail)
@@ -202,7 +207,13 @@ async def get_email_message(
 ) -> EmailMessage:
     """Get a single email message with full body."""
     account = await _get_account_or_404(account_id, ctx.organization.id, session)
-    return await _get_message_or_404(message_id, account, session)
+    msg = await _get_message_or_404(message_id, account, session)
+    msg.body_text = sanitize_text(msg.body_text)
+    msg.body_html = sanitize_text(msg.body_html)
+    text, html, _, _ = redact_email_content(msg.body_text, msg.body_html, level=RedactionLevel.MODERATE)
+    msg.body_text = text
+    msg.body_html = html
+    return msg
 
 
 @router.patch("/accounts/{account_id}/messages/{message_id}", response_model=EmailMessageRead)

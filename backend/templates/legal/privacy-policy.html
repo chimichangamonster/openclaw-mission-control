@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>OpenClaw Platform — Privacy Policy</title>
+<style>
+  body { font-family: 'Segoe UI', system-ui, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; color: #333; line-height: 1.7; }
+  h1 { color: #1a1a2e; border-bottom: 3px solid #e63946; padding-bottom: 8px; }
+  h2 { color: #1a1a2e; margin-top: 2em; }
+  h3 { color: #444; margin-top: 1.5em; }
+  .banner { background: #fff3cd; border: 1px solid #ffc107; padding: 12px 16px; border-radius: 6px; margin: 20px 0; font-size: 0.9em; }
+  .banner strong { color: #856404; }
+  .effective { color: #666; font-size: 0.9em; }
+  ul { margin: 0.5em 0 1em; }
+  li { margin-bottom: 0.4em; }
+  table { width: 100%; border-collapse: collapse; margin: 1em 0; font-size: 0.95em; }
+  th { background: #f5f5f5; padding: 8px 12px; text-align: left; border-bottom: 2px solid #ddd; }
+  td { padding: 8px 12px; border-bottom: 1px solid #eee; }
+  .data-flow { background: #f8f8f8; padding: 16px; border-radius: 8px; margin: 1em 0; font-family: monospace; font-size: 0.9em; }
+</style>
+</head>
+<body>
+
+<h1>Privacy Policy</h1>
+<p class="effective">Version 2026.1 — Effective March 22, 2026</p>
+
+<div class="banner">
+  <strong>DRAFT — PENDING LEGAL REVIEW.</strong> This document has been prepared for informational purposes and will be reviewed by qualified legal counsel. References to PIPEDA and PIPA compliance are intended and will be validated by counsel.
+</div>
+
+<h2>1. Who We Are</h2>
+<p>The OpenClaw Business Platform ("Platform") is operated by the Platform Owner based in Alberta, Canada. This Privacy Policy explains how we collect, use, disclose, and protect personal information through the Platform.</p>
+
+<h2>2. Information We Collect</h2>
+
+<h3>2.1 Account Information</h3>
+<ul>
+  <li>Name, email address, and authentication credentials</li>
+  <li>Organization name and membership details</li>
+  <li>Role and access permissions within your Organization</li>
+</ul>
+
+<h3>2.2 Business Data You Provide</h3>
+<ul>
+  <li>Emails connected via OAuth (Zoho Mail, Microsoft Outlook)</li>
+  <li>Documents uploaded for analysis or generation</li>
+  <li>Trading positions, watchlist items, and portfolio data</li>
+  <li>Invoices, expenses, and bookkeeping records</li>
+  <li>Calendar events and contacts (if Microsoft Graph is connected)</li>
+  <li>Files stored in connected cloud services (OneDrive, Google Drive)</li>
+</ul>
+
+<h3>2.3 Usage Data</h3>
+<ul>
+  <li>API request logs (endpoints called, timestamps, response codes)</li>
+  <li>Agent interaction logs (which agents processed which requests)</li>
+  <li>Audit trail (settings changes, member additions, key operations)</li>
+  <li>Cost tracking data (LLM token usage per Organization)</li>
+</ul>
+
+<h3>2.4 Data We Do NOT Collect</h3>
+<ul>
+  <li>We do not collect browser cookies, device fingerprints, or advertising identifiers</li>
+  <li>We do not track user behavior across other websites</li>
+  <li>We do not collect location data beyond what is in email/document content</li>
+</ul>
+
+<h2>3. How We Use Your Information</h2>
+<ul>
+  <li><strong>Provide the service:</strong> Process your data through AI agents to deliver the features you use</li>
+  <li><strong>Maintain security:</strong> Authenticate users, enforce access controls, detect unauthorized access</li>
+  <li><strong>Improve operations:</strong> Monitor system performance, debug issues, optimize agent responses</li>
+  <li><strong>Communicate:</strong> Send service notifications via Discord or email</li>
+</ul>
+<p>We do <strong>not</strong> use your data for advertising, profiling, or selling to third parties.</p>
+
+<h2>4. How Your Data Is Shared</h2>
+
+<h3>4.1 Third-Party LLM Providers (SaaS / Dedicated Tier)</h3>
+<p>On the SaaS and Dedicated tiers, your data is sent to third-party AI companies for inference:</p>
+
+<div class="data-flow">
+Your Data → Platform Server → OpenRouter (US) → LLM Provider → Response → You
+</div>
+
+<p>Each LLM provider receives the text content necessary to generate a response. We apply redaction (see Section 5) before sending, but the remaining content is processed on the provider's infrastructure under their terms.</p>
+
+<h3>4.1a Self-Hosted LLM (Private Cloud / Enterprise Tier)</h3>
+<p>On Private Cloud and Enterprise tiers, your data is processed by a self-hosted LLM on infrastructure you control:</p>
+
+<div class="data-flow">
+Your Data → Platform Server → Your Self-Hosted LLM Server → Response → You
+</div>
+
+<p><strong>No data is shared with any third party.</strong> The Platform connects directly to your LLM endpoint using an OpenAI-compatible API. OpenRouter is bypassed entirely. Your Organization can verify this via the Platform's LLM routing status API.</p>
+
+<table>
+  <tr><th>Provider</th><th>Country</th><th>Training Policy</th><th>Retention</th></tr>
+  <tr><td>Anthropic</td><td>USA</td><td>Does not train on API data</td><td>30-day abuse monitoring logs</td></tr>
+  <tr><td>DeepSeek</td><td>China</td><td>See provider terms</td><td>See provider terms</td></tr>
+  <tr><td>xAI</td><td>USA</td><td>See provider terms</td><td>See provider terms</td></tr>
+  <tr><td>Google</td><td>USA</td><td>Does not train on API data (paid tier)</td><td>See provider terms</td></tr>
+  <tr><td>OpenAI</td><td>USA</td><td>Does not train on API data</td><td>30-day abuse monitoring logs</td></tr>
+  <tr><td>OpenRouter</td><td>USA</td><td>Intermediary — routes requests</td><td>See provider terms</td></tr>
+</table>
+
+<p><strong>Your control:</strong> You can restrict which providers process your Organization's data via Organization Settings.</p>
+
+<h3>4.2 Connected Services</h3>
+<p>When your Organization connects third-party services (Microsoft 365, Google Workspace, Adobe), data flows to those services under their terms. The Platform acts as an authorized application accessing data on your behalf via OAuth.</p>
+
+<h3>4.3 We Do Not Sell Your Data</h3>
+<p>We do not sell, rent, or trade personal information or business data to any third party.</p>
+
+<h2>5. Data Protection Measures</h2>
+
+<h3>5.1 Encryption</h3>
+<ul>
+  <li>All API keys, OAuth tokens, and secrets are encrypted at rest using Fernet symmetric encryption</li>
+  <li>All data in transit uses HTTPS/TLS encryption</li>
+  <li>Database connections use encrypted channels</li>
+</ul>
+
+<h3>5.2 Sensitive Data Redaction</h3>
+<p>Before data reaches any LLM provider, the Platform automatically redacts:</p>
+<ul>
+  <li>Passwords, reset links, OTP codes, and authentication tokens</li>
+  <li>API keys, secrets, and JWT tokens</li>
+  <li>Credit card numbers (validated by Luhn checksum)</li>
+  <li>Bank account and routing numbers</li>
+  <li>Social Insurance Numbers and Social Security Numbers</li>
+</ul>
+<p>With "strict" redaction enabled, also removed: phone numbers, email addresses in body text, mailing addresses, and dates of birth.</p>
+
+<h3>5.3 Access Controls</h3>
+<ul>
+  <li>Role-based access control (viewer, member, operator, admin, owner)</li>
+  <li>Organization data isolation — one Organization cannot access another's data</li>
+  <li>Email folder scoping — restrict which email folders agents can access</li>
+  <li>Sender blocking — prevent agents from processing emails from specific senders</li>
+  <li>Audit logging of all security-sensitive operations</li>
+</ul>
+
+<h3>5.4 Infrastructure Security</h3>
+<ul>
+  <li>Platform accessible via Tailscale VPN (private network, not public internet)</li>
+  <li>SSH key authentication for server access</li>
+  <li>Non-root container execution</li>
+  <li>Rate limiting per Organization (600 requests/minute)</li>
+</ul>
+
+<h2>6. Data Retention</h2>
+<ul>
+  <li><strong>Account data:</strong> Retained while account is active, deleted 30 days after termination</li>
+  <li><strong>Email messages:</strong> Retained while email account is connected, deleted when disconnected</li>
+  <li><strong>Documents:</strong> Retained until Organization deletion or manual removal</li>
+  <li><strong>Audit logs:</strong> Retained for 1 year</li>
+  <li><strong>LLM provider logs:</strong> Subject to each provider's retention policy (typically 30 days for abuse monitoring)</li>
+</ul>
+
+<h2>7. Your Rights</h2>
+<p>Under PIPEDA and Alberta's PIPA, you have the right to:</p>
+<ul>
+  <li><strong>Access:</strong> Request a copy of personal information we hold about you</li>
+  <li><strong>Correction:</strong> Request correction of inaccurate personal information</li>
+  <li><strong>Withdrawal of consent:</strong> Withdraw consent to data processing (which may require account closure)</li>
+  <li><strong>Complaint:</strong> File a complaint with the Office of the Privacy Commissioner of Canada or the Alberta Information and Privacy Commissioner</li>
+  <li><strong>Data export:</strong> Request an export of your Organization's data in a machine-readable format</li>
+</ul>
+<p>To exercise these rights, contact the Platform Owner.</p>
+
+<h2>8. Cross-Border Transfers</h2>
+
+<h3>8.1 SaaS / Dedicated Tier</h3>
+<p>Your data is transferred outside Canada in the following ways:</p>
+<ul>
+  <li><strong>Platform infrastructure:</strong> Currently hosted in the United States</li>
+  <li><strong>LLM processing:</strong> Sent to providers in the United States and potentially China (DeepSeek)</li>
+  <li><strong>Connected services:</strong> Microsoft 365, Google Workspace, and Adobe operate globally</li>
+</ul>
+<p>By using the Platform on the SaaS or Dedicated tier, you consent to these transfers. You may restrict LLM provider jurisdictions via Organization Settings.</p>
+
+<h3>8.2 Private Cloud / Enterprise Tier</h3>
+<p>On these tiers, cross-border transfers can be eliminated entirely:</p>
+<ul>
+  <li><strong>Platform infrastructure:</strong> Can be deployed in any jurisdiction (Canada, EU, your country of choice)</li>
+  <li><strong>LLM processing:</strong> Self-hosted on GPU servers in your chosen jurisdiction — no data sent to third-party providers</li>
+  <li><strong>Connected services:</strong> Your Organization controls which external services (Microsoft 365, Google Workspace) are connected</li>
+</ul>
+<p>The Platform Owner maintains deployment guides for compliant GPU hosting in Canada, United States, European Union, United Kingdom, Australia, Middle East, and Asia Pacific.</p>
+
+<h3>8.3 General</h3>
+<p>We endeavour to ensure that your data receives comparable protection in all jurisdictions, but cannot guarantee the same level of legal protection as under Canadian law for data processed outside Canada.</p>
+
+<h2>9. Children's Privacy</h2>
+<p>The Platform is not intended for use by individuals under the age of 18. We do not knowingly collect personal information from children.</p>
+
+<h2>10. Changes to This Policy</h2>
+<p>We may update this Privacy Policy periodically. Material changes will be communicated through the Platform and may require re-acceptance of terms.</p>
+
+<h2>11. Contact</h2>
+<p>For privacy inquiries or to exercise your rights under Canadian privacy law, contact:</p>
+<p>Platform Owner<br>
+Alberta, Canada<br>
+Contact via the email address provided during Organization onboarding.</p>
+
+</body>
+</html>
