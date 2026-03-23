@@ -38,6 +38,15 @@ Fork of abhi1693/openclaw-mission-control. Separate git repo (not a submodule).
 - `POST /watchlist/portfolios/{id}/items/bulk` — bulk add from report scan
 - `GET /watchlist/portfolios/{id}/items/summary` — counts + active alerts
 
+## Chat & Gateway Session Endpoints
+- `GET /gateways/sessions` — list gateway sessions (requires board_id)
+- `GET /gateways/sessions/{id}/history` — fetch chat history for a session
+- `POST /gateways/sessions/{id}/message` — send a message into a session
+- `POST /gateways/sessions/{id}/abort` — stop an agent's in-progress response
+- `POST /gateways/sessions/{id}/compact` — summarise and trim session history
+- `POST /gateways/sessions/{id}/reset` — clear session conversation history
+- Frontend chat page at `/chat` — single-conversation interface with The Claw, auto-resolves session, SSE real-time typing indicators, markdown rendering, context meter, abort/compact/clear controls
+
 ## Environment Variables (mc-backend)
 - `OPENROUTER_API_KEY` — required for cost tracking page (added to docker-compose.mission-control.yml)
 - `DATABASE_URL`, `LOCAL_AUTH_TOKEN`, `ENCRYPTION_KEY` — standard config in .env.production

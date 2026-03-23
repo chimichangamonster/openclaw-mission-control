@@ -15,6 +15,7 @@ import {
   Calendar,
   LayoutGrid,
   Mail,
+  MessageSquare,
   Moon,
   Network,
   Sun,
@@ -105,6 +106,18 @@ export function DashboardSidebar() {
               >
                 <Radio className="h-4 w-4" />
                 Agent Activity
+              </Link>
+              <Link
+                href="/chat"
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-[color:var(--text)] transition",
+                  pathname.startsWith("/chat")
+                    ? "bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)] font-medium"
+                    : "hover:bg-[color:var(--surface-muted)]",
+                )}
+              >
+                <MessageSquare className="h-4 w-4" />
+                Chat
               </Link>
               <Link
                 href="/activity"

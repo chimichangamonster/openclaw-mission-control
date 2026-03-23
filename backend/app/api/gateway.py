@@ -141,6 +141,63 @@ async def send_gateway_session_message(
     return OkResponse()
 
 
+@router.post("/sessions/{session_id}/abort", response_model=OkResponse)
+async def abort_gateway_session(
+    session_id: str,
+    board_id: str | None = BOARD_ID_QUERY,
+    session: AsyncSession = SESSION_DEP,
+    auth: AuthContext = AUTH_DEP,
+    ctx: OrganizationContext = ORG_ADMIN_DEP,
+) -> OkResponse:
+    """Abort (stop) an agent's in-progress response."""
+    service = GatewaySessionService(session)
+    await service.abort_session_chat(
+        session_id=session_id,
+        board_id=board_id,
+        organization_id=ctx.organization.id,
+        user=auth.user,
+    )
+    return OkResponse()
+
+
+@router.post("/sessions/{session_id}/compact", response_model=OkResponse)
+async def compact_gateway_session(
+    session_id: str,
+    board_id: str | None = BOARD_ID_QUERY,
+    session: AsyncSession = SESSION_DEP,
+    auth: AuthContext = AUTH_DEP,
+    ctx: OrganizationContext = ORG_ADMIN_DEP,
+) -> OkResponse:
+    """Compact a session's context (summarise and trim history)."""
+    service = GatewaySessionService(session)
+    await service.compact_session_history(
+        session_id=session_id,
+        board_id=board_id,
+        organization_id=ctx.organization.id,
+        user=auth.user,
+    )
+    return OkResponse()
+
+
+@router.post("/sessions/{session_id}/reset", response_model=OkResponse)
+async def reset_gateway_session(
+    session_id: str,
+    board_id: str | None = BOARD_ID_QUERY,
+    session: AsyncSession = SESSION_DEP,
+    auth: AuthContext = AUTH_DEP,
+    ctx: OrganizationContext = ORG_ADMIN_DEP,
+) -> OkResponse:
+    """Reset a session (clear conversation history)."""
+    service = GatewaySessionService(session)
+    await service.reset_session_history(
+        session_id=session_id,
+        board_id=board_id,
+        organization_id=ctx.organization.id,
+        user=auth.user,
+    )
+    return OkResponse()
+
+
 @router.get("/commands", response_model=GatewayCommandsResponse)
 async def gateway_commands(
     _auth: AuthContext = AUTH_DEP,

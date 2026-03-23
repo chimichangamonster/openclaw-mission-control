@@ -554,6 +554,21 @@ async def get_chat_history(
     return await openclaw_call("chat.history", params, config=config)
 
 
+async def abort_chat(session_key: str, *, config: GatewayConfig) -> object:
+    """Abort (stop) the agent's in-progress response."""
+    return await openclaw_call("chat.abort", {"sessionKey": session_key}, config=config)
+
+
+async def compact_session(session_key: str, *, config: GatewayConfig) -> object:
+    """Compact a session's context (summarise and trim history)."""
+    return await openclaw_call("sessions.compact", {"key": session_key}, config=config)
+
+
+async def reset_session(session_key: str, *, config: GatewayConfig) -> object:
+    """Reset a session (clear conversation history)."""
+    return await openclaw_call("sessions.reset", {"key": session_key}, config=config)
+
+
 async def delete_session(session_key: str, *, config: GatewayConfig) -> object:
     """Delete a session by key."""
     return await openclaw_call("sessions.delete", {"key": session_key}, config=config)
