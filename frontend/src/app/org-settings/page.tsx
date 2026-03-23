@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Key, Shield, Save, Trash2, Eye, EyeOff, AlertTriangle,
+  Key, Shield, Save, Trash2, Eye, EyeOff, AlertTriangle, DollarSign,
   Server, Upload, Image, ShieldCheck, Globe, CheckCircle2, XCircle, Loader2,
 } from "lucide-react";
 
@@ -61,6 +61,133 @@ interface AuditEntry {
   created_at: string;
 }
 
+// ─── Interactive Cost Calculator ──────────────────────────────────────────────
+
+function CostCalculator({
+  t1Cost, t2Cost, t3Cost, cronCostT2, cronCostT3,
+  hasRealData, projectedMonthly, daysTracked, dailyAvg, totalSpend,
+}: {
+  t1Cost: number; t2Cost: number; t3Cost: number;
+  cronCostT2: number; cronCostT3: number;
+  hasRealData: boolean; projectedMonthly: number | null;
+  daysTracked: number; dailyAvg: number | null; totalSpend: number;
+}) {
+  const [users, setUsers] = useState(5);
+  const [convsPerUser, setConvsPerUser] = useState(5);
+  const [agents, setAgents] = useState(3);
+  const [tier3Pct, setTier3Pct] = useState(30);
+  const [cronJobs, setCronJobs] = useState(3);
+  const [cronTier3Pct, setCronTier3Pct] = useState(50);
+
+  const dailyConversations = users * convsPerUser;
+  const tier3Fraction = tier3Pct / 100;
+  const tier2Fraction = 1 - tier3Fraction;
+  const avgConvCost = tier2Fraction * t2Cost + tier3Fraction * t3Cost;
+  const dailyCost = dailyConversations * avgConvCost;
+
+  const cronTier3Frac = cronTier3Pct / 100;
+  const avgCronCost = (1 - cronTier3Frac) * cronCostT2 + cronTier3Frac * cronCostT3;
+  const dailyCronCost = cronJobs * avgCronCost; // assume ~1 run/day avg
+
+  const monthlyCost = (dailyCost + dailyCronCost) * 30;
+  const annualCost = monthlyCost * 12;
+
+  const SliderRow = ({ label, value, setValue, min, max, step, unit, hint }: {
+    label: string; value: number; setValue: (v: number) => void;
+    min: number; max: number; step: number; unit: string; hint?: string;
+  }) => (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <label className="text-xs text-slate-600">{label}</label>
+        <span className="text-xs font-mono font-semibold text-slate-800">{value}{unit}</span>
+      </div>
+      <input
+        type="range" min={min} max={max} step={step} value={value}
+        onChange={(e) => setValue(Number(e.target.value))}
+        className="w-full h-1.5 rounded-full appearance-none cursor-pointer bg-slate-200 accent-blue-600"
+      />
+      <div className="flex justify-between text-[9px] text-slate-400 mt-0.5">
+        <span>{min}{unit}</span>
+        {hint && <span>{hint}</span>}
+        <span>{max}{unit}</span>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="rounded-xl border border-amber-200 bg-amber-50/50 shadow-sm">
+      <div className="px-5 py-4">
+        <h2 className="text-sm font-semibold text-amber-900 flex items-center gap-2">
+          <DollarSign className="h-4 w-4" /> AI Cost Calculator
+        </h2>
+        <p className="text-[11px] text-amber-600 mt-1">Adjust the sliders to estimate your monthly AI costs.</p>
+
+        {/* Real data banner */}
+        {hasRealData && projectedMonthly != null && (
+          <div className="mt-3 rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2">
+            <div className="flex items-baseline gap-2">
+              <span className="text-lg font-bold text-emerald-800">${projectedMonthly}</span>
+              <span className="text-[11px] text-emerald-600">/month based on actual usage</span>
+            </div>
+            <p className="text-[10px] text-emerald-600">
+              {daysTracked} days tracked, ${dailyAvg}/day avg, ${totalSpend} total to date
+            </p>
+          </div>
+        )}
+
+        {/* Sliders */}
+        <div className="mt-4 space-y-4">
+          <SliderRow label="Team size (users)" value={users} setValue={setUsers} min={1} max={100} step={1} unit="" hint="who will interact with agents" />
+          <SliderRow label="Conversations per user / day" value={convsPerUser} setValue={setConvsPerUser} min={1} max={20} step={1} unit="" hint="messages, commands, queries" />
+          <SliderRow label="Active agents" value={agents} setValue={setAgents} min={1} max={20} step={1} unit="" />
+          <SliderRow label="Reasoning model usage" value={tier3Pct} setValue={setTier3Pct} min={0} max={100} step={5} unit="%" hint="Tier 3 (Sonnet/Grok) vs Tier 2 (DeepSeek)" />
+          <SliderRow label="Scheduled jobs (crons)" value={cronJobs} setValue={setCronJobs} min={0} max={30} step={1} unit="" />
+          {cronJobs > 0 && (
+            <SliderRow label="Cron reasoning model %" value={cronTier3Pct} setValue={setCronTier3Pct} min={0} max={100} step={10} unit="%" hint="% of cron jobs using Tier 3" />
+          )}
+        </div>
+
+        {/* Result */}
+        <div className="mt-4 rounded-lg bg-white border border-amber-200 px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-bold text-amber-900">${monthlyCost.toFixed(2)}</span>
+                <span className="text-xs text-amber-600">/month</span>
+              </div>
+              <p className="text-[10px] text-slate-500 mt-0.5">${annualCost.toFixed(0)}/year · ${dailyCost.toFixed(2)}/day conversations · ${(dailyCronCost * 30).toFixed(2)}/mo crons</p>
+            </div>
+            <div className="text-right">
+              <p className="text-[10px] text-slate-500">{dailyConversations} conv/day</p>
+              <p className="text-[10px] text-slate-500">${avgConvCost.toFixed(4)}/conv avg</p>
+            </div>
+          </div>
+
+          {/* Cost breakdown bar */}
+          <div className="mt-2 flex h-2 rounded-full overflow-hidden bg-slate-100">
+            {tier2Fraction > 0 && <div className="bg-blue-400 transition-all" style={{ width: `${tier2Fraction * 100}%` }} />}
+            {tier3Fraction > 0 && <div className="bg-purple-500 transition-all" style={{ width: `${tier3Fraction * 100}%` }} />}
+          </div>
+          <div className="flex justify-between text-[9px] mt-1">
+            <span className="text-blue-600">Tier 2 Standard — ${t2Cost.toFixed(4)}/conv</span>
+            <span className="text-purple-600">Tier 3 Reasoning — ${t3Cost.toFixed(4)}/conv</span>
+          </div>
+        </div>
+
+        <div className="mt-3 flex items-center gap-2">
+          <a
+            href="/costs"
+            className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700 transition"
+          >
+            Set Budget Cap
+          </a>
+          <span className="text-[10px] text-amber-600">Prevent unexpected charges by setting a monthly limit</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function OrgSettingsPage() {
   const { isSignedIn } = useAuth();
   const [settings, setSettings] = useState<OrgSettings | null>(null);
@@ -104,20 +231,38 @@ export default function OrgSettingsPage() {
   const [editLocation, setEditLocation] = useState("");
   const [savingLocale, setSavingLocale] = useState(false);
 
+  // Cost estimate state
+  const [costEstimate, setCostEstimate] = useState<{
+    has_real_data: boolean;
+    days_tracked: number;
+    projected_monthly: number | null;
+    daily_avg: number | null;
+    total_spend_to_date: number;
+    tier_costs: { tier: string; model: string; per_conversation: number; per_100_conversations: number }[];
+    examples: { description: string; monthly_est: number }[];
+    note: string;
+  } | null>(null);
+  const [showBudgetPrompt, setShowBudgetPrompt] = useState(false);
+
   // Microsoft Graph state
   const [connectingGraph, setConnectingGraph] = useState(false);
 
   // Google Calendar state
   const [connectingGcal, setConnectingGcal] = useState(false);
+  const [gcalStatus, setGcalStatus] = useState<{ connected: boolean; email?: string } | null>(null);
 
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      const [settingsRaw, auditRaw, routingRaw]: any[] = await Promise.all([
+      const [settingsRaw, auditRaw, routingRaw, estimateRaw, gcalRaw]: any[] = await Promise.all([
         customFetch("/api/v1/organization-settings", { method: "GET" }).catch(() => null),
         customFetch("/api/v1/organization-settings/audit-log?limit=20", { method: "GET" }).catch(() => null),
         customFetch("/api/v1/organization-settings/llm-routing", { method: "GET" }).catch(() => null),
+        customFetch("/api/v1/cost-tracker/cost-estimate", { method: "GET" }).catch(() => null),
+        customFetch("/api/v1/google-calendar/status", { method: "GET" }).catch(() => null),
       ]);
+      const gcData = gcalRaw?.data ?? gcalRaw;
+      if (gcData) setGcalStatus(gcData);
       const sData = settingsRaw?.data ?? settingsRaw;
       if (sData) {
         setSettings(sData as OrgSettings);
@@ -137,6 +282,8 @@ export default function OrgSettingsPage() {
       if (aData?.entries) setAuditLog(aData.entries as AuditEntry[]);
       const rData = routingRaw?.data ?? routingRaw;
       if (rData) setLlmRouting(rData as LLMRouting);
+      const eData = estimateRaw?.data ?? estimateRaw;
+      if (eData?.tier_costs) setCostEstimate(eData);
     } catch {
       // ignore
     } finally {
@@ -169,6 +316,7 @@ export default function OrgSettingsPage() {
 
   const setOrKey = async () => {
     if (!newOrKey.trim()) return;
+    const hadKey = settings?.has_openrouter_key;
     await customFetch("/api/v1/organization-settings/openrouter-key", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -176,6 +324,7 @@ export default function OrgSettingsPage() {
     });
     setNewOrKey("");
     await loadData();
+    if (!hadKey) setShowBudgetPrompt(true);
   };
 
   const removeOrKey = async () => {
@@ -377,6 +526,16 @@ export default function OrgSettingsPage() {
                 <p className="text-xs text-slate-500">Bring your own OpenRouter keys. Falls back to platform default if not set.</p>
               </div>
               <div className="p-5 space-y-4">
+                {/* Provider ToS Notice */}
+                <div className="rounded-lg border border-blue-200 bg-blue-50/50 px-4 py-3">
+                  <p className="text-xs font-medium text-blue-800">Provider Compliance</p>
+                  <p className="text-[11px] text-blue-700 mt-1 leading-relaxed">
+                    Use <strong>API keys</strong> from OpenRouter or provider developer consoles (console.anthropic.com, platform.openai.com, etc.).
+                    Do not use OAuth tokens from personal subscriptions (Claude Pro/Max, ChatGPT Plus) — provider Terms of Service prohibit
+                    routing personal plan credentials through third-party platforms.
+                  </p>
+                </div>
+
                 {/* OpenRouter API Key */}
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">OpenRouter API Key</label>
@@ -446,6 +605,61 @@ export default function OrgSettingsPage() {
                 </div>
               </div>
             </div>
+
+            {/* AI Cost Calculator — interactive estimator */}
+            {(llmRouting?.configured || settings.has_openrouter_key) && costEstimate && (() => {
+              // Tier pricing from backend (per conversation)
+              const tierMap = Object.fromEntries(costEstimate.tier_costs.map((t) => [t.tier.split(" ")[0] + " " + t.tier.split(" ")[2], t.per_conversation]));
+              const t1Cost = costEstimate.tier_costs[0]?.per_conversation ?? 0.0003;
+              const t2Cost = costEstimate.tier_costs[1]?.per_conversation ?? 0.001;
+              const t3Cost = costEstimate.tier_costs[2]?.per_conversation ?? 0.02;
+              const cronCostT2 = t2Cost * 2; // crons use ~2x tokens
+              const cronCostT3 = t3Cost * 2;
+
+              return (
+                <CostCalculator
+                  t1Cost={t1Cost}
+                  t2Cost={t2Cost}
+                  t3Cost={t3Cost}
+                  cronCostT2={cronCostT2}
+                  cronCostT3={cronCostT3}
+                  hasRealData={costEstimate.has_real_data}
+                  projectedMonthly={costEstimate.projected_monthly}
+                  daysTracked={costEstimate.days_tracked}
+                  dailyAvg={costEstimate.daily_avg}
+                  totalSpend={costEstimate.total_spend_to_date}
+                />
+              );
+            })()}
+
+            {/* Budget Setup Prompt — appears after first key save */}
+            {showBudgetPrompt && (
+              <div className="rounded-xl border-2 border-red-300 bg-red-50 shadow-sm animate-[slideDown_0.3s_ease-out]">
+                <div className="px-5 py-4">
+                  <h2 className="text-sm font-semibold text-red-900 flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-red-500" /> Set a Budget Before Agents Start Spending
+                  </h2>
+                  <p className="mt-2 text-xs text-red-800 leading-relaxed">
+                    Your API key is now active. Agents and cron jobs will begin using LLM tokens, which cost real money.
+                    Without a budget cap, there is no limit on how much agents can spend.
+                  </p>
+                  <div className="mt-3 flex items-center gap-3">
+                    <a
+                      href="/costs"
+                      className="rounded-lg bg-red-600 px-4 py-2 text-xs font-semibold text-white hover:bg-red-700 transition"
+                    >
+                      Set Budget Now
+                    </a>
+                    <button
+                      onClick={() => setShowBudgetPrompt(false)}
+                      className="text-xs text-red-500 hover:text-red-700 transition"
+                    >
+                      I'll do this later
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Custom LLM Endpoint */}
             <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -777,6 +991,14 @@ export default function OrgSettingsPage() {
               <div className="p-5">
                 {editFlags.google_calendar === false ? (
                   <p className="text-xs text-slate-400">Enable the &quot;google calendar&quot; feature flag above to use this integration.</p>
+                ) : gcalStatus?.connected ? (
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                      <span className="text-sm font-medium text-emerald-700">Connected</span>
+                      <span className="text-xs text-emerald-600">{gcalStatus.email}</span>
+                    </div>
+                  </div>
                 ) : (
                   <div className="flex items-center gap-3">
                     <button

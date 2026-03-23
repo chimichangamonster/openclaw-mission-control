@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from unittest.mock import AsyncMock, patch
+
 import pytest
 
 
@@ -132,3 +134,106 @@ class TestPerAgentSpend:
             if spend > daily_limit
         ]
         assert over_limit == ["the-claw"]
+
+
+class TestProactiveCompaction:
+    """Compaction fallback — reset after repeated compact failures."""
+
+    @pytest.fixture(autouse=True)
+    def _clear_fail_counts(self):
+        """Reset the module-level fail counter between tests."""
+        from app.services.budget_monitor import _compact_fail_counts
+        _compact_fail_counts.clear()
+        yield
+        _compact_fail_counts.clear()
+
+    @staticmethod
+    def _make_session(key: str, tokens: int, model: str = "anthropic/claude-sonnet-4") -> dict:
+        return {"key": key, "totalTokens": tokens, "model": model, "groupChannel": "#test"}
+
+    @pytest.mark.asyncio
+    @patch("app.services.budget_monitor._send_discord_alert", new_callable=AsyncMock)
+    @patch("app.services.budget_monitor.track_error", new_callable=AsyncMock)
+    @patch("app.services.budget_monitor.reset_session", new_callable=AsyncMock)
+    @patch("app.services.budget_monitor.compact_session", new_callable=AsyncMock)
+    async def test_compact_success_resets_fail_count(
+        self, mock_compact, mock_reset, mock_track, mock_alert,
+    ):
+        from app.services.budget_monitor import _compact_fail_counts, _proactive_compaction, GatewayConfig
+
+        mock_compact.return_value = {"compacted": True}
+        config = GatewayConfig(url="ws://fake:1234")
+
+        # Pre-seed a fail count
+        _compact_fail_counts["agent:test:discord:1"] = 2
+
+        sessions = [self._make_session("agent:test:discord:1", 160_000)]
+        await _proactive_compaction(sessions, config)
+
+        mock_compact.assert_called_once()
+        mock_reset.assert_not_called()
+        assert "agent:test:discord:1" not in _compact_fail_counts
+
+    @pytest.mark.asyncio
+    @patch("app.services.budget_monitor._send_discord_alert", new_callable=AsyncMock)
+    @patch("app.services.budget_monitor.track_error", new_callable=AsyncMock)
+    @patch("app.services.budget_monitor.reset_session", new_callable=AsyncMock)
+    @patch("app.services.budget_monitor.compact_session", new_callable=AsyncMock)
+    async def test_compact_fail_increments_counter(
+        self, mock_compact, mock_reset, mock_track, mock_alert,
+    ):
+        from app.services.budget_monitor import _compact_fail_counts, _proactive_compaction, GatewayConfig
+
+        mock_compact.return_value = {"compacted": False}
+        config = GatewayConfig(url="ws://fake:1234")
+
+        sessions = [self._make_session("agent:test:discord:1", 160_000)]
+        await _proactive_compaction(sessions, config)
+
+        assert _compact_fail_counts["agent:test:discord:1"] == 1
+        mock_reset.assert_not_called()
+
+    @pytest.mark.asyncio
+    @patch("app.services.budget_monitor._send_discord_alert", new_callable=AsyncMock)
+    @patch("app.services.budget_monitor.track_error", new_callable=AsyncMock)
+    @patch("app.services.budget_monitor.reset_session", new_callable=AsyncMock)
+    @patch("app.services.budget_monitor.compact_session", new_callable=AsyncMock)
+    async def test_reset_after_three_compact_failures(
+        self, mock_compact, mock_reset, mock_track, mock_alert,
+    ):
+        from app.services.budget_monitor import _compact_fail_counts, _proactive_compaction, GatewayConfig
+
+        mock_compact.return_value = {"compacted": False}
+        mock_reset.return_value = {"ok": True}
+        config = GatewayConfig(url="ws://fake:1234")
+
+        # Pre-seed 2 failures — next one triggers reset
+        _compact_fail_counts["agent:test:discord:1"] = 2
+
+        sessions = [self._make_session("agent:test:discord:1", 160_000)]
+        await _proactive_compaction(sessions, config)
+
+        mock_reset.assert_called_once_with("agent:test:discord:1", config=config)
+        assert "agent:test:discord:1" not in _compact_fail_counts
+        # Should send a Discord alert about the reset
+        mock_alert.assert_called()
+        alert_text = mock_alert.call_args[0][1]
+        assert "SESSION RESET" in alert_text
+
+    @pytest.mark.asyncio
+    @patch("app.services.budget_monitor._send_discord_alert", new_callable=AsyncMock)
+    @patch("app.services.budget_monitor.track_error", new_callable=AsyncMock)
+    @patch("app.services.budget_monitor.reset_session", new_callable=AsyncMock)
+    @patch("app.services.budget_monitor.compact_session", new_callable=AsyncMock)
+    async def test_below_threshold_no_compact(
+        self, mock_compact, mock_reset, mock_track, mock_alert,
+    ):
+        from app.services.budget_monitor import _proactive_compaction, GatewayConfig
+
+        config = GatewayConfig(url="ws://fake:1234")
+        # 100K tokens = 50% of 200K window — below 75% threshold
+        sessions = [self._make_session("agent:test:discord:1", 100_000)]
+        await _proactive_compaction(sessions, config)
+
+        mock_compact.assert_not_called()
+        mock_reset.assert_not_called()

@@ -226,12 +226,31 @@ class KeyPayload(BaseModel):
     key: str
 
 
+# Prefixes that indicate personal-plan OAuth tokens, not API keys.
+_OAUTH_PREFIXES = ("sk-ant-sid", "sess-", "eyJhbG")
+
+
 @router.post("/openrouter-key")
 async def set_openrouter_key(
     payload: KeyPayload,
     org_ctx: OrganizationContext = _ADMIN_DEP,
 ):
     """Store a BYOK OpenRouter API key (Fernet-encrypted). Requires admin role."""
+    key = payload.key.strip()
+
+    # Block keys that look like personal-plan OAuth tokens
+    for prefix in _OAUTH_PREFIXES:
+        if key.startswith(prefix):
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "This looks like a personal-plan OAuth token, not an API key. "
+                    "Provider Terms of Service prohibit routing personal subscriptions "
+                    "(Claude Pro/Max, ChatGPT Plus) through third-party platforms. "
+                    "Use an API key from openrouter.ai or the provider's developer console."
+                ),
+            )
+
     org_id = org_ctx.organization.id
 
     async with async_session_maker() as session:
@@ -244,7 +263,7 @@ async def set_openrouter_key(
             settings = OrganizationSettings(id=uuid4(), organization_id=org_id, created_at=utcnow(), updated_at=utcnow())
             session.add(settings)
 
-        settings.openrouter_api_key_encrypted = encrypt_token(payload.key)
+        settings.openrouter_api_key_encrypted = encrypt_token(key)
         settings.updated_at = utcnow()
         await session.commit()
 

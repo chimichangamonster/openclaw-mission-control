@@ -30,8 +30,10 @@ logger = get_logger(__name__)
 router = APIRouter(
     prefix="/google-calendar",
     tags=["google-calendar"],
-    dependencies=[Depends(require_feature("google_calendar")), ORG_RATE_LIMIT_DEP],
 )
+
+# Shared dependencies for authenticated routes (callback is exempt — it's a Google redirect)
+_AUTH_DEPS = [Depends(require_feature("google_calendar")), ORG_RATE_LIMIT_DEP]
 
 _STATE_TTL_SECONDS = 300
 _oauth_provider = GoogleCalendarOAuthProvider()
@@ -46,7 +48,7 @@ def _redis_client() -> redis.Redis:
 # ---------------------------------------------------------------------------
 
 
-@router.get("/authorize", summary="Initiate Google Calendar OAuth")
+@router.get("/authorize", summary="Initiate Google Calendar OAuth", dependencies=_AUTH_DEPS)
 async def initiate_oauth(
     ctx: OrganizationContext = ORG_MEMBER_DEP,
 ) -> dict[str, str]:
@@ -137,7 +139,7 @@ async def oauth_callback(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/status", summary="Get Google Calendar connection status")
+@router.get("/status", summary="Get Google Calendar connection status", dependencies=_AUTH_DEPS)
 async def connection_status(
     ctx: OrganizationContext = ORG_MEMBER_DEP,
     session: AsyncSession = SESSION_DEP,
@@ -157,7 +159,7 @@ async def connection_status(
     }
 
 
-@router.delete("/disconnect", summary="Disconnect Google Calendar")
+@router.delete("/disconnect", summary="Disconnect Google Calendar", dependencies=_AUTH_DEPS)
 async def disconnect(
     ctx: OrganizationContext = ORG_MEMBER_DEP,
     session: AsyncSession = SESSION_DEP,
@@ -177,7 +179,7 @@ class CalendarSettingsUpdate(BaseModel):
     default_calendar_id: str = Field(..., description="Calendar ID to use for scheduling")
 
 
-@router.patch("/settings", summary="Update default calendar")
+@router.patch("/settings", summary="Update default calendar", dependencies=_AUTH_DEPS)
 async def update_calendar_settings(
     body: CalendarSettingsUpdate,
     ctx: OrganizationContext = ORG_MEMBER_DEP,
@@ -197,7 +199,7 @@ async def update_calendar_settings(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/calendars", summary="List calendars")
+@router.get("/calendars", summary="List calendars", dependencies=_AUTH_DEPS)
 async def list_calendars(
     ctx: OrganizationContext = ORG_MEMBER_DEP,
     session: AsyncSession = SESSION_DEP,
@@ -213,7 +215,7 @@ async def list_calendars(
     return {"calendars": calendars}
 
 
-@router.get("/events", summary="List events")
+@router.get("/events", summary="List events", dependencies=_AUTH_DEPS)
 async def list_events(
     ctx: OrganizationContext = ORG_MEMBER_DEP,
     session: AsyncSession = SESSION_DEP,
@@ -254,7 +256,7 @@ class CreateEventRequest(BaseModel):
     time_zone: str = "America/Edmonton"
 
 
-@router.post("/events", status_code=status.HTTP_201_CREATED, summary="Create event")
+@router.post("/events", status_code=status.HTTP_201_CREATED, summary="Create event", dependencies=_AUTH_DEPS)
 async def create_event(
     body: CreateEventRequest,
     ctx: OrganizationContext = ORG_MEMBER_DEP,
@@ -290,7 +292,7 @@ class UpdateEventRequest(BaseModel):
     time_zone: str = "America/Edmonton"
 
 
-@router.patch("/events/{event_id}", summary="Update event")
+@router.patch("/events/{event_id}", summary="Update event", dependencies=_AUTH_DEPS)
 async def update_event(
     event_id: str,
     body: UpdateEventRequest,
@@ -318,7 +320,7 @@ async def update_event(
     return event
 
 
-@router.delete("/events/{event_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete event")
+@router.delete("/events/{event_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete event", dependencies=_AUTH_DEPS)
 async def delete_event(
     event_id: str,
     ctx: OrganizationContext = ORG_MEMBER_DEP,

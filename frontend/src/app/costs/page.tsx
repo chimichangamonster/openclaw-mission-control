@@ -110,7 +110,7 @@ export default function CostsPage() {
   const [activityLoading, setActivityLoading] = useState(false);
   const [budget, setBudget] = useState<any>(null);
   const [editingBudget, setEditingBudget] = useState(false);
-  const [budgetForm, setBudgetForm] = useState({ monthly_budget: 25, alert_thresholds: "50, 80, 95", agent_daily_limits: "{}", throttle_to_tier1_on_exceed: true, alerts_enabled: true });
+  const [budgetForm, setBudgetForm] = useState({ monthly_budget: 25, alert_thresholds: "50, 80, 95", agent_daily_limits: "{}", default_agent_daily_limit: 2.0, throttle_to_tier1_on_exceed: true, alerts_enabled: true });
   const [savingBudget, setSavingBudget] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -289,7 +289,7 @@ export default function CostsPage() {
                 <div>
                   <h3 className="text-sm font-semibold text-slate-900">Budget Controls</h3>
                   <p className="text-xs text-slate-500">
-                    Monthly budget: ${budget.config.monthly_budget.toFixed(2)} • Alerts at {budget.config.alert_thresholds.join("%, ")}%
+                    Monthly budget: ${budget.config.monthly_budget.toFixed(2)} • Default daily limit: ${budget.config.default_agent_daily_limit?.toFixed(2) ?? "2.00"}/agent • Alerts at {budget.config.alert_thresholds.join("%, ")}%
                   </p>
                 </div>
                 <button
@@ -299,6 +299,7 @@ export default function CostsPage() {
                         monthly_budget: budget.config.monthly_budget,
                         alert_thresholds: budget.config.alert_thresholds.join(", "),
                         agent_daily_limits: JSON.stringify(budget.config.agent_daily_limits, null, 2),
+                        default_agent_daily_limit: budget.config.default_agent_daily_limit ?? 2.0,
                         throttle_to_tier1_on_exceed: budget.config.throttle_to_tier1_on_exceed,
                         alerts_enabled: budget.config.alerts_enabled,
                       });
@@ -314,7 +315,7 @@ export default function CostsPage() {
               {/* Budget Editor */}
               {editingBudget && (
                 <div className="border-b border-slate-100 bg-slate-50/50 p-4 space-y-3">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div>
                       <label className="block text-xs font-medium text-slate-600 mb-1">Monthly Budget ($)</label>
                       <input
@@ -327,6 +328,18 @@ export default function CostsPage() {
                       />
                     </div>
                     <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">Default Daily Limit ($)</label>
+                      <input
+                        type="number"
+                        step="0.5"
+                        min="0"
+                        value={budgetForm.default_agent_daily_limit}
+                        onChange={(e) => setBudgetForm({ ...budgetForm, default_agent_daily_limit: parseFloat(e.target.value) || 0 })}
+                        className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-800 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none"
+                      />
+                      <p className="text-[10px] text-slate-400 mt-0.5">Applies to all agents without a specific override</p>
+                    </div>
+                    <div>
                       <label className="block text-xs font-medium text-slate-600 mb-1">Alert Thresholds (%)</label>
                       <input
                         type="text"
@@ -337,15 +350,7 @@ export default function CostsPage() {
                       />
                     </div>
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-600 mb-1">Agent Daily Limits (JSON)</label>
-                    <textarea
-                      value={budgetForm.agent_daily_limits}
-                      onChange={(e) => setBudgetForm({ ...budgetForm, agent_daily_limits: e.target.value })}
-                      rows={4}
-                      className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-mono text-slate-800 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none"
-                    />
-                  </div>
+                  {/* Agent-specific overrides hidden — managed via API for power users */}
                   <div className="flex items-center gap-6">
                     <label className="flex items-center gap-2 text-xs text-slate-600">
                       <input
@@ -382,6 +387,7 @@ export default function CostsPage() {
                               monthly_budget: budgetForm.monthly_budget,
                               alert_thresholds: thresholds,
                               agent_daily_limits: agentLimits,
+                              default_agent_daily_limit: budgetForm.default_agent_daily_limit,
                               throttle_to_tier1_on_exceed: budgetForm.throttle_to_tier1_on_exceed,
                               alerts_enabled: budgetForm.alerts_enabled,
                             }),

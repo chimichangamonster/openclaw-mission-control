@@ -21,6 +21,7 @@ from app.services.openclaw.gateway_rpc import (
     GatewayConfig,
     compact_session,
     openclaw_call,
+    reset_session,
 )
 
 logger = get_logger(__name__)
@@ -47,6 +48,11 @@ _MODEL_CONTEXT_WINDOWS: dict[str, int] = {
 _COMPACT_THRESHOLD = 0.75
 # Alert (but don't reset) when above this fraction.
 _ALERT_THRESHOLD = 0.90
+# Reset after this many consecutive compact failures for a session.
+_COMPACT_FAIL_LIMIT = 3
+
+# Track consecutive compact failures per session key.
+_compact_fail_counts: dict[str, int] = {}
 
 
 async def _get_gateway_config_for_org(org_id: UUID) -> GatewayConfig | None:
@@ -118,8 +124,28 @@ async def _proactive_compaction(
                 compacted = result.get("compacted", False) if isinstance(result, dict) else False
                 if compacted:
                     logger.info("budget_monitor.compact_ok session=%s", channel)
+                    _compact_fail_counts.pop(key, None)
                 else:
-                    logger.info("budget_monitor.compact_skipped session=%s", channel)
+                    fails = _compact_fail_counts.get(key, 0) + 1
+                    _compact_fail_counts[key] = fails
+                    logger.info(
+                        "budget_monitor.compact_skipped session=%s fails=%d/%d",
+                        channel, fails, _COMPACT_FAIL_LIMIT,
+                    )
+                    if fails >= _COMPACT_FAIL_LIMIT:
+                        logger.warning(
+                            "budget_monitor.compact_giving_up session=%s — resetting",
+                            channel,
+                        )
+                        await reset_session(key, config=gw_config)
+                        _compact_fail_counts.pop(key, None)
+                        logger.info("budget_monitor.reset_ok session=%s", channel)
+                        await _send_discord_alert(
+                            gw_config,
+                            f"**SESSION RESET** — {channel} was stuck at "
+                            f"{int(ratio * 100)}% context after {_COMPACT_FAIL_LIMIT} "
+                            f"failed compaction attempts. Session has been reset.",
+                        )
             except Exception as exc:
                 logger.warning(
                     "budget_monitor.compact_failed session=%s error=%s",
@@ -332,9 +358,10 @@ async def _check_thresholds(
 
     # Per-agent daily limit alerts
     daily_limits = budget_config.agent_daily_limits
+    default_limit = budget_config.default_agent_daily_limit
     exceeded_agents: list[str] = []
     for agent_name, agg in agent_agg.items():
-        limit = daily_limits.get(agent_name)
+        limit = daily_limits.get(agent_name) or default_limit
         if limit and agg["estimated_cost"] > limit:
             exceeded_agents.append(
                 f"  {agent_name}: ${agg['estimated_cost']:.4f} / ${limit:.2f} daily limit **EXCEEDED**"

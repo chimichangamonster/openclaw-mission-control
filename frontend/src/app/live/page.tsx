@@ -38,10 +38,25 @@ interface AgentSession {
   inputTokens: number;
   outputTokens: number;
   totalTokens: number;
+  contextWindow: number;
   updatedAt: number;
   abortedLastRun: boolean;
   systemSent: boolean;
 }
+
+// OpenRouter actual context limits per model (tokens).
+const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
+  "deepseek-v3.2": 163_840,
+  "deepseek-chat-v3.1": 163_840,
+  "claude-sonnet-4": 200_000,
+  "claude-sonnet-4.6": 200_000,
+  "claude-opus-4.6": 1_000_000,
+  "gpt-5-nano": 128_000,
+  "grok-4": 131_072,
+  "grok-4-fast": 131_072,
+  "gemini-2.5-flash": 1_000_000,
+  "gemini-2.5-flash-lite": 1_000_000,
+};
 
 interface ActivityEvent {
   id: string;
@@ -246,14 +261,16 @@ export default function LivePage() {
       const newSessions: AgentSession[] = (data?.sessions || []).map((s: any) => {
         const key = s.key || "";
         const agentId = key.split(":")[1] || "unknown";
+        const shortModel = (s.model || "").split("/").pop() || "unknown";
         return {
           key,
           channel: s.groupChannel || s.displayName || "direct",
           agent: agentId,
-          model: (s.model || "").split("/").pop() || "unknown",
+          model: shortModel,
           inputTokens: s.inputTokens || 0,
           outputTokens: s.outputTokens || 0,
           totalTokens: s.totalTokens || 0,
+          contextWindow: s.contextTokens || MODEL_CONTEXT_WINDOWS[shortModel] || 0,
           updatedAt: s.updatedAt || 0,
           abortedLastRun: s.abortedLastRun || false,
           systemSent: s.systemSent || false,
@@ -380,6 +397,15 @@ export default function LivePage() {
       setErrorEvents(items);
     } catch {
       setErrorEvents([]);
+    }
+  }, []);
+
+  const clearErrors = useCallback(async () => {
+    try {
+      await customFetch("/api/v1/cost-tracker/errors", { method: "DELETE" });
+      setErrorEvents([]);
+    } catch {
+      // ignore — user may not have admin role
     }
   }, []);
 
@@ -512,15 +538,30 @@ export default function LivePage() {
                       <Cpu className="h-3 w-3" />
                       <span className="font-mono">{session.model}</span>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <Radio className="h-3 w-3" />
-                      {session.totalTokens.toLocaleString()} tokens
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <DollarSign className="h-3 w-3" />
+                    <div className="col-span-2 flex items-center gap-1">
+                      <DollarSign className="h-3 w-3 shrink-0" />
                       <span className="font-mono">{cost}</span>
                     </div>
                   </div>
+
+                  {/* Context usage bar */}
+                  {session.contextWindow > 0 && (() => {
+                    const pct = Math.min((session.totalTokens / session.contextWindow) * 100, 100);
+                    const overflowed = session.totalTokens > session.contextWindow;
+                    const color = overflowed ? "bg-red-500" : pct > 75 ? "bg-amber-500" : "bg-blue-500";
+                    const formatTokens = (n: number) => n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : `${(n / 1_000).toFixed(0)}K`;
+                    return (
+                      <div className="relative mt-2">
+                        <div className="flex items-center justify-between text-[10px] text-slate-400 mb-1">
+                          <span>{formatTokens(session.totalTokens)} / {formatTokens(session.contextWindow)}</span>
+                          <span className={cn(overflowed && "text-red-500 font-semibold")}>{overflowed ? `${Math.round(session.totalTokens / session.contextWindow * 100)}%` : `${Math.round(pct)}%`}</span>
+                        </div>
+                        <div className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
+                          <div className={cn("h-full rounded-full transition-all", color)} style={{ width: `${Math.min(pct, 100)}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   <div className="relative mt-2 flex items-center justify-between text-[10px] text-slate-400">
                     <span>{timeAgo(session.updatedAt)}</span>
@@ -652,17 +693,33 @@ export default function LivePage() {
                             <Bot className="h-3 w-3" /> All Sessions ({allSessions.length})
                           </h4>
                           <div className="space-y-1.5">
-                            {allSessions.map((s) => (
-                              <div key={s.key} className="flex items-center justify-between rounded-lg bg-white px-3 py-2 text-xs border border-slate-100">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-mono text-slate-500 truncate max-w-[200px]">{s.key}</span>
+                            {allSessions.map((s) => {
+                              const ctxPct = s.contextWindow > 0 ? Math.min((s.totalTokens / s.contextWindow) * 100, 100) : 0;
+                              const ctxOver = s.contextWindow > 0 && s.totalTokens > s.contextWindow;
+                              const ctxColor = ctxOver ? "bg-red-500" : ctxPct > 75 ? "bg-amber-500" : "bg-blue-500";
+                              const fmtTok = (n: number) => n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : `${(n / 1_000).toFixed(0)}K`;
+                              return (
+                                <div key={s.key} className="rounded-lg bg-white px-3 py-2 text-xs border border-slate-100">
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-mono text-slate-500 truncate max-w-[200px]">{s.key}</span>
+                                    <div className="flex items-center gap-3 text-slate-500">
+                                      <span>{s.totalTokens.toLocaleString()} tokens</span>
+                                      <span className="text-slate-400">{timeAgo(s.updatedAt)}</span>
+                                    </div>
+                                  </div>
+                                  {s.contextWindow > 0 && (
+                                    <div className="mt-1.5 flex items-center gap-2">
+                                      <div className="h-1 flex-1 rounded-full bg-slate-100 overflow-hidden">
+                                        <div className={cn("h-full rounded-full", ctxColor)} style={{ width: `${Math.min(ctxPct, 100)}%` }} />
+                                      </div>
+                                      <span className={cn("text-[10px] text-slate-400 tabular-nums", ctxOver && "text-red-500 font-semibold")}>
+                                        {fmtTok(s.totalTokens)}/{fmtTok(s.contextWindow)}
+                                      </span>
+                                    </div>
+                                  )}
                                 </div>
-                                <div className="flex items-center gap-3 text-slate-500">
-                                  <span>{s.totalTokens.toLocaleString()} tokens</span>
-                                  <span className="text-slate-400">{timeAgo(s.updatedAt)}</span>
-                                </div>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         </div>
                       );
@@ -691,7 +748,7 @@ export default function LivePage() {
               </p>
             </div>
             <button
-              onClick={() => { setCronLoading(true); loadCronJobs(); }}
+              onClick={() => { setCronLoading(true); loadCronJobs(); loadErrors(); }}
               className="flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-600 hover:bg-slate-50 transition"
             >
               <RefreshCw className={cn("h-3 w-3", cronLoading && "animate-spin")} />
@@ -794,22 +851,30 @@ export default function LivePage() {
         {/* ═══ Error Log ═══ */}
         {errorEvents.length > 0 && (
           <div className="rounded-xl border border-red-200 bg-white shadow-sm">
-            <button
-              onClick={() => setShowErrors(!showErrors)}
-              className="flex w-full items-center justify-between border-b border-red-100 px-4 py-3 hover:bg-red-50/50 transition"
-            >
-              <div>
-                <h3 className="text-sm font-semibold text-red-900 flex items-center gap-1.5">
-                  <AlertTriangle className="h-4 w-4 text-red-500" />
-                  Error Log
-                  <span className="ml-1.5 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-700">
-                    {errorEvents.length}
-                  </span>
-                </h3>
-                <p className="text-xs text-red-400">Recent system errors and warnings</p>
-              </div>
-              {showErrors ? <ChevronUp className="h-4 w-4 text-red-400" /> : <ChevronDown className="h-4 w-4 text-red-400" />}
-            </button>
+            <div className="flex items-center justify-between border-b border-red-100 px-4 py-3">
+              <button
+                onClick={() => setShowErrors(!showErrors)}
+                className="flex flex-1 items-center justify-between hover:opacity-80 transition"
+              >
+                <div>
+                  <h3 className="text-sm font-semibold text-red-900 flex items-center gap-1.5">
+                    <AlertTriangle className="h-4 w-4 text-red-500" />
+                    Error Log
+                    <span className="ml-1.5 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-700">
+                      {errorEvents.length}
+                    </span>
+                  </h3>
+                  <p className="text-xs text-red-400">Recent system errors and warnings</p>
+                </div>
+                {showErrors ? <ChevronUp className="h-4 w-4 text-red-400" /> : <ChevronDown className="h-4 w-4 text-red-400" />}
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); clearErrors(); }}
+                className="ml-3 flex items-center gap-1 rounded-lg border border-red-200 px-2.5 py-1.5 text-xs text-red-600 hover:bg-red-50 transition"
+              >
+                Clear
+              </button>
+            </div>
             {showErrors && (
               <div className="divide-y divide-red-50 max-h-[300px] overflow-y-auto">
                 {errorEvents.map((evt: any, idx: number) => {

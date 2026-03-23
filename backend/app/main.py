@@ -54,6 +54,7 @@ from app.api.users import router as users_router
 from app.api.watchlist import router as watchlist_router
 from app.api.bookkeeping import router as bookkeeping_router
 from app.api.org_config import router as org_config_router
+from app.api.skill_config import router as skill_config_router
 from app.api.industry_templates import router as industry_templates_router
 from app.core.config import settings
 from app.core.error_handling import install_error_handling
@@ -758,6 +759,7 @@ api_v1.include_router(users_router)
 api_v1.include_router(watchlist_router)
 api_v1.include_router(bookkeeping_router)
 api_v1.include_router(org_config_router)
+api_v1.include_router(skill_config_router)
 api_v1.include_router(industry_templates_router)
 app.include_router(api_v1)
 

@@ -26,9 +26,8 @@ class BudgetConfig(QueryModel, table=True):
     organization_id: UUID = Field(foreign_key="organizations.id", index=True)
     monthly_budget: float = Field(default=25.0)
     alert_thresholds_json: str = Field(default="[50, 80, 95]")
-    agent_daily_limits_json: str = Field(
-        default='{"the-claw": 2.0, "market-scout": 1.0, "sports-analyst": 2.0, "stock-analyst": 1.5}'
-    )
+    agent_daily_limits_json: str = Field(default="{}")
+    default_agent_daily_limit: float = Field(default=2.0)
     throttle_to_tier1_on_exceed: bool = Field(default=True)
     alerts_enabled: bool = Field(default=True)
     last_alert_month: str = Field(default="")

@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from sqlmodel import select
 from sqlalchemy import text
 
-from app.api.deps import ORG_MEMBER_DEP, ORG_RATE_LIMIT_DEP, require_feature, require_org_member
+from app.api.deps import ORG_MEMBER_DEP, ORG_RATE_LIMIT_DEP, require_feature, require_org_member, require_org_role
 from app.services.organizations import OrganizationContext
 from app.core.config import settings
 from app.core.logging import get_logger
@@ -442,6 +442,7 @@ class BudgetConfigUpdate(BaseModel):
     monthly_budget: float | None = None
     alert_thresholds: list[int] | None = None
     agent_daily_limits: dict[str, float] | None = None
+    default_agent_daily_limit: float | None = None
     throttle_to_tier1_on_exceed: bool | None = None
     alerts_enabled: bool | None = None
 
@@ -494,25 +495,24 @@ async def get_budget(
     days_in_month = calendar.monthrange(today.year, today.month)[1]
     projected = daily_avg * days_in_month
 
-    agent_today = [
-        {
+    agent_today = []
+    for s in today_spends:
+        effective_limit = config.agent_daily_limits.get(s.agent_name) or config.default_agent_daily_limit
+        agent_today.append({
             "agent": s.agent_name,
             "cost": round(s.estimated_cost, 6),
             "tokens": s.input_tokens + s.output_tokens,
-            "limit": config.agent_daily_limits.get(s.agent_name),
-            "exceeded": (
-                s.estimated_cost > config.agent_daily_limits.get(s.agent_name, float("inf"))
-            ),
+            "limit": effective_limit,
+            "exceeded": s.estimated_cost > effective_limit if effective_limit else False,
             "models": s.model_breakdown,
-        }
-        for s in today_spends
-    ]
+        })
 
     return {
         "config": {
             "monthly_budget": config.monthly_budget,
             "alert_thresholds": config.alert_thresholds,
             "agent_daily_limits": config.agent_daily_limits,
+            "default_agent_daily_limit": config.default_agent_daily_limit,
             "throttle_to_tier1_on_exceed": config.throttle_to_tier1_on_exceed,
             "alerts_enabled": config.alerts_enabled,
         },
@@ -555,6 +555,8 @@ async def update_budget(
             config.alert_thresholds_json = json.dumps(payload.alert_thresholds)
         if payload.agent_daily_limits is not None:
             config.agent_daily_limits_json = json.dumps(payload.agent_daily_limits)
+        if payload.default_agent_daily_limit is not None:
+            config.default_agent_daily_limit = payload.default_agent_daily_limit
         if payload.throttle_to_tier1_on_exceed is not None:
             config.throttle_to_tier1_on_exceed = payload.throttle_to_tier1_on_exceed
         if payload.alerts_enabled is not None:
@@ -632,3 +634,98 @@ async def get_error_log(
         }
         for r in rows
     ]
+
+
+@router.delete("/errors", dependencies=[Depends(require_org_role("admin"))])
+async def clear_error_log():
+    """Clear all system error events. Requires admin role."""
+    from sqlalchemy import delete as sa_delete
+
+    async with async_session_maker() as session:
+        stmt = sa_delete(ActivityEvent).where(
+            ActivityEvent.event_type.startswith("system.error")  # type: ignore[union-attr]
+        )
+        result = await session.execute(stmt)
+        await session.commit()
+
+    return {"cleared": result.rowcount}
+
+
+# ─── Cost Estimate ───────────────────────────────────────────────────────────
+
+# Average tokens per interaction, based on observed platform usage.
+_EST_TOKENS_PER_CONVERSATION = 4_000  # ~3K input + ~1K output typical
+
+
+@router.get("/cost-estimate", dependencies=[ORG_MEMBER_DEP])
+async def get_cost_estimate(
+    org_ctx: OrganizationContext = Depends(require_org_member),
+):
+    """Cost reference card for org settings.
+
+    If the org has real spend data (≥3 days), projects from actual usage.
+    Otherwise returns per-conversation cost by model tier so users can
+    estimate based on their own expected usage patterns.
+    """
+    org_id = org_ctx.organization.id
+    today = date.today()
+
+    # Check for real spend data
+    async with async_session_maker() as session:
+        result = await session.execute(
+            text(
+                "SELECT COUNT(DISTINCT date), COALESCE(SUM(estimated_cost), 0) "
+                "FROM daily_agent_spends WHERE organization_id = :org_id"
+            ),
+            {"org_id": str(org_id)},
+        )
+        row = result.one()
+        days_with_data = int(row[0])
+        total_spend = float(row[1])
+
+    # If we have ≥3 days of real data, project from actuals
+    has_real_data = days_with_data >= 3
+    projected_monthly = None
+    daily_avg = None
+    if has_real_data:
+        daily_avg = round(total_spend / days_with_data, 4)
+        projected_monthly = round(daily_avg * 30, 2)
+
+    # Per-conversation cost by tier (always useful as reference)
+    tier_costs = []
+    for model, label in [
+        ("gpt-5-nano", "Tier 1 — Nano"),
+        ("deepseek-v3.2", "Tier 2 — Standard"),
+        ("claude-sonnet-4", "Tier 3 — Reasoning"),
+        ("claude-opus-4.6", "Tier 4 — Critical"),
+    ]:
+        prompt_pm, comp_pm = _get_model_price(model)
+        input_tok = _EST_TOKENS_PER_CONVERSATION * 0.75
+        output_tok = _EST_TOKENS_PER_CONVERSATION * 0.25
+        per_conversation = (input_tok / 1_000_000) * prompt_pm + (output_tok / 1_000_000) * comp_pm
+        tier_costs.append({
+            "tier": label,
+            "model": model,
+            "per_conversation": round(per_conversation, 6),
+            "per_100_conversations": round(per_conversation * 100, 4),
+            "prompt_per_m": prompt_pm,
+            "completion_per_m": comp_pm,
+        })
+
+    # Usage examples to help non-technical users estimate
+    examples = [
+        {"description": "Light usage — 1 agent, ~10 conversations/day, Tier 2", "monthly_est": round(tier_costs[1]["per_conversation"] * 10 * 30, 2)},
+        {"description": "Moderate — 2 agents, ~20 conversations/day, mixed Tier 2/3", "monthly_est": round((tier_costs[1]["per_conversation"] * 10 + tier_costs[2]["per_conversation"] * 10) * 30, 2)},
+        {"description": "Heavy — 4+ agents, cron jobs, mostly Tier 3", "monthly_est": round(tier_costs[2]["per_conversation"] * 40 * 30, 2)},
+    ]
+
+    return {
+        "has_real_data": has_real_data,
+        "days_tracked": days_with_data,
+        "projected_monthly": projected_monthly,
+        "daily_avg": daily_avg,
+        "total_spend_to_date": round(total_spend, 4),
+        "tier_costs": tier_costs,
+        "examples": examples,
+        "note": "Costs depend on conversation length, tool usage, and model tier. Set a monthly budget cap to prevent unexpected charges.",
+    }
