@@ -553,6 +553,24 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
     watchdog_task = asyncio.create_task(_cron_watchdog_loop())
 
+    # Background task: sync emails and process email sync queue every 5 minutes.
+    async def _email_sync_loop() -> None:
+        from app.services.email.sync import sync_all_active_accounts
+        from app.services.email.worker import process_email_sync_queue
+
+        await asyncio.sleep(30)  # delay to let DB settle
+        while True:
+            try:
+                # Enqueue all active accounts for sync
+                await sync_all_active_accounts()
+                # Process the queue (both periodic + manually-triggered syncs)
+                await process_email_sync_queue()
+            except Exception:  # noqa: BLE001
+                logger.exception("email_sync.loop_failed")
+            await asyncio.sleep(settings.email_sync_interval_seconds)
+
+    email_sync_task = asyncio.create_task(_email_sync_loop())
+
     logger.info("app.lifecycle.started")
     try:
         yield
@@ -560,6 +578,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         pool_task.cancel()
         budget_task.cancel()
         watchdog_task.cancel()
+        email_sync_task.cancel()
         if listener_task and not listener_task.done():
             listener_task.cancel()
             try:

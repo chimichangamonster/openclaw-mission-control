@@ -246,6 +246,7 @@ export default function OrgSettingsPage() {
 
   // Microsoft Graph state
   const [connectingGraph, setConnectingGraph] = useState(false);
+  const [graphStatus, setGraphStatus] = useState<{ connected: boolean; email?: string } | null>(null);
 
   // Google Calendar state
   const [connectingGcal, setConnectingGcal] = useState(false);
@@ -254,15 +255,18 @@ export default function OrgSettingsPage() {
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      const [settingsRaw, auditRaw, routingRaw, estimateRaw, gcalRaw]: any[] = await Promise.all([
+      const [settingsRaw, auditRaw, routingRaw, estimateRaw, gcalRaw, graphRaw]: any[] = await Promise.all([
         customFetch("/api/v1/organization-settings", { method: "GET" }).catch(() => null),
         customFetch("/api/v1/organization-settings/audit-log?limit=20", { method: "GET" }).catch(() => null),
         customFetch("/api/v1/organization-settings/llm-routing", { method: "GET" }).catch(() => null),
         customFetch("/api/v1/cost-tracker/cost-estimate", { method: "GET" }).catch(() => null),
         customFetch("/api/v1/google-calendar/status", { method: "GET" }).catch(() => null),
+        customFetch("/api/v1/microsoft-graph/status", { method: "GET" }).catch(() => null),
       ]);
       const gcData = gcalRaw?.data ?? gcalRaw;
       if (gcData) setGcalStatus(gcData);
+      const grData = graphRaw?.data ?? graphRaw;
+      if (grData) setGraphStatus(grData);
       const sData = settingsRaw?.data ?? settingsRaw;
       if (sData) {
         setSettings(sData as OrgSettings);
@@ -954,6 +958,14 @@ export default function OrgSettingsPage() {
               <div className="p-5">
                 {editFlags.microsoft_graph === false ? (
                   <p className="text-xs text-slate-400">Enable the &quot;microsoft graph&quot; feature flag above to use this integration.</p>
+                ) : graphStatus?.connected ? (
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                      <span className="text-sm font-medium text-emerald-700">Connected</span>
+                      <span className="text-xs text-emerald-600">{graphStatus.email}</span>
+                    </div>
+                  </div>
                 ) : (
                   <div className="flex items-center gap-3">
                     <button

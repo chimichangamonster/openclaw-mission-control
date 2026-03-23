@@ -44,11 +44,15 @@ class MicrosoftGraphOAuthProvider:
     def _tenant(self) -> str:
         return settings.microsoft_oauth_tenant_id or "common"
 
+    @property
+    def _redirect_uri(self) -> str:
+        return settings.microsoft_graph_redirect_uri or settings.microsoft_oauth_redirect_uri
+
     def get_authorization_url(self, state: str) -> str:
         params = {
             "response_type": "code",
             "client_id": settings.microsoft_oauth_client_id,
-            "redirect_uri": settings.microsoft_oauth_redirect_uri,
+            "redirect_uri": self._redirect_uri,
             "scope": GRAPH_SCOPES,
             "state": state,
             "response_mode": "query",
@@ -66,7 +70,7 @@ class MicrosoftGraphOAuthProvider:
                     "grant_type": "authorization_code",
                     "client_id": settings.microsoft_oauth_client_id,
                     "client_secret": settings.microsoft_oauth_client_secret,
-                    "redirect_uri": settings.microsoft_oauth_redirect_uri,
+                    "redirect_uri": self._redirect_uri,
                     "code": code,
                     "scope": GRAPH_SCOPES,
                 },

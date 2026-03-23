@@ -29,8 +29,10 @@ logger = get_logger(__name__)
 router = APIRouter(
     prefix="/microsoft-graph",
     tags=["microsoft-graph"],
-    dependencies=[Depends(require_feature("microsoft_graph")), ORG_RATE_LIMIT_DEP],
 )
+
+# Shared dependencies for authenticated routes (callback is exempt — it's a Microsoft redirect)
+_AUTH_DEPS = [Depends(require_feature("microsoft_graph")), ORG_RATE_LIMIT_DEP]
 
 _STATE_TTL_SECONDS = 300
 _oauth_provider = MicrosoftGraphOAuthProvider()
@@ -45,7 +47,7 @@ def _redis_client() -> redis.Redis:
 # ---------------------------------------------------------------------------
 
 
-@router.get("/authorize", summary="Initiate Microsoft Graph OAuth")
+@router.get("/authorize", summary="Initiate Microsoft Graph OAuth", dependencies=_AUTH_DEPS)
 async def initiate_oauth(
     ctx: OrganizationContext = ORG_MEMBER_DEP,
 ) -> dict[str, str]:
@@ -136,7 +138,7 @@ async def oauth_callback(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/status", summary="Get Microsoft Graph connection status")
+@router.get("/status", summary="Get Microsoft Graph connection status", dependencies=_AUTH_DEPS)
 async def connection_status(
     ctx: OrganizationContext = ORG_MEMBER_DEP,
     session: AsyncSession = SESSION_DEP,
@@ -156,7 +158,7 @@ async def connection_status(
     }
 
 
-@router.delete("/disconnect", summary="Disconnect Microsoft Graph")
+@router.delete("/disconnect", summary="Disconnect Microsoft Graph", dependencies=_AUTH_DEPS)
 async def disconnect(
     ctx: OrganizationContext = ORG_MEMBER_DEP,
     session: AsyncSession = SESSION_DEP,
@@ -176,7 +178,7 @@ class FolderUpdate(BaseModel):
     default_folder: str = Field(..., description="OneDrive folder path for generated documents")
 
 
-@router.patch("/settings", summary="Update Graph connection settings")
+@router.patch("/settings", summary="Update Graph connection settings", dependencies=_AUTH_DEPS)
 async def update_graph_settings(
     body: FolderUpdate,
     ctx: OrganizationContext = ORG_MEMBER_DEP,
@@ -196,7 +198,7 @@ async def update_graph_settings(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/files", summary="List OneDrive files")
+@router.get("/files", summary="List OneDrive files", dependencies=_AUTH_DEPS)
 async def list_onedrive_files(
     path: str = Query(default="/", description="Folder path"),
     ctx: OrganizationContext = ORG_MEMBER_DEP,
@@ -222,7 +224,7 @@ class UploadRequest(BaseModel):
     sharing_scope: str = Field(default="organization", pattern="^(organization|anonymous)$")
 
 
-@router.post("/files/upload", summary="Upload file to OneDrive")
+@router.post("/files/upload", summary="Upload file to OneDrive", dependencies=_AUTH_DEPS)
 async def upload_to_onedrive(
     body: UploadRequest,
     ctx: OrganizationContext = ORG_MEMBER_DEP,
@@ -260,7 +262,7 @@ async def upload_to_onedrive(
     return result
 
 
-@router.post("/files/upload-workspace", summary="Upload workspace file to OneDrive")
+@router.post("/files/upload-workspace", summary="Upload workspace file to OneDrive", dependencies=_AUTH_DEPS)
 async def upload_workspace_to_onedrive(
     token: str = Query(..., description="Auth token"),
     workspace_path: str = Query(..., description="Relative path in gateway workspace"),

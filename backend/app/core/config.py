@@ -92,6 +92,9 @@ class Settings(BaseSettings):
     microsoft_oauth_redirect_uri: str = ""
     microsoft_oauth_tenant_id: str = "common"
 
+    # Microsoft Graph OAuth (reuses client ID/secret, separate redirect URI)
+    microsoft_graph_redirect_uri: str = ""
+
     # Google Calendar OAuth
     google_oauth_client_id: str = ""
     google_oauth_client_secret: str = ""
