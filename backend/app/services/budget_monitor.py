@@ -17,13 +17,36 @@ from app.services.error_tracker import track_error
 from app.db.session import async_session_maker
 from app.models.budget import BudgetConfig, DailyAgentSpend
 from app.models.gateways import Gateway
-from app.services.openclaw.gateway_rpc import GatewayConfig, openclaw_call
+from app.services.openclaw.gateway_rpc import (
+    GatewayConfig,
+    compact_session,
+    openclaw_call,
+)
 
 logger = get_logger(__name__)
 
 # Track max tokens seen per session key to handle session compaction
 _session_max_tokens: dict[str, tuple[int, int]] = {}
 _session_max_date: str = ""
+
+# Known context windows per model (tokens).  Keep in sync with OpenRouter.
+_MODEL_CONTEXT_WINDOWS: dict[str, int] = {
+    "deepseek-v3.2": 163_840,
+    "deepseek-chat-v3.1": 163_840,
+    "claude-sonnet-4": 200_000,
+    "claude-sonnet-4.6": 200_000,
+    "claude-opus-4.6": 1_000_000,
+    "gpt-5-nano": 128_000,
+    "grok-4": 131_072,
+    "grok-4-fast": 131_072,
+    "gemini-2.5-flash": 1_000_000,
+    "gemini-2.5-flash-lite": 1_000_000,
+}
+
+# Compact when a session exceeds this fraction of its context window.
+_COMPACT_THRESHOLD = 0.75
+# Alert (but don't reset) when above this fraction.
+_ALERT_THRESHOLD = 0.90
 
 
 async def _get_gateway_config_for_org(org_id: UUID) -> GatewayConfig | None:
@@ -54,8 +77,82 @@ async def _get_or_create_budget_config(org_id: UUID) -> BudgetConfig:
         return config
 
 
-async def _aggregate_agent_spend(config: GatewayConfig) -> dict[str, dict]:
-    """Fetch gateway sessions and aggregate tokens per agent."""
+async def _proactive_compaction(
+    raw_sessions: list[dict],
+    gw_config: GatewayConfig,
+) -> None:
+    """Check session token usage and compact sessions approaching context limits.
+
+    Runs every budget check cycle (~5 min).  When a session exceeds 75% of its
+    model's context window we ask the gateway to compact.  At 90% we also send
+    a Discord alert so the user knows a session is near capacity.
+    """
+    for s in raw_sessions:
+        key: str = s.get("key", "")
+        if "heartbeat" in key or "mc-gateway" in key or "lead-" in key:
+            continue
+
+        total_tokens = s.get("totalTokens", 0)
+        if total_tokens == 0:
+            continue
+
+        full_model: str = s.get("model") or ""
+        short_model = full_model.split("/")[-1]
+        context_window = _MODEL_CONTEXT_WINDOWS.get(short_model, 0)
+        if context_window == 0:
+            continue
+
+        ratio = total_tokens / context_window
+        channel = s.get("groupChannel") or key
+
+        if ratio >= _COMPACT_THRESHOLD:
+            logger.info(
+                "budget_monitor.proactive_compact session=%s tokens=%d/%d (%.0f%%)",
+                channel,
+                total_tokens,
+                context_window,
+                ratio * 100,
+            )
+            try:
+                result = await compact_session(key, config=gw_config)
+                compacted = result.get("compacted", False) if isinstance(result, dict) else False
+                if compacted:
+                    logger.info("budget_monitor.compact_ok session=%s", channel)
+                else:
+                    logger.info("budget_monitor.compact_skipped session=%s", channel)
+            except Exception as exc:
+                logger.warning(
+                    "budget_monitor.compact_failed session=%s error=%s",
+                    channel,
+                    str(exc)[:200],
+                )
+
+        if ratio >= _ALERT_THRESHOLD:
+            pct = int(ratio * 100)
+            alert_msg = (
+                f"**CONTEXT ALERT** — {channel} is at {pct}% capacity "
+                f"({total_tokens:,}/{context_window:,} tokens, {short_model}). "
+                f"Auto-compaction was attempted; if the session degrades, "
+                f"use `/compact` or `/clear` in that channel."
+            )
+            await _send_discord_alert(gw_config, alert_msg)
+            await track_error(
+                "context_monitor",
+                f"Session {channel} at {pct}% context ({short_model})",
+                severity="warning",
+            )
+
+
+async def _aggregate_agent_spend(
+    config: GatewayConfig,
+    *,
+    _raw_sessions_out: list | None = None,
+) -> dict[str, dict]:
+    """Fetch gateway sessions and aggregate tokens per agent.
+
+    If *_raw_sessions_out* is provided (an empty list), the raw session dicts
+    are appended so the caller can pass them to ``_proactive_compaction``.
+    """
     global _session_max_tokens, _session_max_date
 
     today = date.today().isoformat()
@@ -83,6 +180,9 @@ async def _aggregate_agent_spend(config: GatewayConfig) -> dict[str, dict]:
         if isinstance(sessions_data, list)
         else sessions_data.get("sessions", [])
     )
+
+    if _raw_sessions_out is not None:
+        _raw_sessions_out.extend(raw_sessions)
 
     agent_agg: dict[str, dict] = {}
 
@@ -308,7 +408,13 @@ async def check_budgets() -> None:
             continue
 
         budget_config = await _get_or_create_budget_config(org_id)
-        agent_agg = await _aggregate_agent_spend(gw_config)
+        raw_sessions: list[dict] = []
+        agent_agg = await _aggregate_agent_spend(gw_config, _raw_sessions_out=raw_sessions)
+
+        # Proactive context compaction — runs every cycle
+        if raw_sessions:
+            await _proactive_compaction(raw_sessions, gw_config)
+
         if not agent_agg:
             continue
 
