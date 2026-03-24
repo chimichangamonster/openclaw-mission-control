@@ -38,6 +38,7 @@ from app.models.polymarket_wallets import PolymarketWallet
 from app.models.trade_history import TradeHistory
 from app.models.trade_proposals import TradeProposal
 from app.models.organization_board_access import OrganizationBoardAccess
+from app.models.organization_domains import OrganizationDomain
 from app.models.organization_invite_board_access import OrganizationInviteBoardAccess
 from app.models.organization_invites import OrganizationInvite
 from app.models.organization_members import OrganizationMember
@@ -91,6 +92,7 @@ __all__ = [
     "BoardTaskCustomField",
     "TaskCustomFieldDefinition",
     "TaskCustomFieldValue",
+    "OrganizationDomain",
     "OrganizationMember",
     "OrganizationBoardAccess",
     "OrganizationInvite",

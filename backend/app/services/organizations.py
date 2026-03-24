@@ -18,6 +18,7 @@ from app.db import crud
 from app.models.boards import Board
 from app.models.organization_board_access import OrganizationBoardAccess
 from app.models.organization_invite_board_access import OrganizationInviteBoardAccess
+from app.models.organization_domains import PERSONAL_EMAIL_DOMAINS, OrganizationDomain
 from app.models.organization_invites import OrganizationInvite
 from app.models.organization_members import OrganizationMember
 from app.models.organizations import Organization
@@ -275,6 +276,26 @@ async def _fetch_existing_default_pack_sources(
     }
 
 
+async def _find_org_by_email_domain(
+    session: AsyncSession,
+    email: str,
+) -> OrganizationDomain | None:
+    """Look up an org domain mapping for the user's email domain.
+
+    Returns None if the domain is a personal email provider or has no mapping.
+    """
+    domain = email.rsplit("@", 1)[-1].lower()
+    if domain in PERSONAL_EMAIL_DOMAINS:
+        return None
+    result = await session.exec(
+        select(OrganizationDomain).where(
+            col(OrganizationDomain.domain) == domain,
+            col(OrganizationDomain.verified) == True,  # noqa: E712
+        ),
+    )
+    return result.first()
+
+
 async def ensure_member_for_user(
     session: AsyncSession,
     user: User,
@@ -301,6 +322,33 @@ async def ensure_member_for_user(
         invite = await _find_pending_invite(session, user.email)
         if invite is not None:
             return await accept_invite(session, invite, user)
+
+        # Auto-assign by email domain (e.g., @eliteconstruction.ca → Elite org)
+        domain_mapping = await _find_org_by_email_domain(session, user.email)
+        if domain_mapping is not None:
+            now = utcnow()
+            member = OrganizationMember(
+                organization_id=domain_mapping.organization_id,
+                user_id=user.id,
+                role=domain_mapping.default_role,
+                all_boards_read=True,
+                all_boards_write=domain_mapping.default_role in ("admin", "owner"),
+                created_at=now,
+                updated_at=now,
+            )
+            user.active_organization_id = domain_mapping.organization_id
+            session.add(user)
+            session.add(member)
+            try:
+                await session.commit()
+            except IntegrityError:
+                await session.rollback()
+                existing_member = await get_first_membership(session, user.id)
+                if existing_member is None:
+                    raise
+                return existing_member
+            await session.refresh(member)
+            return member
 
     now = utcnow()
     org = Organization(name=DEFAULT_ORG_NAME, created_at=now, updated_at=now)

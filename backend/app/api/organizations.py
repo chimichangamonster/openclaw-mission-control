@@ -29,6 +29,7 @@ from app.models.board_webhooks import BoardWebhook
 from app.models.boards import Board
 from app.models.gateways import Gateway
 from app.models.organization_board_access import OrganizationBoardAccess
+from app.models.organization_domains import PERSONAL_EMAIL_DOMAINS, OrganizationDomain
 from app.models.organization_invite_board_access import OrganizationInviteBoardAccess
 from app.models.organization_invites import OrganizationInvite
 from app.models.organization_members import OrganizationMember
@@ -728,3 +729,91 @@ async def accept_org_invite(
 
     user = await User.objects.by_id(member.user_id).first(session)
     return _member_to_read(member, user)
+
+
+# ── Domain auto-assignment management (admin+) ──────────────────────────────
+
+
+@router.get("/me/domains", summary="List claimed domains for org")
+async def list_org_domains(
+    session: "AsyncSession" = Depends(get_session),
+    ctx: Any = Depends(require_org_admin),
+) -> list[dict]:
+    result = await session.exec(
+        select(OrganizationDomain).where(
+            col(OrganizationDomain.organization_id) == ctx.member.organization_id,
+        ),
+    )
+    return [
+        {
+            "id": str(d.id),
+            "domain": d.domain,
+            "default_role": d.default_role,
+            "verified": d.verified,
+            "created_at": d.created_at.isoformat(),
+        }
+        for d in result.all()
+    ]
+
+
+@router.post("/me/domains", status_code=201, summary="Claim a domain for auto-assignment")
+async def add_org_domain(
+    body: dict,
+    session: "AsyncSession" = Depends(get_session),
+    ctx: Any = Depends(require_org_admin),
+) -> dict:
+    domain = body.get("domain", "").strip().lower()
+    if not domain or "@" in domain or "." not in domain:
+        raise HTTPException(status_code=400, detail="Invalid domain format")
+    if domain in PERSONAL_EMAIL_DOMAINS:
+        raise HTTPException(status_code=400, detail="Personal email domains cannot be claimed")
+
+    # Check if already claimed by any org
+    existing = await session.exec(
+        select(OrganizationDomain).where(col(OrganizationDomain.domain) == domain),
+    )
+    if existing.first() is not None:
+        raise HTTPException(status_code=409, detail="Domain already claimed")
+
+    default_role = body.get("default_role", "member")
+    if default_role not in ("viewer", "member", "operator"):
+        raise HTTPException(
+            status_code=400,
+            detail="default_role must be viewer, member, or operator",
+        )
+
+    record = OrganizationDomain(
+        organization_id=ctx.member.organization_id,
+        domain=domain,
+        default_role=default_role,
+    )
+    session.add(record)
+    await session.commit()
+    await session.refresh(record)
+    return {
+        "id": str(record.id),
+        "domain": record.domain,
+        "default_role": record.default_role,
+        "verified": record.verified,
+        "created_at": record.created_at.isoformat(),
+    }
+
+
+@router.delete("/me/domains/{domain_id}", summary="Remove a claimed domain")
+async def remove_org_domain(
+    domain_id: UUID,
+    session: "AsyncSession" = Depends(get_session),
+    ctx: Any = Depends(require_org_admin),
+) -> OkResponse:
+    result = await session.exec(
+        select(OrganizationDomain).where(
+            col(OrganizationDomain.id) == domain_id,
+            col(OrganizationDomain.organization_id) == ctx.member.organization_id,
+        ),
+    )
+    record = result.first()
+    if record is None:
+        raise HTTPException(status_code=404, detail="Domain not found")
+    await session.delete(record)
+    await session.commit()
+    return OkResponse()
