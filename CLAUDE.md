@@ -1,6 +1,6 @@
 # Mission Control
 
-Fork of abhi1693/openclaw-mission-control. Separate git repo (not a submodule).
+VantageClaw fork of abhi1693/openclaw-mission-control. Separate git repo (not a submodule).
 
 ## Remotes
 - `origin` — upstream (abhi1693/openclaw-mission-control)
@@ -41,14 +41,32 @@ Fork of abhi1693/openclaw-mission-control. Separate git repo (not a submodule).
 ## Chat & Gateway Session Endpoints
 - `GET /gateways/sessions` — list gateway sessions (requires board_id)
 - `GET /gateways/sessions/{id}/history` — fetch chat history for a session
-- `POST /gateways/sessions/{id}/message` — send a message into a session
+- `POST /gateways/sessions/{id}/message` — send a message into a session (supports optional `attachments` array for file references)
+- `POST /gateways/sessions/{id}/upload` — upload a file for chat attachment (multipart, max 10MB, images/PDF/text/CSV/JSON/DOCX/XLSX)
 - `POST /gateways/sessions/{id}/abort` — stop an agent's in-progress response
 - `POST /gateways/sessions/{id}/compact` — summarise and trim session history
 - `POST /gateways/sessions/{id}/reset` — clear session conversation history
-- Frontend chat page at `/chat` — single-conversation interface with The Claw, auto-resolves session, SSE real-time typing indicators, markdown rendering, context meter, abort/compact/clear controls
+- `GET/PUT /memory/files/{filename}` — read/write agent memory files (SOUL.md, IDENTITY.md, etc.) — org-scoped via `resolve_org_workspace()`
+- Frontend chat page at `/chat` — single-conversation interface with The Claw, auto-resolves session, file upload (paperclip + paste), SSE real-time typing indicators with fallback polling, markdown rendering, context meter, abort/compact/clear controls
+- Frontend memory page at `/memory` — view/edit agent memory files per org
+
+## Contacts & Email Visibility Endpoints
+- `GET/POST /contacts` — list/create org contacts (manual external contacts)
+- `PATCH/DELETE /contacts/{id}` — update/delete contact
+- `GET /agent/contacts/members` — list org members (name, email, role) for agent contact resolution
+- `GET /agent/contacts/search?q=name` — unified search across org members, manual contacts, and email history (deduplicated, priority-sorted)
+- `PATCH /email/accounts/{id}` — now supports `visibility` field ("shared" or "private")
+- `PATCH /google-calendar/connections/{id}` — update calendar connection visibility
+- Email accounts have `visibility` field: "shared" (default) or "private". Private accounts hidden from non-owner/non-admin users and from agents.
+- Google Calendar supports multiple connections per org with same visibility model.
+- `GET/POST/PATCH/DELETE /microsoft-graph/calendar/events` — Outlook Calendar CRUD (same event format as Google Calendar)
+- `GET /microsoft-graph/calendar/calendars` — List Outlook calendars
+- Outlook Calendar uses existing Microsoft Graph OAuth (no separate connection needed — `Calendars.ReadWrite` scope already included)
 
 ## Environment Variables (mc-backend)
 - `OPENROUTER_API_KEY` — required for cost tracking page (added to docker-compose.mission-control.yml)
+- `GATEWAY_WORKSPACES_ROOT` — parent directory for per-org gateway workspaces (e.g., `/app/gateway-workspaces`)
+- `GATEWAY_WORKSPACE_PATH` — legacy single-workspace fallback (e.g., `/app/gateway-workspace`)
 - `DATABASE_URL`, `LOCAL_AUTH_TOKEN`, `ENCRYPTION_KEY` — standard config in .env.production
 
 ## Build & Deploy

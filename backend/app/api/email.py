@@ -29,7 +29,7 @@ from app.schemas.email import (
 )
 from app.services.email.queue import QueuedEmailSync, enqueue_email_sync
 from app.services.email.token_manager import get_valid_access_token
-from app.services.organizations import OrganizationContext
+from app.services.organizations import OrganizationContext, is_org_admin
 
 if TYPE_CHECKING:
     from sqlmodel.ext.asyncio.session import AsyncSession
@@ -49,11 +49,14 @@ router = APIRouter(
 
 async def _get_account_or_404(
     account_id: UUID,
-    org_id: UUID,
+    ctx: OrganizationContext,
     session: AsyncSession,
 ) -> EmailAccount:
     account = await session.get(EmailAccount, account_id)
-    if account is None or account.organization_id != org_id:
+    if account is None or account.organization_id != ctx.organization.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    # Private accounts are only visible to the owner or org admins
+    if account.visibility == "private" and account.user_id != ctx.member.user_id and not is_org_admin(ctx.member):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
     return account
 
@@ -80,11 +83,21 @@ async def list_email_accounts(
     session: AsyncSession = SESSION_DEP,
 ) -> list[EmailAccount]:
     """List connected email accounts for the current organization."""
+    from sqlalchemy import or_
+
     stmt = (
         select(EmailAccount)
         .where(EmailAccount.organization_id == ctx.organization.id)
         .order_by(EmailAccount.created_at.desc())
     )
+    # Non-admin users only see shared accounts + their own private accounts
+    if not is_org_admin(ctx.member):
+        stmt = stmt.where(
+            or_(
+                EmailAccount.visibility == "shared",
+                EmailAccount.user_id == ctx.member.user_id,
+            )
+        )
     result = await session.execute(stmt)
     return list(result.scalars().all())
 
@@ -96,7 +109,7 @@ async def get_email_account(
     session: AsyncSession = SESSION_DEP,
 ) -> EmailAccount:
     """Get a single email account."""
-    return await _get_account_or_404(account_id, ctx.organization.id, session)
+    return await _get_account_or_404(account_id, ctx, session)
 
 
 @router.patch("/accounts/{account_id}", response_model=EmailAccountRead)
@@ -106,12 +119,19 @@ async def update_email_account(
     ctx: OrganizationContext = ORG_MEMBER_DEP,
     session: AsyncSession = SESSION_DEP,
 ) -> EmailAccount:
-    """Update email account settings (sync toggle, display name)."""
-    account = await _get_account_or_404(account_id, ctx.organization.id, session)
+    """Update email account settings (sync toggle, display name, visibility)."""
+    account = await _get_account_or_404(account_id, ctx, session)
     if payload.sync_enabled is not None:
         account.sync_enabled = payload.sync_enabled
     if payload.display_name is not None:
         account.display_name = payload.display_name
+    if payload.visibility is not None:
+        if payload.visibility not in ("shared", "private"):
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="visibility must be 'shared' or 'private'")
+        # Only account owner or org admin can change visibility
+        if account.user_id != ctx.member.user_id and not is_org_admin(ctx.member):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the account owner or an admin can change visibility.")
+        account.visibility = payload.visibility
     account.updated_at = utcnow()
     session.add(account)
     await session.commit()
@@ -126,7 +146,7 @@ async def delete_email_account(
     session: AsyncSession = SESSION_DEP,
 ) -> None:
     """Disconnect and delete an email account and its synced messages."""
-    account = await _get_account_or_404(account_id, ctx.organization.id, session)
+    account = await _get_account_or_404(account_id, ctx, session)
 
     # Delete attachments for this account's messages
     msg_ids_stmt = select(EmailMessage.id).where(EmailMessage.email_account_id == account.id)
@@ -149,7 +169,7 @@ async def trigger_email_sync(
     session: AsyncSession = SESSION_DEP,
 ) -> EmailSyncTriggerResponse:
     """Trigger an immediate email sync for an account."""
-    account = await _get_account_or_404(account_id, ctx.organization.id, session)
+    account = await _get_account_or_404(account_id, ctx, session)
     ok = enqueue_email_sync(
         QueuedEmailSync(
             email_account_id=account.id,
@@ -176,7 +196,7 @@ async def list_email_messages(
     offset: int = Query(default=0, ge=0),
 ) -> list[EmailMessage]:
     """List synced email messages for an account with filters."""
-    account = await _get_account_or_404(account_id, ctx.organization.id, session)
+    account = await _get_account_or_404(account_id, ctx, session)
     stmt = (
         select(EmailMessage)
         .where(EmailMessage.email_account_id == account.id)
@@ -206,7 +226,7 @@ async def get_email_message(
     session: AsyncSession = SESSION_DEP,
 ) -> EmailMessage:
     """Get a single email message with full body."""
-    account = await _get_account_or_404(account_id, ctx.organization.id, session)
+    account = await _get_account_or_404(account_id, ctx, session)
     msg = await _get_message_or_404(message_id, account, session)
     msg.body_text = sanitize_text(msg.body_text)
     msg.body_html = sanitize_text(msg.body_html)
@@ -225,7 +245,7 @@ async def update_email_message(
     session: AsyncSession = SESSION_DEP,
 ) -> EmailMessage:
     """Update email message metadata (triage, read status, linked task)."""
-    account = await _get_account_or_404(account_id, ctx.organization.id, session)
+    account = await _get_account_or_404(account_id, ctx, session)
     msg = await _get_message_or_404(message_id, account, session)
 
     for field in ("is_read", "is_starred", "triage_status", "triage_category", "linked_task_id"):
@@ -252,7 +272,7 @@ async def reply_to_email(
     session: AsyncSession = SESSION_DEP,
 ) -> dict[str, bool]:
     """Send a reply to an email message via the provider API."""
-    account = await _get_account_or_404(account_id, ctx.organization.id, session)
+    account = await _get_account_or_404(account_id, ctx, session)
     msg = await _get_message_or_404(message_id, account, session)
     access_token = await get_valid_access_token(session, account)
 
@@ -292,7 +312,7 @@ async def forward_email(
     session: AsyncSession = SESSION_DEP,
 ) -> dict[str, bool]:
     """Forward an email message to another recipient."""
-    account = await _get_account_or_404(account_id, ctx.organization.id, session)
+    account = await _get_account_or_404(account_id, ctx, session)
     msg = await _get_message_or_404(message_id, account, session)
     access_token = await get_valid_access_token(session, account)
 
@@ -333,7 +353,7 @@ async def archive_email(
     session: AsyncSession = SESSION_DEP,
 ) -> dict[str, bool]:
     """Move an email message to the archive folder."""
-    account = await _get_account_or_404(account_id, ctx.organization.id, session)
+    account = await _get_account_or_404(account_id, ctx, session)
     msg = await _get_message_or_404(message_id, account, session)
     access_token = await get_valid_access_token(session, account)
 
@@ -369,7 +389,7 @@ async def list_email_attachments(
     session: AsyncSession = SESSION_DEP,
 ) -> list[EmailAttachment]:
     """List attachment metadata for an email message."""
-    account = await _get_account_or_404(account_id, ctx.organization.id, session)
+    account = await _get_account_or_404(account_id, ctx, session)
     msg = await _get_message_or_404(message_id, account, session)
     stmt = (
         select(EmailAttachment)

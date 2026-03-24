@@ -13,6 +13,10 @@ import {
   Minimize2,
   Trash2,
   Square,
+  Paperclip,
+  X,
+  FileText,
+  Image as ImageIcon,
 } from "lucide-react";
 
 import { useAuth } from "@/auth/clerk";
@@ -26,6 +30,15 @@ import { cn } from "@/lib/utils";
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const BOARD_ID = "fc95c061-3c32-4c82-a87d-9e21225e59fd";
+const MAX_UPLOAD_SIZE = 10 * 1024 * 1024; // 10 MB
+const ALLOWED_UPLOAD_TYPES = new Set([
+  "image/png", "image/jpeg", "image/gif", "image/webp", "image/svg+xml",
+  "application/pdf",
+  "text/plain", "text/csv", "text/markdown",
+  "application/json",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+]);
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -55,6 +68,14 @@ interface ChatMessage {
   id: string;
   role: "user" | "assistant" | "system";
   content: string;
+}
+
+interface ChatAttachment {
+  filename: string;
+  workspace_path: string;
+  content_type: string;
+  size_bytes: number;
+  preview_url?: string; // local blob URL for image preview
 }
 
 interface LiveSSEEvent {
@@ -154,6 +175,11 @@ export default function ChatPage() {
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [agentTyping, setAgentTyping] = useState(false);
+
+  // File uploads
+  const [pendingFiles, setPendingFiles] = useState<ChatAttachment[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // SSE
   const [sseConnected, setSseConnected] = useState(false);
@@ -335,42 +361,156 @@ export default function ChatPage() {
     };
   }, [isSignedIn, fetchHistory]);
 
+  // ─── File upload helpers ──────────────────────────────────────────────────
+
+  const uploadFile = useCallback(async (file: File): Promise<ChatAttachment | null> => {
+    if (!sessionKey) return null;
+    if (!ALLOWED_UPLOAD_TYPES.has(file.type)) {
+      alert(`File type "${file.type || "unknown"}" is not supported.`);
+      return null;
+    }
+    if (file.size > MAX_UPLOAD_SIZE) {
+      alert(`File too large (${(file.size / 1024 / 1024).toFixed(1)} MB, max 10 MB).`);
+      return null;
+    }
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || "";
+    const url = `${baseUrl}/api/v1/gateways/sessions/${encodeURIComponent(sessionKey)}/upload?board_id=${BOARD_ID}`;
+
+    // Build auth headers (can't use customFetch — it forces Content-Type: application/json)
+    const headers: Record<string, string> = {};
+    const localToken = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
+    if (localToken) {
+      headers["Authorization"] = `Bearer ${localToken}`;
+    } else {
+      const clerk = (window as unknown as { Clerk?: { session?: { getToken: () => Promise<string> } } }).Clerk;
+      if (clerk?.session) {
+        try { headers["Authorization"] = `Bearer ${await clerk.session.getToken()}`; } catch { /* ignore */ }
+      }
+    }
+
+    const res = await fetch(url, { method: "POST", headers, body: formData });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: "Upload failed" }));
+      alert((err as { detail?: string }).detail || "Upload failed");
+      return null;
+    }
+    const data = (await res.json()) as ChatAttachment;
+    // Create local preview for images
+    if (file.type.startsWith("image/")) {
+      data.preview_url = URL.createObjectURL(file);
+    }
+    return data;
+  }, [sessionKey]);
+
+  const handleFileSelect = useCallback(async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setUploading(true);
+    try {
+      const results = await Promise.all(
+        Array.from(files).map((f) => uploadFile(f)),
+      );
+      const uploaded = results.filter((r): r is ChatAttachment => r !== null);
+      if (uploaded.length > 0) {
+        setPendingFiles((prev) => [...prev, ...uploaded]);
+      }
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }, [uploadFile]);
+
+  const removePendingFile = useCallback((idx: number) => {
+    setPendingFiles((prev) => {
+      const removed = prev[idx];
+      if (removed?.preview_url) URL.revokeObjectURL(removed.preview_url);
+      return prev.filter((_, i) => i !== idx);
+    });
+  }, []);
+
   // ─── Send message ─────────────────────────────────────────────────────────
 
   const sendMessage = useCallback(async () => {
-    if (!sessionKey || !input.trim() || isSending) return;
+    if (!sessionKey || isSending) return;
+    if (!input.trim() && pendingFiles.length === 0) return;
 
-    const content = input.trim();
+    const content = input.trim() || (pendingFiles.length > 0 ? "Please review the attached file(s)." : "");
+    const attachments = pendingFiles.length > 0 ? [...pendingFiles] : undefined;
     setInput("");
+    setPendingFiles([]);
     setIsSending(true);
 
     // Optimistic: add user message immediately
+    const displayContent = attachments
+      ? `${attachments.map((a) => `📎 ${a.filename}`).join("\n")}\n\n${content}`
+      : content;
     const optimisticMsg: ChatMessage = {
       id: `user-${Date.now()}`,
       role: "user",
-      content,
+      content: displayContent,
     };
     setMessages((prev) => [...prev, optimisticMsg]);
     setAgentTyping(true);
 
     try {
+      const body: Record<string, unknown> = { content };
+      if (attachments) {
+        body.attachments = attachments.map(({ filename, workspace_path, content_type, size_bytes }) => ({
+          filename, workspace_path, content_type, size_bytes,
+        }));
+      }
       await customFetch(
         `/api/v1/gateways/sessions/${encodeURIComponent(sessionKey)}/message?board_id=${BOARD_ID}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ content }),
+          body: JSON.stringify(body),
         },
       );
     } catch {
       setMessages((prev) => prev.filter((m) => m.id !== optimisticMsg.id));
       setInput(content);
+      if (attachments) setPendingFiles(attachments);
       setAgentTyping(false);
     } finally {
       setIsSending(false);
       textareaRef.current?.focus();
     }
-  }, [sessionKey, input, isSending]);
+  }, [sessionKey, input, isSending, pendingFiles]);
+
+  // ─── Fallback polling when SSE is unavailable ────────────────────────────
+  // If SSE isn't connected and agent is typing, poll history every 3s
+  // to catch the response even without real-time events.
+  const lastMessageCountRef = useRef(0);
+  useEffect(() => {
+    lastMessageCountRef.current = messages.length;
+  }, [messages]);
+
+  useEffect(() => {
+    if (!agentTyping || sseConnected || !sessionKey) return;
+    const countBefore = lastMessageCountRef.current;
+    const poll = setInterval(async () => {
+      try {
+        const raw: any = await customFetch(
+          `/api/v1/gateways/sessions/${encodeURIComponent(sessionKey)}/history?board_id=${BOARD_ID}`,
+          { method: "GET" },
+        );
+        const data = raw?.data ?? raw;
+        const history = Array.isArray(data?.history) ? data.history : [];
+        const parsed = parseHistory(history);
+        // If we got more messages than before sending, agent has responded
+        if (parsed.length > countBefore) {
+          setMessages(parsed);
+          setAgentTyping(false);
+          if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+        }
+      } catch { /* ignore */ }
+    }, 3000);
+    return () => clearInterval(poll);
+  }, [agentTyping, sseConnected, sessionKey]);
 
   // ─── Session commands ─────────────────────────────────────────────────────
 
@@ -618,44 +758,115 @@ export default function ChatPage() {
         {/* ─── Input area ──────────────────────────────────────────────── */}
         {!resolving && !resolveError ? (
           <div className="border-t border-[color:var(--border)] bg-[color:var(--surface)] p-4">
-            <div className="mx-auto flex max-w-3xl gap-2">
-              <Textarea
-                ref={textareaRef}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key !== "Enter") return;
-                  if (e.nativeEvent.isComposing) return;
-                  if (e.shiftKey) return;
-                  e.preventDefault();
-                  void sendMessage();
-                }}
-                placeholder="Message The Claw..."
-                className="min-h-[44px] max-h-[160px] resize-none"
-                rows={1}
-                disabled={isSending}
-              />
-              {agentTyping ? (
-                <Button
-                  onClick={() => void abortChat()}
-                  className="shrink-0 h-[44px] w-[44px] px-0 bg-rose-500 hover:bg-rose-600"
-                  title="Stop response"
+            <div className="mx-auto max-w-3xl">
+              {/* Pending file chips */}
+              {pendingFiles.length > 0 ? (
+                <div className="mb-2 flex flex-wrap gap-2">
+                  {pendingFiles.map((att, idx) => (
+                    <div
+                      key={`${att.workspace_path}-${idx}`}
+                      className="flex items-center gap-1.5 rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-2.5 py-1.5 text-xs text-[color:var(--text)]"
+                    >
+                      {att.preview_url ? (
+                        <img src={att.preview_url} alt="" className="h-6 w-6 rounded object-cover" />
+                      ) : att.content_type === "application/pdf" ? (
+                        <FileText className="h-4 w-4 text-rose-500" />
+                      ) : att.content_type.startsWith("image/") ? (
+                        <ImageIcon className="h-4 w-4 text-blue-500" />
+                      ) : (
+                        <FileText className="h-4 w-4 text-[color:var(--text-quiet)]" />
+                      )}
+                      <span className="max-w-[120px] truncate">{att.filename}</span>
+                      <span className="text-[color:var(--text-quiet)]">
+                        {att.size_bytes < 1024 ? `${att.size_bytes}B` : `${(att.size_bytes / 1024).toFixed(0)}KB`}
+                      </span>
+                      <button
+                        onClick={() => removePendingFile(idx)}
+                        className="ml-0.5 rounded p-0.5 hover:bg-[color:var(--surface)] transition"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+              <div className="flex gap-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  className="hidden"
+                  accept="image/*,.pdf,.txt,.csv,.md,.json,.docx,.xlsx"
+                  onChange={(e) => void handleFileSelect(e.target.files)}
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading || isSending}
+                  title="Attach a file"
+                  className="shrink-0 flex h-[44px] w-[44px] items-center justify-center rounded-md text-[color:var(--text-quiet)] hover:bg-[color:var(--surface-muted)] hover:text-[color:var(--text)] transition disabled:opacity-40"
                 >
-                  <Square className="h-4 w-4 fill-current" />
-                </Button>
-              ) : (
-                <Button
-                  onClick={() => void sendMessage()}
-                  disabled={isSending || !input.trim()}
-                  className="shrink-0 h-[44px] w-[44px] px-0"
-                >
-                  {isSending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                  {uploading ? (
+                    <Loader2 className="h-4.5 w-4.5 animate-spin" />
                   ) : (
-                    <Send className="h-4 w-4" />
+                    <Paperclip className="h-4.5 w-4.5" />
                   )}
-                </Button>
-              )}
+                </button>
+                <Textarea
+                  ref={textareaRef}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key !== "Enter") return;
+                    if (e.nativeEvent.isComposing) return;
+                    if (e.shiftKey) return;
+                    e.preventDefault();
+                    void sendMessage();
+                  }}
+                  onPaste={(e) => {
+                    const items = e.clipboardData?.items;
+                    if (!items) return;
+                    const files: File[] = [];
+                    for (let i = 0; i < items.length; i++) {
+                      const item = items[i];
+                      if (item.kind === "file") {
+                        const file = item.getAsFile();
+                        if (file) files.push(file);
+                      }
+                    }
+                    if (files.length > 0) {
+                      e.preventDefault();
+                      const dt = new DataTransfer();
+                      files.forEach((f) => dt.items.add(f));
+                      void handleFileSelect(dt.files);
+                    }
+                  }}
+                  placeholder={pendingFiles.length > 0 ? "Add a message or press Enter to send..." : "Message The Claw..."}
+                  className="min-h-[44px] max-h-[160px] resize-none"
+                  rows={1}
+                  disabled={isSending}
+                />
+                {agentTyping ? (
+                  <Button
+                    onClick={() => void abortChat()}
+                    className="shrink-0 h-[44px] w-[44px] px-0 bg-rose-500 hover:bg-rose-600"
+                    title="Stop response"
+                  >
+                    <Square className="h-4 w-4 fill-current" />
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={() => void sendMessage()}
+                    disabled={isSending || (!input.trim() && pendingFiles.length === 0)}
+                    className="shrink-0 h-[44px] w-[44px] px-0"
+                  >
+                    {isSending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Send className="h-4 w-4" />
+                    )}
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
         ) : null}

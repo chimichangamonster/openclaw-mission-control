@@ -78,7 +78,7 @@ class TestGraphTokenManager:
         with patch("app.core.encryption.settings", encryption_key=test_key, email_token_encryption_key=""):
             # Reset cached fernet instance
             import app.core.encryption as enc_mod
-            enc_mod._fernet = None
+            enc_mod.reset_cache()
 
             store_graph_tokens(
                 conn,
@@ -87,7 +87,7 @@ class TestGraphTokenManager:
                 expires_in=3600,
             )
 
-            enc_mod._fernet = None  # reset for other tests
+            enc_mod.reset_cache()  # reset for other tests
 
         assert conn.access_token_encrypted != ""
         assert conn.refresh_token_encrypted != ""

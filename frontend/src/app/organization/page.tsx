@@ -839,6 +839,9 @@ export default function OrganizationPage() {
                     type="email"
                     required
                   />
+                  <p className="text-xs text-slate-400">
+                    They must sign in with this email (Google, Microsoft, LinkedIn, or password).
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">
@@ -849,10 +852,18 @@ export default function OrganizationPage() {
                       <SelectValue placeholder="Select role" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="member">Member</SelectItem>
-                      <SelectItem value="admin">Admin</SelectItem>
+                      <SelectItem value="viewer">Viewer — Read-only access</SelectItem>
+                      <SelectItem value="member">Member — Use features, view data</SelectItem>
+                      <SelectItem value="operator">Operator — Manage daily operations</SelectItem>
+                      <SelectItem value="admin">Admin — Full settings, invite members</SelectItem>
                     </SelectContent>
                   </Select>
+                  <p className="mt-1 text-xs text-slate-400">
+                    {inviteRole === "viewer" && "Can view dashboards and reports. Cannot make changes."}
+                    {inviteRole === "member" && "Can use enabled features and interact with boards."}
+                    {inviteRole === "operator" && "Can manage trades, bets, jobs, and day-to-day workflows."}
+                    {inviteRole === "admin" && "Can change org settings, manage API keys, and invite team members."}
+                  </p>
                 </div>
               </div>
 
@@ -940,9 +951,11 @@ export default function OrganizationPage() {
                     <SelectValue placeholder="Select role" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="owner">Owner</SelectItem>
+                    <SelectItem value="viewer">Viewer</SelectItem>
                     <SelectItem value="member">Member</SelectItem>
+                    <SelectItem value="operator">Operator</SelectItem>
                     <SelectItem value="admin">Admin</SelectItem>
+                    <SelectItem value="owner">Owner</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

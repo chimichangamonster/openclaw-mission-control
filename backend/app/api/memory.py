@@ -9,13 +9,11 @@ from pydantic import BaseModel
 
 from app.api.deps import ORG_MEMBER_DEP
 from app.core.logging import get_logger
+from app.core.workspace import resolve_org_workspace
 from app.services.organizations import OrganizationContext
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/memory", tags=["memory"])
-
-# The gateway workspace is mounted at this path inside the MC backend container
-WORKSPACE_DIR = Path("/gateway-workspace")
 
 MEMORY_FILES = [
     {"name": "IDENTITY.md", "description": "Who The Claw is — name, role, personality"},
@@ -41,9 +39,10 @@ class MemoryFileUpdate(BaseModel):
 async def list_memory_files(
     ctx: OrganizationContext = ORG_MEMBER_DEP,
 ) -> list[MemoryFile]:
+    workspace = resolve_org_workspace(ctx.organization)
     files = []
     for f in MEMORY_FILES:
-        path = WORKSPACE_DIR / f["name"]
+        path = workspace / f["name"]
         exists = path.exists()
         files.append(MemoryFile(
             name=f["name"],
@@ -63,7 +62,8 @@ async def read_memory_file(
         raise HTTPException(status_code=404, detail=f"Unknown memory file: {filename}")
 
     desc = next(f["description"] for f in MEMORY_FILES if f["name"] == filename)
-    path = WORKSPACE_DIR / filename
+    workspace = resolve_org_workspace(ctx.organization)
+    path = workspace / filename
 
     if not path.exists():
         return MemoryFile(name=filename, description=desc, content="")
@@ -83,8 +83,10 @@ async def update_memory_file(
         raise HTTPException(status_code=404, detail=f"Unknown memory file: {filename}")
 
     desc = next(f["description"] for f in MEMORY_FILES if f["name"] == filename)
-    path = WORKSPACE_DIR / filename
+    workspace = resolve_org_workspace(ctx.organization)
+    path = workspace / filename
 
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(body.content, encoding="utf-8")
     logger.info("memory.file.updated", extra={"filename": filename})
 

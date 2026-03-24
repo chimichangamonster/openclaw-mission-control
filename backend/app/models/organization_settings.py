@@ -27,6 +27,7 @@ DEFAULT_FEATURE_FLAGS = {
     "microsoft_graph": False,
     "google_calendar": False,
     "bookkeeping": True,
+    "wechat": False,
 }
 
 

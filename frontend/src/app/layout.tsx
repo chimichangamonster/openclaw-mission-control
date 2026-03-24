@@ -12,8 +12,17 @@ import { TermsGate } from "@/components/auth/TermsGate";
 import { GlobalLoader } from "@/components/ui/global-loader";
 
 export const metadata: Metadata = {
-  title: "OpenClaw Mission Control",
+  title: "VantageClaw Mission Control",
   description: "A calm command center for every task.",
+  icons: {
+    icon: "/logo.png",
+    apple: "/logo.png",
+  },
+  openGraph: {
+    title: "VantageClaw Mission Control",
+    description: "A calm command center for every task.",
+    images: [{ url: "/logo.png", width: 512, height: 512 }],
+  },
 };
 
 const bodyFont = IBM_Plex_Sans({

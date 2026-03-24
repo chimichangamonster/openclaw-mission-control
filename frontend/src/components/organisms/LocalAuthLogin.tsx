@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { Lock } from "lucide-react";
 
 import { setLocalAuthToken } from "@/auth/localAuth";
@@ -87,17 +88,21 @@ export function LocalAuthLogin({ onAuthenticated }: LocalAuthLoginProps) {
 
       <Card className="relative w-full max-w-lg animate-fade-in-up">
         <CardHeader className="space-y-5 border-b border-[color:var(--border)] pb-5">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col items-center gap-4">
+            <Image
+              src="/logo.png"
+              alt="VantageClaw"
+              width={80}
+              height={80}
+              className="rounded-xl shadow-md"
+            />
             <span className="rounded-full border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted">
               Self-host mode
             </span>
-            <div className="rounded-xl bg-[color:var(--accent-soft)] p-2 text-[color:var(--accent)]">
-              <Lock className="h-5 w-5" />
-            </div>
           </div>
-          <div className="space-y-1">
+          <div className="space-y-1 text-center">
             <h1 className="text-2xl font-semibold tracking-tight text-strong">
-              Local Authentication
+              VantageClaw Mission Control
             </h1>
             <p className="text-sm text-muted">
               Enter your access token to unlock Mission Control.

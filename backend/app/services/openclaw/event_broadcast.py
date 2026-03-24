@@ -24,6 +24,8 @@ class LiveActivityEvent:
     channel: str = ""
     message: str = ""
     model: str = ""
+    organization_id: str = ""
+    gateway_id: str = ""
     metadata: dict[str, Any] = field(default_factory=dict)
     timestamp: str = field(default_factory=lambda: datetime.utcnow().isoformat())
 
@@ -35,6 +37,8 @@ class LiveActivityEvent:
             "channel": self.channel,
             "message": self.message,
             "model": self.model,
+            "organization_id": self.organization_id,
+            "gateway_id": self.gateway_id,
             "metadata": self.metadata,
             "timestamp": self.timestamp,
         }

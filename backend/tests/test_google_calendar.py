@@ -90,7 +90,7 @@ class TestGoogleTokenManager:
         test_key = Fernet.generate_key().decode()
         with patch("app.core.encryption.settings", encryption_key=test_key, email_token_encryption_key=""):
             import app.core.encryption as enc_mod
-            enc_mod._fernet = None
+            enc_mod.reset_cache()
 
             store_google_tokens(
                 conn,
@@ -99,7 +99,7 @@ class TestGoogleTokenManager:
                 expires_in=3600,
             )
 
-            enc_mod._fernet = None  # reset for other tests
+            enc_mod.reset_cache()  # reset for other tests
 
         assert conn.access_token_encrypted != ""
         assert conn.refresh_token_encrypted != ""
@@ -115,7 +115,7 @@ class TestGoogleTokenManager:
         test_key = Fernet.generate_key().decode()
         with patch("app.core.encryption.settings", encryption_key=test_key, email_token_encryption_key=""):
             import app.core.encryption as enc_mod
-            enc_mod._fernet = None
+            enc_mod.reset_cache()
 
             store_google_tokens(
                 conn,
@@ -124,7 +124,7 @@ class TestGoogleTokenManager:
                 expires_in=7200,
             )
 
-            enc_mod._fernet = None
+            enc_mod.reset_cache()
 
         # Token should expire roughly 2 hours from now
         now = datetime.now(timezone.utc)

@@ -19,6 +19,7 @@ export interface EmailAccount {
   email_address: string;
   display_name: string | null;
   sync_enabled: boolean;
+  visibility: "shared" | "private";
   last_sync_at: string | null;
   last_sync_error: string | null;
   created_at: string;
@@ -69,7 +70,7 @@ export async function deleteEmailAccount(accountId: string): Promise<void> {
 
 export async function updateEmailAccount(
   accountId: string,
-  data: { sync_enabled?: boolean; display_name?: string },
+  data: { sync_enabled?: boolean; display_name?: string; visibility?: "shared" | "private" },
 ): Promise<EmailAccount> {
   const res = await customFetch<{ data: EmailAccount }>(
     `${V1}/email/accounts/${accountId}`,

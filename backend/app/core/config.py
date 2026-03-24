@@ -116,6 +116,7 @@ class Settings(BaseSettings):
 
     # File serving (gateway workspace access)
     gateway_workspace_path: str = ""
+    gateway_workspaces_root: str = ""  # Parent dir for per-org gateways (e.g., /app/gateway-workspaces)
 
     # Adobe PDF Services (platform-level fallback for BYOK)
     adobe_pdf_client_id: str = ""

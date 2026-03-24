@@ -12,6 +12,7 @@ from sqlmodel import select
 
 from app.api.deps import require_org_member, require_org_role
 from app.core.config import settings as app_settings
+from app.core.workspace import resolve_org_workspace
 from app.core.encryption import encrypt_token, decrypt_token
 from app.core.file_tokens import create_file_token
 from app.core.logging import get_logger
@@ -455,11 +456,8 @@ async def upload_logo(
         raise HTTPException(status_code=413, detail=f"Logo too large ({len(data)} bytes, max {_LOGO_MAX_SIZE}).")
 
     # Save to workspace: orgs/{org_id}/logo.{ext}
-    workspace = app_settings.gateway_workspace_path
-    if not workspace:
-        raise HTTPException(status_code=503, detail="File storage not configured.")
-
-    org_dir = Path(workspace) / "orgs" / str(org_id)
+    workspace = resolve_org_workspace(org_ctx.organization)
+    org_dir = workspace / "orgs" / str(org_id)
     org_dir.mkdir(parents=True, exist_ok=True)
 
     # Remove any existing logo files
@@ -520,8 +518,8 @@ async def remove_logo(
             await session.commit()
 
             # Delete file from disk
-            if logo_path and app_settings.gateway_workspace_path:
-                full_path = Path(app_settings.gateway_workspace_path) / logo_path
+            if logo_path:
+                full_path = resolve_org_workspace(org_ctx.organization) / logo_path
                 if full_path.is_file():
                     full_path.unlink()
 

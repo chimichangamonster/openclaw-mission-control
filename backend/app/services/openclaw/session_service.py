@@ -206,6 +206,19 @@ class GatewaySessionService(OpenClawDBService):
             return sessions_list
 
     @staticmethod
+    def _build_message_with_attachments(payload: GatewaySessionMessageRequest) -> str:
+        """Build the message string, prepending file attachment context if present."""
+        if not payload.attachments:
+            return payload.content
+        lines = ["[Attached files]"]
+        for att in payload.attachments:
+            lines.append(f"- {att.filename} ({att.content_type}, {att.size_bytes:,} bytes): {att.workspace_path}")
+        lines.append("[/Attached files]")
+        lines.append("")
+        lines.append(payload.content)
+        return "\n".join(lines)
+
+    @staticmethod
     def _require_same_org(board: Board | None, organization_id: UUID) -> None:
         if board is None:
             return
@@ -392,7 +405,8 @@ class GatewaySessionService(OpenClawDBService):
         try:
             if main_session and session_id == main_session:
                 await ensure_session(main_session, config=config, label="Gateway Agent")
-            await send_message(payload.content, session_key=session_id, config=config)
+            message = self._build_message_with_attachments(payload)
+            await send_message(message, session_key=session_id, config=config)
         except OpenClawGatewayError as exc:
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,

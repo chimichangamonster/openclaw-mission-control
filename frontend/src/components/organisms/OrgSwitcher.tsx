@@ -83,7 +83,9 @@ export function OrgSwitcher() {
           if (orgId) {
             announceOrgSwitch(orgId);
           }
-          window.location.reload();
+          // Redirect to dashboard — the previous page may not be enabled
+          // for the new org's feature flags.
+          window.location.href = "/";
         },
         onError: (err) => {
           setOrgError(err.message || "Unable to switch organization.");

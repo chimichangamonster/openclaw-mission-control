@@ -2,13 +2,17 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
+  Eye,
+  EyeOff,
   Mail,
   Power,
   PowerOff,
   RefreshCw,
   Trash2,
-  ExternalLink,
 } from "lucide-react";
+
+import { useAuth } from "@/auth/clerk";
+import { useOrganizationMembership } from "@/lib/use-organization-membership";
 
 import { Button } from "@/components/ui/button";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
@@ -22,6 +26,8 @@ import {
 } from "@/lib/email-api";
 
 export function EmailIntegrations() {
+  const { isSignedIn } = useAuth();
+  const { member, isAdmin } = useOrganizationMembership(isSignedIn);
   const [accounts, setAccounts] = useState<EmailAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -80,6 +86,23 @@ export function EmailIntegrations() {
       setError("Failed to trigger sync.");
     }
   };
+
+  const handleToggleVisibility = async (account: EmailAccount) => {
+    try {
+      const newVisibility = account.visibility === "shared" ? "private" : "shared";
+      const updated = await updateEmailAccount(account.id, {
+        visibility: newVisibility,
+      });
+      setAccounts((prev) =>
+        prev.map((a) => (a.id === updated.id ? updated : a)),
+      );
+    } catch {
+      setError("Failed to update visibility.");
+    }
+  };
+
+  const canToggleVisibility = (account: EmailAccount) =>
+    isAdmin || account.user_id === member?.user_id;
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
@@ -167,6 +190,15 @@ export function EmailIntegrations() {
                       Paused
                     </span>
                   )}
+                  {account.visibility === "private" ? (
+                    <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-700">
+                      Private
+                    </span>
+                  ) : (
+                    <span className="rounded bg-sky-100 px-1.5 py-0.5 text-xs text-sky-700">
+                      Shared
+                    </span>
+                  )}
                 </div>
                 {account.last_sync_at ? (
                   <p className="mt-1 text-xs text-slate-500">
@@ -181,6 +213,24 @@ export function EmailIntegrations() {
                 ) : null}
               </div>
               <div className="flex items-center gap-2">
+                {canToggleVisibility(account) ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleToggleVisibility(account)}
+                    title={
+                      account.visibility === "shared"
+                        ? "Make private (only you and admins can see)"
+                        : "Make shared (all org members can see)"
+                    }
+                  >
+                    {account.visibility === "shared" ? (
+                      <Eye className="h-3.5 w-3.5" />
+                    ) : (
+                      <EyeOff className="h-3.5 w-3.5" />
+                    )}
+                  </Button>
+                ) : null}
                 <Button
                   variant="outline"
                   size="sm"

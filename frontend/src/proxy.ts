@@ -32,23 +32,27 @@ function returnBackUrlFor(req: Request): string {
   return `${requestOrigin(req)}${pathname}${search}${hash}`;
 }
 
-export default isClerkEnabled()
-  ? clerkMiddleware(async (auth, req) => {
-      if (isClerkInternalPath(new URL(req.url).pathname)) {
-        return NextResponse.next();
-      }
-      if (isPublicRoute(req)) return NextResponse.next();
+// Always register clerkMiddleware so it runs at request time.
+// The isClerkEnabled() check happens per-request inside the handler,
+// not at module-evaluation time (which happens during `next build`
+// when env vars may not be available yet).
+const clerkHandler = clerkMiddleware(async (auth, req) => {
+  if (!isClerkEnabled()) return NextResponse.next();
 
-      // In middleware, `auth()` resolves to a session/auth context (Promise in current typings).
-      // Use redirectToSignIn() (instead of protect()) for unauthenticated requests.
-      const { userId, redirectToSignIn } = await auth();
-      if (!userId) {
-        return redirectToSignIn({ returnBackUrl: returnBackUrlFor(req) });
-      }
+  if (isClerkInternalPath(new URL(req.url).pathname)) {
+    return NextResponse.next();
+  }
+  if (isPublicRoute(req)) return NextResponse.next();
 
-      return NextResponse.next();
-    })
-  : () => NextResponse.next();
+  const { userId, redirectToSignIn } = await auth();
+  if (!userId) {
+    return redirectToSignIn({ returnBackUrl: returnBackUrlFor(req) });
+  }
+
+  return NextResponse.next();
+});
+
+export default clerkHandler;
 
 export const config = {
   matcher: [

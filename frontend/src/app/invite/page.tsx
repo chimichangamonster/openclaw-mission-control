@@ -82,7 +82,7 @@ function InviteContent() {
               Organization Invite
             </p>
             <h1 className="text-2xl font-semibold text-strong">
-              Join your team in OpenClaw
+              Join your team in VantageClaw
             </h1>
             <p className="text-sm text-muted">{helperText}</p>
           </div>

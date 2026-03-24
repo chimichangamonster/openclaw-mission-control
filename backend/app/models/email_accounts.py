@@ -36,6 +36,7 @@ class EmailAccount(TenantScoped, table=True):
     scopes: str | None = None
     provider_account_id: str | None = None
     sync_enabled: bool = Field(default=True, index=True)
+    visibility: str = Field(default="shared", index=True)  # "shared" or "private"
     # Scope controls — restrict what agents can access
     allowed_folders_json: str = Field(default="[]")  # empty = all folders
     blocked_senders_json: str = Field(default="[]")  # emails from these senders are hidden from agents

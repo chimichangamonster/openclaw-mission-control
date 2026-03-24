@@ -18,7 +18,7 @@ class GoogleCalendarConnection(TenantScoped, table=True):
     __tablename__ = "google_calendar_connections"  # pyright: ignore[reportAssignmentType]
     __table_args__ = (
         UniqueConstraint(
-            "organization_id", "provider_account_id", name="uq_gcal_org_account"
+            "organization_id", "user_id", "provider_account_id", name="uq_gcal_org_user_account"
         ),
     )
 
@@ -33,6 +33,7 @@ class GoogleCalendarConnection(TenantScoped, table=True):
     token_expires_at: datetime | None = None
     scopes: str | None = None
     is_active: bool = Field(default=True)
+    visibility: str = Field(default="shared", index=True)  # "shared" or "private"
     # Default calendar ID (usually "primary")
     default_calendar_id: str = Field(default="primary")
     created_at: datetime = Field(default_factory=utcnow)

@@ -15,7 +15,7 @@ from unittest.mock import patch
 
 import pytest
 
-from app.core.file_tokens import create_file_token, verify_file_token
+from app.core.file_tokens import create_file_token, reset_signing_key, verify_file_token
 
 
 # ---------------------------------------------------------------------------
@@ -23,9 +23,22 @@ from app.core.file_tokens import create_file_token, verify_file_token
 # ---------------------------------------------------------------------------
 
 
-def _patch_settings():
-    """Patch settings for file_tokens module."""
-    return patch("app.core.file_tokens.settings", encryption_key="test-key-for-hmac", email_token_encryption_key="")
+class _patch_settings:
+    """Context manager: patch settings for file_tokens and reset key cache."""
+
+    def __enter__(self):
+        reset_signing_key()
+        self._patcher = patch(
+            "app.core.file_tokens.settings",
+            encryption_key="test-key-for-hmac",
+            email_token_encryption_key="",
+        )
+        self._patcher.__enter__()
+        return self
+
+    def __exit__(self, *args):
+        self._patcher.__exit__(*args)
+        reset_signing_key()
 
 
 class TestFileTokens:
@@ -197,6 +210,7 @@ def _app_client(_workspace: Path):
     test_app = FastAPI()
     test_app.include_router(router, prefix="/api/v1")
 
+    reset_signing_key()
     with (
         patch("app.api.file_serve.settings") as mock_settings,
         patch("app.core.file_tokens.settings") as mock_token_settings,
@@ -206,6 +220,7 @@ def _app_client(_workspace: Path):
         mock_settings.base_url = "http://100.100.202.83:8000"
         mock_token_settings.encryption_key = "test-encryption-key-for-hmac-signing"
         mock_token_settings.email_token_encryption_key = ""
+        reset_signing_key()  # re-derive from patched settings
 
         transport = ASGITransport(app=test_app)
         client = AsyncClient(transport=transport, base_url="http://test")

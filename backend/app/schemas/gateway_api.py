@@ -9,10 +9,29 @@ from app.schemas.common import NonEmptyStr
 RUNTIME_ANNOTATION_TYPES = (NonEmptyStr,)
 
 
+class ChatAttachment(SQLModel):
+    """Reference to a previously-uploaded file attached to a chat message."""
+
+    filename: str
+    workspace_path: str
+    content_type: str
+    size_bytes: int
+
+
 class GatewaySessionMessageRequest(SQLModel):
     """Request payload for sending a message into a gateway session."""
 
     content: NonEmptyStr
+    attachments: list[ChatAttachment] | None = None
+
+
+class ChatUploadResponse(SQLModel):
+    """Response after uploading a file for chat attachment."""
+
+    filename: str
+    workspace_path: str
+    content_type: str
+    size_bytes: int
 
 
 class GatewayResolveQuery(SQLModel):

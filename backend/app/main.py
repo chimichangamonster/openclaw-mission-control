@@ -13,6 +13,7 @@ from fastapi_pagination import add_pagination
 
 from app.api.activity import router as activity_router
 from app.api.agent import router as agent_router
+from app.api.agent_contacts import router as agent_contacts_router
 from app.api.agent_email import router as agent_email_router
 from app.api.agent_polymarket import router as agent_polymarket_router
 from app.api.agents import router as agents_router
@@ -53,9 +54,11 @@ from app.api.tasks import router as tasks_router
 from app.api.users import router as users_router
 from app.api.watchlist import router as watchlist_router
 from app.api.bookkeeping import router as bookkeeping_router
+from app.api.contacts import router as contacts_router
 from app.api.org_config import router as org_config_router
 from app.api.skill_config import router as skill_config_router
 from app.api.industry_templates import router as industry_templates_router
+from app.api.wecom import router as wecom_router
 from app.core.config import settings
 from app.core.error_handling import install_error_handling
 from app.core.logging import configure_logging, get_logger
@@ -480,34 +483,18 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     else:
         logger.info("app.lifecycle.rate_limit backend=memory")
 
-    # Start gateway event listener for real-time activity feed.
-    listener_task: asyncio.Task[None] | None = None
+    # Start gateway event listeners (one per configured gateway) for real-time
+    # activity feed.  Replaces the old single-gateway approach.
+    listener_tasks: list[asyncio.Task[None]] = []
     try:
-        from app.db.session import async_session_maker
-        from app.models.gateways import Gateway
-        from app.services.openclaw.gateway_event_listener import run_event_listener
-        from app.services.openclaw.gateway_rpc import GatewayConfig
-        from sqlmodel import col, select
+        from app.services.openclaw.gateway_event_listener import run_all_event_listeners
 
-        async with async_session_maker() as session:
-            gateway = (
-                await session.exec(
-                    select(Gateway).where(col(Gateway.url).is_not(None)).limit(1)
-                )
-            ).first()
-        if gateway and gateway.url:
-            config = GatewayConfig(
-                url=gateway.url.strip(),
-                token=(gateway.token or "").strip() or None,
-                allow_insecure_tls=gateway.allow_insecure_tls,
-                disable_device_pairing=gateway.disable_device_pairing,
-            )
-            listener_task = asyncio.create_task(run_event_listener(config))
-            logger.info("app.lifecycle.gateway_listener started url=%s", gateway.url)
-        else:
-            logger.info("app.lifecycle.gateway_listener skipped (no gateway configured)")
+        listener_tasks = await run_all_event_listeners()
+        logger.info(
+            "app.lifecycle.gateway_listeners started count=%d", len(listener_tasks)
+        )
     except Exception as exc:  # noqa: BLE001
-        logger.warning("app.lifecycle.gateway_listener_init_failed error=%s", exc)
+        logger.warning("app.lifecycle.gateway_listeners_init_failed error=%s", exc)
 
     # Background task: update DB pool metrics for Prometheus every 15s.
     async def _update_pool_metrics() -> None:
@@ -579,12 +566,15 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         budget_task.cancel()
         watchdog_task.cancel()
         email_sync_task.cancel()
-        if listener_task and not listener_task.done():
-            listener_task.cancel()
-            try:
-                await listener_task
-            except asyncio.CancelledError:
-                pass
+        for lt in listener_tasks:
+            if not lt.done():
+                lt.cancel()
+        for lt in listener_tasks:
+            if not lt.done():
+                try:
+                    await lt
+                except asyncio.CancelledError:
+                    pass
             logger.info("app.lifecycle.gateway_listener stopped")
         logger.info("app.lifecycle.stopped")
 
@@ -751,6 +741,8 @@ api_v1.include_router(boards_router)
 api_v1.include_router(email_router)
 api_v1.include_router(email_oauth_router)
 api_v1.include_router(agent_email_router)
+api_v1.include_router(agent_contacts_router)
+api_v1.include_router(contacts_router)
 api_v1.include_router(polymarket_router)
 api_v1.include_router(agent_polymarket_router)
 api_v1.include_router(document_gen_router)
@@ -780,6 +772,7 @@ api_v1.include_router(bookkeeping_router)
 api_v1.include_router(org_config_router)
 api_v1.include_router(skill_config_router)
 api_v1.include_router(industry_templates_router)
+api_v1.include_router(wecom_router)
 app.include_router(api_v1)
 
 add_pagination(app)

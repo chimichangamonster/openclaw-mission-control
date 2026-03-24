@@ -1,4 +1,4 @@
-"""Microsoft Graph integration — OAuth flow, OneDrive, and connection management."""
+"""Microsoft Graph integration — OAuth flow, OneDrive, Outlook Calendar, and connection management."""
 
 from __future__ import annotations
 
@@ -323,6 +323,139 @@ async def upload_workspace_to_onedrive(
         result["sharing_url"] = share_url
 
     return result
+
+
+# ---------------------------------------------------------------------------
+# Outlook Calendar operations
+# ---------------------------------------------------------------------------
+
+
+@router.get("/calendar/events", summary="List Outlook Calendar events", dependencies=_AUTH_DEPS)
+async def list_outlook_events(
+    ctx: OrganizationContext = ORG_MEMBER_DEP,
+    session: AsyncSession = SESSION_DEP,
+    time_min: str = Query(default="", description="Start time filter (ISO 8601)"),
+    time_max: str = Query(default="", description="End time filter (ISO 8601)"),
+    q: str = Query(default="", description="Search query"),
+    max_results: int = Query(default=50, le=250),
+) -> dict[str, Any]:
+    """List events from Outlook Calendar."""
+    from app.services.microsoft.outlook_calendar import list_events as outlook_list
+
+    conn = await _get_connection(session, ctx.organization.id, require=True)
+    token = await get_valid_graph_token(session, conn)
+    await session.commit()
+
+    from datetime import datetime as dt
+
+    t_min = dt.fromisoformat(time_min) if time_min else None
+    t_max = dt.fromisoformat(time_max) if time_max else None
+
+    events = await outlook_list(token, time_min=t_min, time_max=t_max, max_results=max_results, q=q or None)
+    return {"events": events}
+
+
+class OutlookCreateEventRequest(BaseModel):
+    summary: str
+    start: str = Field(..., description="ISO 8601 datetime or YYYY-MM-DD for all-day")
+    end: str = Field(..., description="ISO 8601 datetime or YYYY-MM-DD for all-day")
+    description: str = ""
+    location: str = ""
+    attendees: list[str] = Field(default_factory=list)
+    time_zone: str = "America/Edmonton"
+
+
+@router.post("/calendar/events", status_code=status.HTTP_201_CREATED, summary="Create Outlook Calendar event", dependencies=_AUTH_DEPS)
+async def create_outlook_event(
+    body: OutlookCreateEventRequest,
+    ctx: OrganizationContext = ORG_MEMBER_DEP,
+    session: AsyncSession = SESSION_DEP,
+) -> dict[str, Any]:
+    """Create a calendar event in Outlook."""
+    from app.services.microsoft.outlook_calendar import create_event as outlook_create
+
+    conn = await _get_connection(session, ctx.organization.id, require=True)
+    token = await get_valid_graph_token(session, conn)
+    await session.commit()
+
+    event = await outlook_create(
+        token,
+        summary=body.summary,
+        start=body.start,
+        end=body.end,
+        description=body.description,
+        location=body.location,
+        attendees=body.attendees or None,
+        time_zone=body.time_zone,
+    )
+    return event
+
+
+class OutlookUpdateEventRequest(BaseModel):
+    summary: str | None = None
+    start: str | None = None
+    end: str | None = None
+    description: str | None = None
+    location: str | None = None
+    time_zone: str = "America/Edmonton"
+
+
+@router.patch("/calendar/events/{event_id}", summary="Update Outlook Calendar event", dependencies=_AUTH_DEPS)
+async def update_outlook_event(
+    event_id: str,
+    body: OutlookUpdateEventRequest,
+    ctx: OrganizationContext = ORG_MEMBER_DEP,
+    session: AsyncSession = SESSION_DEP,
+) -> dict[str, Any]:
+    """Update an existing Outlook calendar event."""
+    from app.services.microsoft.outlook_calendar import update_event as outlook_update
+
+    conn = await _get_connection(session, ctx.organization.id, require=True)
+    token = await get_valid_graph_token(session, conn)
+    await session.commit()
+
+    event = await outlook_update(
+        token, event_id,
+        summary=body.summary,
+        start=body.start,
+        end=body.end,
+        description=body.description,
+        location=body.location,
+        time_zone=body.time_zone,
+    )
+    return event
+
+
+@router.delete("/calendar/events/{event_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete Outlook Calendar event", dependencies=_AUTH_DEPS)
+async def delete_outlook_event(
+    event_id: str,
+    ctx: OrganizationContext = ORG_MEMBER_DEP,
+    session: AsyncSession = SESSION_DEP,
+) -> None:
+    """Delete an Outlook calendar event."""
+    from app.services.microsoft.outlook_calendar import delete_event as outlook_delete
+
+    conn = await _get_connection(session, ctx.organization.id, require=True)
+    token = await get_valid_graph_token(session, conn)
+    await session.commit()
+
+    await outlook_delete(token, event_id)
+
+
+@router.get("/calendar/calendars", summary="List Outlook Calendars", dependencies=_AUTH_DEPS)
+async def list_outlook_calendars(
+    ctx: OrganizationContext = ORG_MEMBER_DEP,
+    session: AsyncSession = SESSION_DEP,
+) -> dict[str, Any]:
+    """List all calendars accessible to the connected Outlook account."""
+    from app.services.microsoft.outlook_calendar import list_calendars as outlook_list_cals
+
+    conn = await _get_connection(session, ctx.organization.id, require=True)
+    token = await get_valid_graph_token(session, conn)
+    await session.commit()
+
+    calendars = await outlook_list_cals(token)
+    return {"calendars": calendars}
 
 
 # ---------------------------------------------------------------------------

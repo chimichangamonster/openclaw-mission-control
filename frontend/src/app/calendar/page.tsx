@@ -21,6 +21,15 @@ import { DashboardPageLayout } from "@/components/templates/DashboardPageLayout"
 import { FeatureGate } from "@/components/molecules/FeatureGate";
 import { customFetch } from "@/api/mutator";
 
+interface CalendarConnection {
+  id: string;
+  email: string;
+  display_name: string | null;
+  default_calendar_id: string;
+  visibility: "shared" | "private";
+  user_id: string;
+}
+
 interface CalendarEvent {
   id: string;
   summary: string;
@@ -68,6 +77,8 @@ export default function CalendarPage() {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [connected, setConnected] = useState<boolean | null>(null);
+  const [connections, setConnections] = useState<CalendarConnection[]>([]);
+  const [activeConnectionId, setActiveConnectionId] = useState<string>("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -87,10 +98,15 @@ export default function CalendarPage() {
       const raw: any = await customFetch("/api/v1/google-calendar/status", { method: "GET" });
       const data = raw?.data ?? raw;
       setConnected(data?.connected ?? false);
+      const conns: CalendarConnection[] = data?.connections ?? [];
+      setConnections(conns);
+      if (conns.length > 0 && !activeConnectionId) {
+        setActiveConnectionId(conns[0].id);
+      }
     } catch {
       setConnected(false);
     }
-  }, []);
+  }, [activeConnectionId]);
 
   const loadEvents = useCallback(async () => {
     try {
@@ -99,8 +115,9 @@ export default function CalendarPage() {
       const now = new Date();
       const future = new Date();
       future.setDate(future.getDate() + 30);
+      const connParam = activeConnectionId ? `&connection_id=${activeConnectionId}` : "";
       const raw: any = await customFetch(
-        `/api/v1/google-calendar/events?time_min=${now.toISOString()}&time_max=${future.toISOString()}&max_results=50`,
+        `/api/v1/google-calendar/events?time_min=${now.toISOString()}&time_max=${future.toISOString()}&max_results=50${connParam}`,
         { method: "GET" },
       );
       const data = raw?.data ?? raw;
@@ -110,13 +127,20 @@ export default function CalendarPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [activeConnectionId]);
 
   useEffect(() => {
     if (isSignedIn) {
       loadStatus().then(() => loadEvents());
     }
   }, [isSignedIn, loadStatus, loadEvents]);
+
+  // Reload events when switching connections
+  useEffect(() => {
+    if (connected && activeConnectionId) {
+      loadEvents();
+    }
+  }, [activeConnectionId, connected, loadEvents]);
 
   const handleCreate = async () => {
     if (!newSummary || !newDate) return;
@@ -197,6 +221,19 @@ export default function CalendarPage() {
                   : "Connect Google Calendar in Org Settings to get started"}
               </p>
             </div>
+            {connected && connections.length > 1 && (
+              <select
+                value={activeConnectionId}
+                onChange={(e) => setActiveConnectionId(e.target.value)}
+                className="rounded-lg border border-[color:var(--border)] bg-[color:var(--bg)] px-3 py-2 text-sm text-[color:var(--text)] focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none"
+              >
+                {connections.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.email}{c.visibility === "private" ? " (Private)" : ""}
+                  </option>
+                ))}
+              </select>
+            )}
             {connected && (
               <button
                 onClick={() => setShowCreate(!showCreate)}

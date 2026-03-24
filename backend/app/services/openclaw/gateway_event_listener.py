@@ -23,6 +23,7 @@ from app.services.openclaw.event_broadcast import LiveActivityEvent, broadcast
 from app.services.openclaw.gateway_rpc import (
     GatewayConfig,
     _build_connect_params,
+    _build_control_ui_origin,
     _build_gateway_url,
     _create_ssl_context,
     _recv_first_message_or_none,
@@ -291,13 +292,22 @@ async def _diff_health_sessions(payload: dict[str, Any], config: GatewayConfig) 
     return events
 
 
-async def _listen(config: GatewayConfig) -> None:
+async def _listen(
+    config: GatewayConfig,
+    *,
+    organization_id: str = "",
+    gateway_id: str = "",
+) -> None:
     """Open a persistent connection and process events until disconnected."""
     url = _build_gateway_url(config)
     ssl_ctx = _create_ssl_context(config)
     connect_kwargs: dict[str, Any] = {"additional_headers": {}}
     if ssl_ctx:
         connect_kwargs["ssl"] = ssl_ctx
+    if config.disable_device_pairing:
+        origin = _build_control_ui_origin(url)
+        if origin:
+            connect_kwargs["origin"] = origin
 
     async with websockets.connect(url, **connect_kwargs) as ws:
         # --- Handshake (same as _ensure_connected) ---
@@ -330,7 +340,8 @@ async def _listen(config: GatewayConfig) -> None:
                     raise WebSocketException(f"Gateway connect failed: {err}")
                 break
 
-        logger.info("gateway_event_listener.connected")
+        label = f"org={organization_id[:8] or 'default'}"
+        logger.info("gateway_event_listener.connected %s", label)
 
         try:
             from app.core.prometheus import gateway_listener_connected
@@ -338,11 +349,17 @@ async def _listen(config: GatewayConfig) -> None:
         except Exception:  # noqa: BLE001
             pass
 
+        def _tag(event: LiveActivityEvent) -> LiveActivityEvent:
+            """Stamp org/gateway identity onto an event."""
+            event.organization_id = organization_id
+            event.gateway_id = gateway_id
+            return event
+
         # Publish a synthetic "connected" event
-        broadcast.publish(LiveActivityEvent(
+        broadcast.publish(_tag(LiveActivityEvent(
             event_type="gateway.connected",
             message="Connected to gateway event stream",
-        ))
+        )))
 
         # --- Event loop ---
         async for raw_msg in ws:
@@ -357,7 +374,8 @@ async def _listen(config: GatewayConfig) -> None:
             # Log all incoming messages for debugging (temporary)
             if msg_type == "event":
                 logger.info(
-                    "gateway_event_listener.event event=%s payload_keys=%s",
+                    "gateway_event_listener.event %s event=%s payload_keys=%s",
+                    label,
                     event_name,
                     sorted((data.get("payload") or {}).keys()) if isinstance(data.get("payload"), dict) else "n/a",
                 )
@@ -375,26 +393,42 @@ async def _listen(config: GatewayConfig) -> None:
             # Health events use diff-based detection.
             if event_name == "health":
                 for activity in await _diff_health_sessions(payload, config):
-                    broadcast.publish(activity)
+                    broadcast.publish(_tag(activity))
                 continue
 
             activity = _normalise_event(event_name, payload)
             if activity:
-                broadcast.publish(activity)
+                broadcast.publish(_tag(activity))
 
 
-async def run_event_listener(config: GatewayConfig) -> None:
-    """Run the event listener forever with auto-reconnect."""
+async def run_event_listener(
+    config: GatewayConfig,
+    *,
+    organization_id: str = "",
+    gateway_id: str = "",
+) -> None:
+    """Run the event listener forever with auto-reconnect.
+
+    When *organization_id* and *gateway_id* are provided, all emitted
+    ``LiveActivityEvent`` objects are tagged so SSE consumers can filter
+    by org.
+    """
     backoff = 1
+    label = f"org={organization_id or 'default'} gw={gateway_id or 'default'}"
     while True:
         try:
-            await _listen(config)
+            await _listen(
+                config,
+                organization_id=organization_id,
+                gateway_id=gateway_id,
+            )
         except asyncio.CancelledError:
-            logger.info("gateway_event_listener.cancelled")
+            logger.info("gateway_event_listener.cancelled %s", label)
             return
         except Exception as exc:  # noqa: BLE001
             logger.warning(
-                "gateway_event_listener.disconnected error=%s backoff=%ss",
+                "gateway_event_listener.disconnected %s error=%s backoff=%ss",
+                label,
                 exc,
                 backoff,
             )
@@ -405,8 +439,64 @@ async def run_event_listener(config: GatewayConfig) -> None:
                 pass
             broadcast.publish(LiveActivityEvent(
                 event_type="gateway.disconnected",
+                organization_id=organization_id,
+                gateway_id=gateway_id,
                 message=f"Disconnected: {exc}",
             ))
 
         await asyncio.sleep(backoff)
         backoff = min(backoff * 2, _MAX_BACKOFF_SECONDS)
+
+
+async def run_all_event_listeners() -> list[asyncio.Task[None]]:
+    """Query all configured gateways and spawn a listener task per gateway.
+
+    Returns the list of running tasks so the lifespan can cancel them on
+    shutdown.
+    """
+    from app.db.session import async_session_maker
+    from app.models.gateways import Gateway
+    from sqlmodel import col, select
+
+    tasks: list[asyncio.Task[None]] = []
+    try:
+        async with async_session_maker() as session:
+            gateways = (
+                await session.exec(
+                    select(Gateway).where(col(Gateway.url).is_not(None))
+                )
+            ).all()
+
+        for gw in gateways:
+            if not gw.url:
+                continue
+            config = GatewayConfig(
+                url=gw.url.strip(),
+                token=(gw.token or "").strip() or None,
+                allow_insecure_tls=gw.allow_insecure_tls,
+                disable_device_pairing=gw.disable_device_pairing,
+            )
+            org_id = str(gw.organization_id) if gw.organization_id else ""
+            gw_id = str(gw.id)
+            task = asyncio.create_task(
+                run_event_listener(
+                    config,
+                    organization_id=org_id,
+                    gateway_id=gw_id,
+                ),
+                name=f"gw-listener-{gw_id[:8]}",
+            )
+            tasks.append(task)
+            logger.info(
+                "gateway_event_listener.spawned org=%s gw=%s url=%s",
+                org_id[:8] if org_id else "n/a",
+                gw_id[:8],
+                gw.url,
+            )
+
+        if not tasks:
+            logger.info("gateway_event_listener.no_gateways_configured")
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("gateway_event_listener.init_failed error=%s", exc)
+
+    return tasks

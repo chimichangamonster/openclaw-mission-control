@@ -115,9 +115,11 @@ class TestBrandingJson:
         """Logo URL uses file-serve signed token pattern."""
         from unittest.mock import patch
 
-        with patch("app.core.file_tokens.settings", encryption_key="test-key", email_token_encryption_key=""):
-            from app.core.file_tokens import create_file_token
+        from app.core.file_tokens import create_file_token, reset_signing_key
 
+        reset_signing_key()
+        with patch("app.core.file_tokens.settings", encryption_key="test-key", email_token_encryption_key=""):
+            reset_signing_key()
             token = create_file_token("orgs/abc/logo.png", expires_hours=168)
             url = f"http://100.100.202.83:8000/api/v1/files/download?token={token}"
 

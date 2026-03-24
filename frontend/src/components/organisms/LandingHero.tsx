@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 
 import {
@@ -34,7 +35,14 @@ export function LandingHero() {
     <>
       <section className="hero">
         <div className="hero-content">
-          <div className="hero-label">OpenClaw Mission Control</div>
+          <Image
+            src="/logo.png"
+            alt="VantageClaw"
+            width={120}
+            height={120}
+            className="mx-auto mb-6 rounded-2xl shadow-lg"
+          />
+          <div className="hero-label">VantageClaw Mission Control</div>
           <h1>
             Command <span className="hero-highlight">autonomous work.</span>
             <br />

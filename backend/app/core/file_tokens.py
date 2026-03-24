@@ -6,20 +6,41 @@ They are compact, URL-safe, and require no database storage.
 
 from __future__ import annotations
 
-import hashlib
 import hmac
 import json
 import time
 from base64 import urlsafe_b64decode, urlsafe_b64encode
+from hashlib import sha256
+
+from cryptography.hazmat.primitives.hashes import SHA256
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
 from app.core.config import settings
 
+_signing_key: bytes | None = None
+
 
 def _get_signing_key() -> bytes:
+    """Derive a 256-bit HMAC signing key via HKDF (consistent with AES-256-GCM key derivation)."""
+    global _signing_key
+    if _signing_key is not None:
+        return _signing_key
     key = settings.encryption_key or settings.email_token_encryption_key
     if not key:
         raise ValueError("ENCRYPTION_KEY must be set for file token signing.")
-    return hashlib.sha256(key.encode()).digest()
+    _signing_key = HKDF(
+        algorithm=SHA256(),
+        length=32,
+        salt=None,
+        info=b"hmac-file-tokens-v1",
+    ).derive(key.encode())
+    return _signing_key
+
+
+def reset_signing_key() -> None:
+    """Clear cached signing key — for tests that swap settings."""
+    global _signing_key
+    _signing_key = None
 
 
 def create_file_token(relative_path: str, expires_hours: int = 24) -> str:
@@ -29,7 +50,7 @@ def create_file_token(relative_path: str, expires_hours: int = 24) -> str:
         separators=(",", ":"),
     )
     payload_b64 = urlsafe_b64encode(payload.encode()).decode().rstrip("=")
-    sig = hmac.new(_get_signing_key(), payload_b64.encode(), hashlib.sha256).hexdigest()
+    sig = hmac.new(_get_signing_key(), payload_b64.encode(), sha256).hexdigest()
     return f"{payload_b64}.{sig}"
 
 
@@ -41,7 +62,7 @@ def verify_file_token(token: str) -> str | None:
     payload_b64, sig = parts
 
     expected_sig = hmac.new(
-        _get_signing_key(), payload_b64.encode(), hashlib.sha256
+        _get_signing_key(), payload_b64.encode(), sha256
     ).hexdigest()
     if not hmac.compare_digest(sig, expected_sig):
         return None

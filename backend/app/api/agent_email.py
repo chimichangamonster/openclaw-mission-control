@@ -59,6 +59,14 @@ def _redact_message(msg: EmailMessage, level: RedactionLevel = RedactionLevel.MO
     return msg
 
 
+async def _require_shared_account(session: AsyncSession, msg: EmailMessage) -> EmailAccount:
+    """Load the parent email account and reject if it's private."""
+    account = await session.get(EmailAccount, msg.email_account_id)
+    if account is None or account.visibility == "private":
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    return account
+
+
 async def _get_org_id(agent_ctx: AgentAuthContext) -> UUID:
     """Resolve organization_id from the agent's board."""
     agent = agent_ctx.agent
@@ -92,6 +100,7 @@ async def agent_list_email_accounts(
         .where(
             EmailAccount.organization_id == board.organization_id,
             EmailAccount.sync_enabled == True,  # noqa: E712
+            EmailAccount.visibility == "shared",
         )
         .order_by(EmailAccount.created_at.desc())
     )
@@ -119,9 +128,17 @@ async def agent_list_email_messages(
     if board is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
 
+    # Only include messages from shared (non-private) accounts
+    shared_account_ids = select(EmailAccount.id).where(
+        EmailAccount.organization_id == board.organization_id,
+        EmailAccount.visibility == "shared",
+    )
     stmt = (
         select(EmailMessage)
-        .where(EmailMessage.organization_id == board.organization_id)
+        .where(
+            EmailMessage.organization_id == board.organization_id,
+            EmailMessage.email_account_id.in_(shared_account_ids),
+        )
         .order_by(EmailMessage.received_at.desc())
         .offset(offset)
         .limit(limit)
@@ -156,6 +173,7 @@ async def agent_get_email_message(
     msg = await session.get(EmailMessage, message_id)
     if msg is None or msg.organization_id != board.organization_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    await _require_shared_account(session, msg)
     return _redact_message(msg)
 
 
@@ -180,6 +198,7 @@ async def agent_update_email_message(
     msg = await session.get(EmailMessage, message_id)
     if msg is None or msg.organization_id != board.organization_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    await _require_shared_account(session, msg)
 
     for field in ("is_read", "is_starred", "triage_status", "triage_category", "linked_task_id"):
         value = getattr(payload, field, None)
@@ -217,7 +236,7 @@ async def agent_reply_to_email(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
 
     account = await session.get(EmailAccount, msg.email_account_id)
-    if account is None:
+    if account is None or account.visibility == "private":
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
 
     # Create approval instead of sending directly
@@ -279,7 +298,7 @@ async def agent_archive_email(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
 
     account = await session.get(EmailAccount, msg.email_account_id)
-    if account is None:
+    if account is None or account.visibility == "private":
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
 
     access_token = await get_valid_access_token(session, account)
@@ -325,6 +344,7 @@ async def agent_create_task_from_email(
     msg = await session.get(EmailMessage, message_id)
     if msg is None or msg.organization_id != board.organization_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    await _require_shared_account(session, msg)
 
     now = utcnow()
     description = f"From: {msg.sender_email}\n"

@@ -21,7 +21,7 @@ from app.core.time import utcnow
 from app.models.google_calendar_connection import GoogleCalendarConnection
 from app.services.google.calendar_oauth import GoogleCalendarOAuthProvider
 from app.services.google.token_manager import get_valid_google_token, store_google_tokens
-from app.services.organizations import OrganizationContext
+from app.services.organizations import OrganizationContext, is_org_admin
 
 if TYPE_CHECKING:
     from sqlmodel.ext.asyncio.session import AsyncSession
@@ -93,9 +93,10 @@ async def oauth_callback(
         logger.exception("google_calendar.oauth.exchange_failed error=%s", exc)
         return RedirectResponse(url="/org-settings?gcal_error=exchange_failed")
 
-    # Upsert GoogleCalendarConnection
+    # Upsert GoogleCalendarConnection (scoped to user — each member can connect their own)
     stmt = select(GoogleCalendarConnection).where(
         GoogleCalendarConnection.organization_id == organization_id,
+        GoogleCalendarConnection.user_id == user_id,
         GoogleCalendarConnection.provider_account_id == result.provider_account_id,
     )
     existing = (await session.execute(stmt)).scalar_one_or_none()
@@ -144,18 +145,32 @@ async def connection_status(
     ctx: OrganizationContext = ORG_MEMBER_DEP,
     session: AsyncSession = SESSION_DEP,
 ) -> dict[str, Any]:
-    """Check if the org has an active Google Calendar connection."""
-    conn = await _get_connection(session, ctx.organization.id)
-    if not conn:
-        return {"connected": False}
+    """Check if the org has active Google Calendar connections."""
+    connections = await _list_connections(session, ctx)
+    if not connections:
+        return {"connected": False, "connections": []}
 
     return {
         "connected": True,
-        "email": conn.email_address,
-        "display_name": conn.display_name,
-        "default_calendar_id": conn.default_calendar_id,
-        "scopes": conn.scopes,
-        "connected_at": conn.created_at.isoformat() if conn.created_at else None,
+        "connections": [
+            {
+                "id": str(conn.id),
+                "email": conn.email_address,
+                "display_name": conn.display_name,
+                "default_calendar_id": conn.default_calendar_id,
+                "visibility": conn.visibility,
+                "user_id": str(conn.user_id),
+                "scopes": conn.scopes,
+                "connected_at": conn.created_at.isoformat() if conn.created_at else None,
+            }
+            for conn in connections
+        ],
+        # Backward compat: return first connection's fields at top level
+        "email": connections[0].email_address,
+        "display_name": connections[0].display_name,
+        "default_calendar_id": connections[0].default_calendar_id,
+        "scopes": connections[0].scopes,
+        "connected_at": connections[0].created_at.isoformat() if connections[0].created_at else None,
     }
 
 
@@ -163,16 +178,48 @@ async def connection_status(
 async def disconnect(
     ctx: OrganizationContext = ORG_MEMBER_DEP,
     session: AsyncSession = SESSION_DEP,
+    connection_id: str = Query(default="", description="Specific connection to disconnect"),
 ) -> dict[str, bool]:
-    """Deactivate the Google Calendar connection for this org."""
-    conn = await _get_connection(session, ctx.organization.id)
+    """Deactivate a Google Calendar connection."""
+    conn = await _get_connection(session, ctx.organization.id, ctx=ctx, connection_id=connection_id or None)
     if conn:
+        # Only owner of connection or admin can disconnect
+        if conn.user_id != ctx.member.user_id and not is_org_admin(ctx.member):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the connection owner or admin can disconnect.")
         conn.is_active = False
         conn.updated_at = utcnow()
         session.add(conn)
         await session.commit()
-        logger.info("google_calendar.disconnected org_id=%s", ctx.organization.id)
+        logger.info("google_calendar.disconnected org_id=%s conn_id=%s", ctx.organization.id, conn.id)
     return {"ok": True}
+
+
+class CalendarConnectionUpdate(BaseModel):
+    visibility: str = Field(..., description="'shared' or 'private'")
+
+
+@router.patch("/connections/{connection_id}", summary="Update calendar connection visibility", dependencies=_AUTH_DEPS)
+async def update_connection(
+    connection_id: str,
+    body: CalendarConnectionUpdate,
+    ctx: OrganizationContext = ORG_MEMBER_DEP,
+    session: AsyncSession = SESSION_DEP,
+) -> dict[str, Any]:
+    """Update calendar connection settings (visibility)."""
+    if body.visibility not in ("shared", "private"):
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="visibility must be 'shared' or 'private'")
+    conn = await _get_connection(session, ctx.organization.id, require=True, connection_id=connection_id, ctx=ctx)
+    if conn.user_id != ctx.member.user_id and not is_org_admin(ctx.member):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the connection owner or admin can change visibility.")
+    conn.visibility = body.visibility
+    conn.updated_at = utcnow()
+    session.add(conn)
+    await session.commit()
+    return {
+        "id": str(conn.id),
+        "visibility": conn.visibility,
+        "email": conn.email_address,
+    }
 
 
 class CalendarSettingsUpdate(BaseModel):
@@ -186,7 +233,7 @@ async def update_calendar_settings(
     session: AsyncSession = SESSION_DEP,
 ) -> dict[str, bool]:
     """Update the default calendar for scheduling events."""
-    conn = await _get_connection(session, ctx.organization.id, require=True)
+    conn = await _get_connection(session, ctx.organization.id, require=True, ctx=ctx)
     conn.default_calendar_id = body.default_calendar_id
     conn.updated_at = utcnow()
     session.add(conn)
@@ -207,7 +254,7 @@ async def list_calendars(
     """List all calendars accessible to the connected Google account."""
     from app.services.google.calendar import list_calendars as gcal_list
 
-    conn = await _get_connection(session, ctx.organization.id, require=True)
+    conn = await _get_connection(session, ctx.organization.id, require=True, ctx=ctx)
     token = await get_valid_google_token(session, conn)
     await session.commit()
 
@@ -220,6 +267,7 @@ async def list_events(
     ctx: OrganizationContext = ORG_MEMBER_DEP,
     session: AsyncSession = SESSION_DEP,
     calendar_id: str = Query(default="", description="Calendar ID (defaults to org default)"),
+    connection_id: str = Query(default="", description="Connection ID (defaults to first visible)"),
     time_min: str = Query(default="", description="Start time filter (ISO 8601)"),
     time_max: str = Query(default="", description="End time filter (ISO 8601)"),
     q: str = Query(default="", description="Search query"),
@@ -228,7 +276,7 @@ async def list_events(
     """List events from a calendar."""
     from app.services.google.calendar import list_events as gcal_list_events
 
-    conn = await _get_connection(session, ctx.organization.id, require=True)
+    conn = await _get_connection(session, ctx.organization.id, require=True, connection_id=connection_id or None, ctx=ctx)
     token = await get_valid_google_token(session, conn)
     await session.commit()
 
@@ -252,6 +300,7 @@ class CreateEventRequest(BaseModel):
     description: str = ""
     location: str = ""
     calendar_id: str = ""
+    connection_id: str = ""
     attendees: list[str] = Field(default_factory=list)
     time_zone: str = "America/Edmonton"
 
@@ -265,7 +314,7 @@ async def create_event(
     """Create a calendar event."""
     from app.services.google.calendar import create_event as gcal_create
 
-    conn = await _get_connection(session, ctx.organization.id, require=True)
+    conn = await _get_connection(session, ctx.organization.id, require=True, connection_id=body.connection_id or None, ctx=ctx)
     token = await get_valid_google_token(session, conn)
     await session.commit()
 
@@ -299,11 +348,12 @@ async def update_event(
     ctx: OrganizationContext = ORG_MEMBER_DEP,
     session: AsyncSession = SESSION_DEP,
     calendar_id: str = Query(default="", description="Calendar ID"),
+    connection_id: str = Query(default="", description="Connection ID"),
 ) -> dict[str, Any]:
     """Update an existing calendar event."""
     from app.services.google.calendar import update_event as gcal_update
 
-    conn = await _get_connection(session, ctx.organization.id, require=True)
+    conn = await _get_connection(session, ctx.organization.id, require=True, connection_id=connection_id or None, ctx=ctx)
     token = await get_valid_google_token(session, conn)
     await session.commit()
 
@@ -326,11 +376,12 @@ async def delete_event(
     ctx: OrganizationContext = ORG_MEMBER_DEP,
     session: AsyncSession = SESSION_DEP,
     calendar_id: str = Query(default="", description="Calendar ID"),
+    connection_id: str = Query(default="", description="Connection ID"),
 ) -> None:
     """Delete a calendar event."""
     from app.services.google.calendar import delete_event as gcal_delete
 
-    conn = await _get_connection(session, ctx.organization.id, require=True)
+    conn = await _get_connection(session, ctx.organization.id, require=True, connection_id=connection_id or None, ctx=ctx)
     token = await get_valid_google_token(session, conn)
     await session.commit()
 
@@ -348,15 +399,67 @@ async def _get_connection(
     org_id: Any,
     *,
     require: bool = False,
+    connection_id: str | None = None,
+    ctx: OrganizationContext | None = None,
 ) -> GoogleCalendarConnection | None:
+    """Get a calendar connection, optionally by ID with visibility check."""
+    from sqlalchemy import or_
+
+    if connection_id:
+        from uuid import UUID as _UUID
+
+        conn = await session.get(GoogleCalendarConnection, _UUID(connection_id))
+        if conn is None or conn.organization_id != org_id or not conn.is_active:
+            if require:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Calendar connection not found.")
+            return None
+        # Visibility check
+        if ctx and conn.visibility == "private" and conn.user_id != ctx.member.user_id and not is_org_admin(ctx.member):
+            if require:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Calendar connection not found.")
+            return None
+        return conn
+
+    # Default: return the first visible active connection
     stmt = select(GoogleCalendarConnection).where(
         GoogleCalendarConnection.organization_id == org_id,
         col(GoogleCalendarConnection.is_active).is_(True),
     )
-    conn = (await session.execute(stmt)).scalar_one_or_none()
+    if ctx and not is_org_admin(ctx.member):
+        stmt = stmt.where(
+            or_(
+                GoogleCalendarConnection.visibility == "shared",
+                GoogleCalendarConnection.user_id == ctx.member.user_id,
+            )
+        )
+    stmt = stmt.order_by(GoogleCalendarConnection.created_at)
+    conn = (await session.execute(stmt)).scalars().first()
     if require and not conn:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="No active Google Calendar connection. Connect via /org-settings.",
         )
     return conn
+
+
+async def _list_connections(
+    session: AsyncSession,
+    ctx: OrganizationContext,
+) -> list[GoogleCalendarConnection]:
+    """List all active calendar connections visible to the caller."""
+    from sqlalchemy import or_
+
+    stmt = select(GoogleCalendarConnection).where(
+        GoogleCalendarConnection.organization_id == ctx.organization.id,
+        col(GoogleCalendarConnection.is_active).is_(True),
+    )
+    if not is_org_admin(ctx.member):
+        stmt = stmt.where(
+            or_(
+                GoogleCalendarConnection.visibility == "shared",
+                GoogleCalendarConnection.user_id == ctx.member.user_id,
+            )
+        )
+    stmt = stmt.order_by(GoogleCalendarConnection.created_at)
+    result = await session.execute(stmt)
+    return list(result.scalars().all())

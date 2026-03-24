@@ -2,6 +2,7 @@
 
 from app.models.activity_events import ActivityEvent
 from app.models.org_config import OrgConfigData, OrgOnboardingStep
+from app.models.org_contacts import OrgContact
 from app.models.bookkeeping import (
     BkClient,
     BkExpense,
@@ -115,5 +116,6 @@ __all__ = [
     "BkTransaction",
     "BkWorker",
     "OrgConfigData",
+    "OrgContact",
     "OrgOnboardingStep",
 ]
