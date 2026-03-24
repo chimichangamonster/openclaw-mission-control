@@ -17,15 +17,21 @@ import {
 
 import { isLikelyValidClerkPublishableKey } from "@/auth/clerkKey";
 import { getLocalAuthToken, isLocalAuthMode } from "@/auth/localAuth";
+import { getWeChatAuthToken, isWeChatAuthMode } from "@/auth/wechatAuth";
 
 function hasLocalAuthToken(): boolean {
   return Boolean(getLocalAuthToken());
+}
+
+function hasWeChatAuthToken(): boolean {
+  return Boolean(getWeChatAuthToken());
 }
 
 export function isClerkEnabled(): boolean {
   // IMPORTANT: keep this in sync with AuthProvider; otherwise components like
   // <SignedOut/> may render without a <ClerkProvider/> and crash during prerender.
   if (isLocalAuthMode()) return false;
+  if (isWeChatAuthMode()) return false;
   return isLikelyValidClerkPublishableKey(
     process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
   );
@@ -35,6 +41,9 @@ export function SignedIn(props: { children: ReactNode }) {
   if (isLocalAuthMode()) {
     return hasLocalAuthToken() ? <>{props.children}</> : null;
   }
+  if (isWeChatAuthMode()) {
+    return hasWeChatAuthToken() ? <>{props.children}</> : null;
+  }
   if (!isClerkEnabled()) return null;
   return <ClerkSignedIn>{props.children}</ClerkSignedIn>;
 }
@@ -42,6 +51,9 @@ export function SignedIn(props: { children: ReactNode }) {
 export function SignedOut(props: { children: ReactNode }) {
   if (isLocalAuthMode()) {
     return hasLocalAuthToken() ? null : <>{props.children}</>;
+  }
+  if (isWeChatAuthMode()) {
+    return hasWeChatAuthToken() ? null : <>{props.children}</>;
   }
   if (!isClerkEnabled()) return <>{props.children}</>;
   return <ClerkSignedOut>{props.children}</ClerkSignedOut>;
@@ -68,6 +80,13 @@ export function useUser() {
       user: null,
     } as const;
   }
+  if (isWeChatAuthMode()) {
+    return {
+      isLoaded: true,
+      isSignedIn: hasWeChatAuthToken(),
+      user: null,
+    } as const;
+  }
   if (!isClerkEnabled()) {
     return { isLoaded: true, isSignedIn: false, user: null } as const;
   }
@@ -82,6 +101,16 @@ export function useAuth() {
       isSignedIn: Boolean(token),
       userId: token ? "local-user" : null,
       sessionId: token ? "local-session" : null,
+      getToken: async () => token,
+    } as const;
+  }
+  if (isWeChatAuthMode()) {
+    const token = getWeChatAuthToken();
+    return {
+      isLoaded: true,
+      isSignedIn: Boolean(token),
+      userId: token ? "wechat-user" : null,
+      sessionId: token ? "wechat-session" : null,
       getToken: async () => token,
     } as const;
   }

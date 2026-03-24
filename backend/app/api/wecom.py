@@ -27,6 +27,7 @@ from app.schemas.wecom import (
 )
 from app.services.organizations import OrganizationContext, is_org_admin
 from app.services.wecom.crypto import WeComCryptoError, check_timestamp, verify_signature
+from app.services.content_filter import filter_content, get_org_filter_region
 from app.services.wecom.message_handler import handle_message
 from app.services.wecom.reply import build_passive_reply, send_active_reply
 from app.services.wecom.xml_parser import parse_inbound_message
@@ -244,7 +245,7 @@ async def wecom_url_verification(
     session: "AsyncSession" = SESSION_DEP,
 ) -> PlainTextResponse:
     """WeCom URL verification — returns decrypted echostr to prove ownership."""
-    org, conn = await _resolve_callback_context(org_slug, session)
+    org, conn, org_settings = await _resolve_callback_context(org_slug, session)
     if not conn:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
 
@@ -276,7 +277,7 @@ async def wecom_callback(
     session: "AsyncSession" = SESSION_DEP,
 ) -> Response:
     """Handle inbound WeCom messages."""
-    org, conn = await _resolve_callback_context(org_slug, session)
+    org, conn, org_settings = await _resolve_callback_context(org_slug, session)
     if not conn:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
 
@@ -338,7 +339,16 @@ async def wecom_callback(
         content=inner_parsed.content,
     )
 
+    # Resolve content filter region from org data policy
+    filter_region = "none"
+    if org_settings:
+        filter_region = get_org_filter_region(org_settings.data_policy)
+
     if response_text:
+        # Apply content filter before replying
+        filter_result = filter_content(response_text, region=filter_region)
+        response_text = filter_result.text
+
         # Passive encrypted reply
         reply_xml = build_passive_reply(
             content=response_text,
@@ -356,6 +366,7 @@ async def wecom_callback(
             from_user=inner_parsed.from_user,
             content=inner_parsed.content,
             session_factory=session,
+            filter_region=filter_region,
         )
     )
     return Response(content="success", media_type="text/plain")
@@ -369,14 +380,14 @@ async def wecom_callback(
 async def _resolve_callback_context(
     org_slug: str,
     session: "AsyncSession",
-) -> tuple[Organization | None, WeComConnection | None]:
-    """Resolve org and active WeCom connection from org slug."""
+) -> tuple[Organization | None, WeComConnection | None, OrganizationSettings | None]:
+    """Resolve org, active WeCom connection, and org settings from org slug."""
     result = await session.execute(
         select(Organization).where(Organization.slug == org_slug)
     )
     org = result.scalars().first()
     if not org:
-        return None, None
+        return None, None, None
 
     # Check wechat feature flag
     settings_result = await session.execute(
@@ -391,7 +402,7 @@ async def _resolve_callback_context(
         flags = dict(DEFAULT_FEATURE_FLAGS)
 
     if not flags.get("wechat", False):
-        return org, None
+        return org, None, org_settings
 
     # Get active connection
     conn_result = await session.execute(
@@ -401,7 +412,7 @@ async def _resolve_callback_context(
         )
     )
     conn = conn_result.scalars().first()
-    return org, conn
+    return org, conn, org_settings
 
 
 async def _resolve_gateway(
@@ -422,6 +433,7 @@ async def _async_reply_worker(
     from_user: str,
     content: str,
     session_factory: "AsyncSession",
+    filter_region: str = "none",
 ) -> None:
     """Background task: wait for agent response and send via WeCom API."""
     import asyncio
@@ -452,6 +464,11 @@ async def _async_reply_worker(
             messages = history.get("messages", [])
             for msg in reversed(messages):
                 if msg.get("role") == "assistant" and msg.get("content", "").strip():
+                    # Apply content filter before sending
+                    reply_text = msg["content"]
+                    filter_result = filter_content(reply_text, region=filter_region)
+                    reply_text = filter_result.text
+
                     # Found a response — send it
                     async with async_session_maker() as db_session:
                         # Re-fetch connection to get current token
@@ -461,7 +478,7 @@ async def _async_reply_worker(
                         fresh_conn = result.scalars().first()
                         if fresh_conn:
                             await send_active_reply(
-                                content=msg["content"],
+                                content=reply_text,
                                 to_user=from_user,
                                 connection=fresh_conn,
                                 session=db_session,

@@ -28,6 +28,12 @@ class User(QueryModel, table=True):
     notes: str | None = None
     context: str | None = None
     is_super_admin: bool = Field(default=False)
+    # Platform-level role for multi-tenant administration:
+    #   "owner"    — full access, can read all org data (Henz)
+    #   "operator" — can manage infrastructure (gateways, restarts, health checks)
+    #                but CANNOT read client emails, chat history, API keys, or org settings
+    #   None       — regular user, no cross-org access
+    platform_role: str | None = Field(default=None)
     active_organization_id: UUID | None = Field(
         default=None,
         foreign_key="organizations.id",

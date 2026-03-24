@@ -40,6 +40,13 @@ async def get_compliance_checklist() -> HTMLResponse:
     return HTMLResponse(content=tos)
 
 
+@router.get("/dpa", summary="Data Processing Agreement", response_class=HTMLResponse)
+async def get_dpa() -> HTMLResponse:
+    """Serve the Data Processing Agreement template. No auth required."""
+    html = (_TEMPLATES / "data-processing-agreement.html").read_text(encoding="utf-8")
+    return HTMLResponse(content=html)
+
+
 @router.get("/version", summary="Current terms version")
 async def get_terms_version() -> dict[str, str]:
     """Return the current terms version that users must accept."""

@@ -39,7 +39,8 @@ class Settings(BaseSettings):
     environment: str = "dev"
     database_url: str = "postgresql+psycopg://postgres:postgres@localhost:5432/openclaw_agency"
 
-    # Auth mode: "clerk" for Clerk JWT auth, "local" for shared bearer token auth.
+    # Auth mode: "clerk" for Clerk JWT auth, "local" for shared bearer token,
+    # "wechat" for WeCom/WeChat OAuth (China deployments).
     auth_mode: AuthMode
     local_auth_token: str = ""
 
@@ -48,6 +49,11 @@ class Settings(BaseSettings):
     clerk_api_url: str = "https://api.clerk.com"
     clerk_verify_iat: bool = True
     clerk_leeway: float = 10.0
+
+    # WeChat/WeCom OAuth (China deployments)
+    wechat_corp_id: str = ""
+    wechat_app_secret: str = ""
+    wechat_agent_id: str = ""
 
     cors_origins: str = ""
     base_url: str = ""
@@ -152,6 +158,15 @@ class Settings(BaseSettings):
             ):
                 raise ValueError(
                     "LOCAL_AUTH_TOKEN must be at least 50 characters and non-placeholder when AUTH_MODE=local.",
+                )
+        elif self.auth_mode == AuthMode.WECHAT:
+            if not self.wechat_corp_id.strip():
+                raise ValueError(
+                    "WECHAT_CORP_ID must be set when AUTH_MODE=wechat.",
+                )
+            if not self.wechat_app_secret.strip():
+                raise ValueError(
+                    "WECHAT_APP_SECRET must be set when AUTH_MODE=wechat.",
                 )
 
         base_url = self.base_url.strip()

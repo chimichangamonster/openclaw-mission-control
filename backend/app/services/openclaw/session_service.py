@@ -384,9 +384,50 @@ class GatewaySessionService(OpenClawDBService):
                 status_code=status.HTTP_502_BAD_GATEWAY,
                 detail=str(exc),
             ) from exc
+
         if isinstance(history, dict) and isinstance(history.get("messages"), list):
-            return GatewaySessionHistoryResponse(history=history["messages"])
-        return GatewaySessionHistoryResponse(history=self.as_object_list(history))
+            messages = history["messages"]
+        else:
+            messages = self.as_object_list(history)
+
+        # Apply content filter if org has a filter region configured
+        messages = await self._apply_content_filter(messages, organization_id)
+
+        return GatewaySessionHistoryResponse(history=messages)
+
+    async def _apply_content_filter(
+        self,
+        messages: list[object],
+        organization_id: UUID,
+    ) -> list[object]:
+        """Filter assistant messages through the org's content filter region."""
+        from sqlmodel import select as sql_select
+
+        from app.models.organization_settings import OrganizationSettings
+        from app.services.content_filter import filter_content, get_org_filter_region
+
+        result = await self.session.execute(
+            sql_select(OrganizationSettings).where(
+                OrganizationSettings.organization_id == organization_id
+            )
+        )
+        org_settings = result.scalars().first()
+        if not org_settings:
+            return messages
+
+        region = get_org_filter_region(org_settings.data_policy)
+        if region == "none":
+            return messages
+
+        filtered = []
+        for msg in messages:
+            if isinstance(msg, dict) and msg.get("role") == "assistant":
+                content = msg.get("content", "")
+                if content:
+                    filter_result = filter_content(content, region=region)
+                    msg = {**msg, "content": filter_result.text}
+            filtered.append(msg)
+        return filtered
 
     async def send_session_message(
         self,

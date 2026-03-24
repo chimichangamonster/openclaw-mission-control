@@ -452,6 +452,50 @@ def _parse_subject(claims: dict[str, object]) -> str | None:
     return payload.sub
 
 
+async def _resolve_wechat_auth_context(
+    *,
+    request: Request,
+    session: AsyncSession,
+    required: bool,
+) -> AuthContext | None:
+    """Resolve user from a WeChat OAuth session token."""
+    token = _extract_bearer_token(request.headers.get("Authorization"))
+    if token is None:
+        if required:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
+        return None
+
+    from app.api.wechat_auth import _verify_token
+
+    payload = _verify_token(token)
+    if payload is None:
+        if required:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
+        return None
+
+    wechat_user_id = payload.get("sub", "")
+    if not wechat_user_id:
+        if required:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
+        return None
+
+    defaults: dict[str, object] = {
+        "email": payload.get("email", ""),
+        "name": payload.get("name", ""),
+    }
+    user, _created = await crud.get_or_create(
+        session,
+        User,
+        clerk_user_id=wechat_user_id,
+        defaults=defaults,
+    )
+
+    from app.services.organizations import ensure_member_for_user
+
+    await ensure_member_for_user(session, user)
+    return AuthContext(actor_type="user", user=user)
+
+
 async def get_auth_context(
     request: Request,
     credentials: HTTPAuthorizationCredentials | None = SECURITY_DEP,
@@ -467,6 +511,16 @@ async def get_auth_context(
         if local_auth is None:  # pragma: no cover
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
         return local_auth
+
+    if settings.auth_mode == AuthMode.WECHAT:
+        wechat_auth = await _resolve_wechat_auth_context(
+            request=request,
+            session=session,
+            required=True,
+        )
+        if wechat_auth is None:  # pragma: no cover
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
+        return wechat_auth
 
     request_state = await _authenticate_clerk_request(request)
     if request_state.status != AuthStatus.SIGNED_IN or not isinstance(request_state.payload, dict):
@@ -504,6 +558,12 @@ async def get_auth_context_optional(
         return None
     if settings.auth_mode == AuthMode.LOCAL:
         return await _resolve_local_auth_context(
+            request=request,
+            session=session,
+            required=False,
+        )
+    if settings.auth_mode == AuthMode.WECHAT:
+        return await _resolve_wechat_auth_context(
             request=request,
             session=session,
             required=False,

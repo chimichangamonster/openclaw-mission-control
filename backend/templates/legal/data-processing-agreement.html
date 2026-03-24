@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Data Processing Agreement — VantageClaw</title>
+<style>
+  body { font-family: 'Segoe UI', system-ui, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; line-height: 1.6; color: #1a1a1a; }
+  h1 { font-size: 24px; border-bottom: 2px solid #1a1a1a; padding-bottom: 10px; }
+  h2 { font-size: 18px; margin-top: 30px; color: #333; }
+  h3 { font-size: 15px; margin-top: 20px; }
+  table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+  th, td { border: 1px solid #ccc; padding: 8px 12px; text-align: left; }
+  th { background: #f5f5f5; }
+  .draft { background: #fff3cd; border: 2px solid #ffc107; padding: 15px; margin: 20px 0; border-radius: 4px; }
+  .signature { margin-top: 40px; display: flex; gap: 40px; }
+  .sig-block { flex: 1; }
+  .sig-line { border-top: 1px solid #1a1a1a; margin-top: 60px; padding-top: 5px; }
+</style>
+</head>
+<body>
+
+<div class="draft">
+  <strong>⚠️ DRAFT — NOT LEGALLY BINDING</strong><br>
+  This template requires review by a Canadian business lawyer before use.
+  It is provided as a starting point for client negotiations, not a final agreement.
+</div>
+
+<h1>Data Processing Agreement</h1>
+
+<p><strong>Between:</strong></p>
+<p><strong>Data Processor:</strong> Vantage Solutions ("Processor")<br>
+Email: info@vantagesolutions.ca</p>
+<p><strong>Data Controller:</strong> {{CLIENT_NAME}} ("Controller")<br>
+Contact: {{CLIENT_CONTACT}}</p>
+<p><strong>Effective Date:</strong> {{EFFECTIVE_DATE}}</p>
+
+<h2>1. Purpose</h2>
+<p>This Data Processing Agreement ("DPA") governs the processing of personal data by the Processor on behalf of the Controller in connection with the VantageClaw platform services ("Services") as described in the Master Services Agreement between the parties.</p>
+
+<h2>2. Definitions</h2>
+<ul>
+  <li><strong>"Personal Data"</strong> — any information relating to an identified or identifiable individual, as defined under PIPEDA (Canada) and applicable provincial privacy laws.</li>
+  <li><strong>"Processing"</strong> — any operation performed on Personal Data, including collection, storage, use, transmission, and deletion.</li>
+  <li><strong>"Sub-processor"</strong> — any third party engaged by the Processor to process Personal Data on behalf of the Controller.</li>
+  <li><strong>"Platform"</strong> — the VantageClaw multi-tenant AI business platform operated by the Processor.</li>
+</ul>
+
+<h2>3. Scope of Processing</h2>
+
+<h3>3.1 Data Categories</h3>
+<table>
+  <tr><th>Category</th><th>Examples</th><th>Processing Purpose</th></tr>
+  <tr><td>Business communications</td><td>Email content, chat messages</td><td>AI agent triage, response drafting, archival</td></tr>
+  <tr><td>Contact information</td><td>Names, email addresses, phone numbers</td><td>Contact directory, scheduling, communication</td></tr>
+  <tr><td>Business documents</td><td>Invoices, proposals, reports</td><td>Document generation, analysis, storage</td></tr>
+  <tr><td>Operational data</td><td>Equipment readings, work orders, inventory</td><td>Monitoring, alerting, reporting</td></tr>
+  <tr><td>Financial data</td><td>Transaction records, expense receipts</td><td>Bookkeeping, cost tracking, invoicing</td></tr>
+</table>
+
+<h3>3.2 Processing Activities</h3>
+<ul>
+  <li>Receiving and storing data submitted by Controller through the Platform</li>
+  <li>Processing data through AI language models for analysis, summarization, and response generation</li>
+  <li>Storing processed results in the Controller's isolated workspace</li>
+  <li>Transmitting data to authorized third-party LLM providers (see Section 6)</li>
+</ul>
+
+<h2>4. Data Isolation and Security</h2>
+
+<h3>4.1 Tenant Isolation</h3>
+<ul>
+  <li>Controller's data is stored in a <strong>dedicated, isolated gateway container</strong> with its own workspace, memory, and configuration</li>
+  <li>No data is shared between organizations on the Platform</li>
+  <li>Each organization has independent encryption keys for stored secrets</li>
+  <li>Database queries are scoped to the Controller's organization ID — cross-tenant data access is architecturally prevented</li>
+</ul>
+
+<h3>4.2 Encryption</h3>
+<ul>
+  <li><strong>At rest:</strong> AES-256-GCM authenticated encryption with HKDF-SHA256 key derivation for all sensitive fields (API keys, OAuth tokens, credentials)</li>
+  <li><strong>In transit:</strong> TLS 1.2+ for all API communications; Tailscale WireGuard for internal network</li>
+  <li><strong>Backups:</strong> GPG-encrypted with AES-256, SHA-256 checksums, 30-day retention</li>
+</ul>
+
+<h3>4.3 Access Controls</h3>
+<ul>
+  <li>Role-based access control (RBAC) with 5 privilege levels: viewer, member, operator, admin, owner</li>
+  <li>Platform administrator access is separated into <strong>owner</strong> (full access) and <strong>operator</strong> (infrastructure only — cannot read client data)</li>
+  <li>All administrative access to Controller's data is audit-logged</li>
+  <li>API rate limiting (600 requests/minute per organization)</li>
+</ul>
+
+<h2>5. Platform Administrator Access</h2>
+
+<h3>5.1 What the Processor CAN access</h3>
+<ul>
+  <li>Organization metadata (name, slug, member count, feature flags)</li>
+  <li>Gateway health status and connectivity</li>
+  <li>Aggregate usage metrics (API calls, token consumption)</li>
+  <li>Audit logs for the Controller's organization</li>
+  <li>Error logs for troubleshooting (with Controller's permission)</li>
+</ul>
+
+<h3>5.2 What the Processor will NOT access without written consent</h3>
+<ul>
+  <li>Email content or attachments</li>
+  <li>Chat conversation history</li>
+  <li>Decrypted API keys or OAuth tokens</li>
+  <li>Business documents, proposals, or reports</li>
+  <li>Calendar events or contact details</li>
+  <li>Financial records or transaction data</li>
+</ul>
+
+<h3>5.3 Emergency Access</h3>
+<p>In the event of a security incident, data corruption, or service outage, the Processor may access Controller's data to the minimum extent necessary to resolve the issue. The Controller will be notified within 24 hours of any such access, with a written description of what was accessed and why.</p>
+
+<h2>6. Sub-processors</h2>
+
+<h3>6.1 Current Sub-processors</h3>
+<table>
+  <tr><th>Provider</th><th>Service</th><th>Data Processed</th><th>Location</th></tr>
+  <tr><td>OpenRouter</td><td>LLM API routing</td><td>Text prompts and responses</td><td>USA</td></tr>
+  <tr><td>Hetzner</td><td>Server hosting</td><td>All Platform data</td><td>Germany (EU)</td></tr>
+  <tr><td>Tailscale</td><td>Network access</td><td>Connection metadata only</td><td>USA/Canada</td></tr>
+</table>
+
+<h3>6.2 Self-Hosted Option</h3>
+<p>If the Controller requires that no data leave their infrastructure, the Processor offers an enterprise self-hosted deployment where the Platform runs entirely on the Controller's own servers. In this configuration, no sub-processors receive Controller data.</p>
+
+<h3>6.3 BYOK (Bring Your Own Key)</h3>
+<p>The Controller may provide their own LLM API key. When configured, LLM requests route directly from the Controller's gateway to their chosen provider, bypassing the Processor's API key and usage tracking.</p>
+
+<h2>7. Data Retention and Deletion</h2>
+<ul>
+  <li>Controller's data is retained for the duration of the service agreement</li>
+  <li>Upon termination, the Processor will delete all Controller data within <strong>30 days</strong></li>
+  <li>The Controller may request data export at any time (gateway workspace archive)</li>
+  <li>Backup copies are automatically purged after the 30-day retention window</li>
+  <li>Audit logs are retained for 90 days after termination for compliance purposes</li>
+</ul>
+
+<h2>8. Breach Notification</h2>
+<ul>
+  <li>The Processor will notify the Controller of any confirmed data breach within <strong>72 hours</strong> of discovery (PIPEDA requirement)</li>
+  <li>Notification will include: nature of the breach, data affected, remediation steps taken, recommendations for the Controller</li>
+  <li>The Processor will cooperate with the Controller's breach response procedures</li>
+</ul>
+
+<h2>9. Controller Rights</h2>
+<ul>
+  <li>The Controller may request a copy of all their data at any time</li>
+  <li>The Controller may request deletion of specific data records</li>
+  <li>The Controller may audit the Processor's security practices with 30 days' notice</li>
+  <li>The Controller may terminate this DPA and the service agreement at any time</li>
+</ul>
+
+<h2>10. Governing Law</h2>
+<p>This DPA is governed by the laws of the Province of Alberta, Canada, and the federal laws of Canada applicable therein, including PIPEDA.</p>
+
+<h2>11. Term</h2>
+<p>This DPA remains in effect for the duration of the Master Services Agreement and for 30 days after its termination (to allow for data deletion).</p>
+
+<div class="signature">
+  <div class="sig-block">
+    <div class="sig-line">
+      <strong>Vantage Solutions</strong> (Processor)<br>
+      Name: ___________________<br>
+      Title: ___________________<br>
+      Date: ___________________
+    </div>
+  </div>
+  <div class="sig-block">
+    <div class="sig-line">
+      <strong>{{CLIENT_NAME}}</strong> (Controller)<br>
+      Name: ___________________<br>
+      Title: ___________________<br>
+      Date: ___________________
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
