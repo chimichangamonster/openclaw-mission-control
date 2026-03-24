@@ -7,6 +7,7 @@ BACKEND_DIR := backend
 FRONTEND_DIR := frontend
 
 NODE_WRAP := bash scripts/with_node.sh
+BUN := bun
 
 .PHONY: help
 help: ## Show available targets
@@ -23,12 +24,12 @@ backend-sync: ## uv sync backend deps (includes dev extra)
 	cd $(BACKEND_DIR) && uv sync --extra dev
 
 .PHONY: frontend-tooling
-frontend-tooling: ## Verify frontend toolchain (node + npm)
-	@$(NODE_WRAP) --check
+frontend-tooling: ## Verify frontend toolchain (bun)
+	@command -v $(BUN) >/dev/null 2>&1 || { echo "ERROR: bun is required. Install: curl -fsSL https://bun.sh/install | bash"; exit 127; }
 
 .PHONY: frontend-sync
-frontend-sync: frontend-tooling ## npm install frontend deps
-	$(NODE_WRAP) --cwd $(FRONTEND_DIR) npm install
+frontend-sync: frontend-tooling ## bun install frontend deps
+	cd $(FRONTEND_DIR) && $(BUN) install
 
 .PHONY: format
 format: backend-format frontend-format ## Format backend + frontend
@@ -40,7 +41,7 @@ backend-format: ## Format backend (isort + black)
 
 .PHONY: frontend-format
 frontend-format: frontend-tooling ## Format frontend (prettier)
-	$(NODE_WRAP) --cwd $(FRONTEND_DIR) npx prettier --write "src/**/*.{ts,tsx,js,jsx,json,css,md}" "*.{ts,js,json,md,mdx}"
+	cd $(FRONTEND_DIR) && $(BUN) x prettier --write "src/**/*.{ts,tsx,js,jsx,json,css,md}" "*.{ts,js,json,md,mdx}"
 
 .PHONY: format-check
 format-check: backend-format-check frontend-format-check ## Check formatting (no changes)
@@ -52,7 +53,7 @@ backend-format-check: ## Check backend formatting (isort + black)
 
 .PHONY: frontend-format-check
 frontend-format-check: frontend-tooling ## Check frontend formatting (prettier)
-	$(NODE_WRAP) --cwd $(FRONTEND_DIR) npx prettier --check "src/**/*.{ts,tsx,js,jsx,json,css,md}" "*.{ts,js,json,md,mdx}"
+	cd $(FRONTEND_DIR) && $(BUN) x prettier --check "src/**/*.{ts,tsx,js,jsx,json,css,md}" "*.{ts,js,json,md,mdx}"
 
 .PHONY: lint
 lint: backend-lint frontend-lint docs-lint ## Lint backend + frontend + docs
@@ -63,7 +64,7 @@ backend-lint: backend-format-check backend-typecheck ## Lint backend (isort/blac
 
 .PHONY: frontend-lint
 frontend-lint: frontend-tooling ## Lint frontend (eslint)
-	$(NODE_WRAP) --cwd $(FRONTEND_DIR) npm run lint
+	cd $(FRONTEND_DIR) && $(BUN) run lint
 
 .PHONY: typecheck
 typecheck: backend-typecheck frontend-typecheck ## Typecheck backend + frontend
@@ -74,7 +75,7 @@ backend-typecheck: ## Typecheck backend (mypy --strict)
 
 .PHONY: frontend-typecheck
 frontend-typecheck: frontend-tooling ## Typecheck frontend (tsc)
-	$(NODE_WRAP) --cwd $(FRONTEND_DIR) npx tsc -p tsconfig.json --noEmit
+	cd $(FRONTEND_DIR) && $(BUN) x tsc -p tsconfig.json --noEmit
 
 .PHONY: test
 test: backend-test frontend-test ## Run tests
@@ -98,7 +99,7 @@ backend-coverage: ## Backend tests with coverage gate (scoped 100% stmt+branch o
 
 .PHONY: frontend-test
 frontend-test: frontend-tooling ## Frontend tests (vitest)
-	$(NODE_WRAP) --cwd $(FRONTEND_DIR) npm run test
+	cd $(FRONTEND_DIR) && $(BUN) run test
 
 .PHONY: backend-migrate
 backend-migrate: ## Apply backend DB migrations (uses backend/migrations)
@@ -139,11 +140,11 @@ build: frontend-build ## Build artifacts
 
 .PHONY: frontend-build
 frontend-build: frontend-tooling ## Build frontend (next build)
-	$(NODE_WRAP) --cwd $(FRONTEND_DIR) npm run build
+	cd $(FRONTEND_DIR) && $(BUN) run build
 
 .PHONY: api-gen
 api-gen: frontend-tooling ## Regenerate TS API client (requires backend running at 127.0.0.1:8000)
-	$(NODE_WRAP) --cwd $(FRONTEND_DIR) npm run api:gen
+	cd $(FRONTEND_DIR) && $(BUN) run api:gen
 
 .PHONY: docker-up
 docker-up: ## Start full Docker stack with image rebuild
@@ -176,7 +177,7 @@ check: lint typecheck backend-coverage frontend-test build ## Run lint + typeche
 
 .PHONY: docs-lint
 docs-lint: frontend-tooling ## Lint markdown files (tiny ruleset; avoids noisy churn)
-	$(NODE_WRAP) npx markdownlint-cli2@0.15.0 --config .markdownlint-cli2.yaml "**/*.md"
+	$(BUN) x markdownlint-cli2@0.15.0 --config .markdownlint-cli2.yaml "**/*.md"
 
 .PHONY: docs-link-check
 docs-link-check: ## Check for broken relative links in markdown docs
