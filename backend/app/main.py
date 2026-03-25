@@ -561,6 +561,21 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
     email_sync_task = asyncio.create_task(_email_sync_loop())
 
+    # Background task: data retention cleanup once per day at ~4 AM UTC.
+    async def _data_retention_loop() -> None:
+        from app.services.data_retention import run_retention_cleanup
+
+        # Initial delay: wait 10 minutes to let everything settle, then align to ~24h cycle
+        await asyncio.sleep(600)
+        while True:
+            try:
+                await run_retention_cleanup()
+            except Exception:  # noqa: BLE001
+                logger.exception("data_retention.cleanup_failed")
+            await asyncio.sleep(86400)  # 24 hours
+
+    retention_task = asyncio.create_task(_data_retention_loop())
+
     logger.info("app.lifecycle.started")
     try:
         yield
@@ -569,6 +584,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         budget_task.cancel()
         watchdog_task.cancel()
         email_sync_task.cancel()
+        retention_task.cancel()
         for lt in listener_tasks:
             if not lt.done():
                 lt.cancel()

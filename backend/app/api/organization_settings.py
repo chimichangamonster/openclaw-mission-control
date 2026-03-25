@@ -143,6 +143,12 @@ class DataPolicyUpdate(BaseModel):
     redaction_level: str | None = None  # "off", "moderate", "strict"
     allow_email_content_to_llm: bool | None = None
     log_llm_inputs: bool | None = None
+    # Retention settings (days, 0 = keep forever)
+    activity_retention_days: int | None = None
+    email_retention_days: int | None = None
+    audit_retention_days: int | None = None
+    webhook_retention_days: int | None = None
+    spend_retention_days: int | None = None
 
 
 class SettingsUpdate(BaseModel):
@@ -201,6 +207,17 @@ async def update_settings(
                 current["allow_email_content_to_llm"] = payload.data_policy.allow_email_content_to_llm
             if payload.data_policy.log_llm_inputs is not None:
                 current["log_llm_inputs"] = payload.data_policy.log_llm_inputs
+            # Retention settings
+            for key in (
+                "activity_retention_days", "email_retention_days",
+                "audit_retention_days", "webhook_retention_days",
+                "spend_retention_days",
+            ):
+                val = getattr(payload.data_policy, key, None)
+                if val is not None:
+                    if val < 0:
+                        raise HTTPException(status_code=400, detail=f"{key} must be >= 0")
+                    current[key] = val
             settings.data_policy_json = json.dumps(current)
             changes["data_policy"] = True
         if payload.timezone is not None:
