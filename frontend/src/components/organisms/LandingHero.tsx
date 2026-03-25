@@ -58,29 +58,28 @@ export function LandingHero() {
             <SignedOut>
               {clerkEnabled ? (
                 <>
-                  <SignInButton
-                    mode="modal"
-                    forceRedirectUrl="/boards"
-                    signUpForceRedirectUrl="/boards"
+                  <Link
+                    href="https://vantageclaw.ai/consultation"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="btn-large primary"
                   >
-                    <button type="button" className="btn-large primary">
-                      Open Boards <ArrowIcon />
-                    </button>
-                  </SignInButton>
+                    Book a Demo <ArrowIcon />
+                  </Link>
                   <SignInButton
                     mode="modal"
-                    forceRedirectUrl="/boards/new"
-                    signUpForceRedirectUrl="/boards/new"
+                    forceRedirectUrl="/onboarding"
+                    signUpForceRedirectUrl="/onboarding"
                   >
                     <button type="button" className="btn-large secondary">
-                      Create Board
+                      Sign In
                     </button>
                   </SignInButton>
                 </>
               ) : (
                 <>
                   <Link href="/boards" className="btn-large primary">
-                    Open Boards <ArrowIcon />
+                    Get Started <ArrowIcon />
                   </Link>
                   <Link href="/boards/new" className="btn-large secondary">
                     Create Board
@@ -402,38 +401,37 @@ export function LandingHero() {
 
       <section className="cta-section">
         <div className="cta-content">
-          <h2>Start with one board. Grow into a control room.</h2>
+          <h2>Ready to automate your business operations?</h2>
           <p>
-            Onboard a board, name a lead agent, and keep approvals and signals
-            visible from day one.
+            Book a free consultation. We&apos;ll audit your workflows and show you
+            exactly which tasks your AI agents will handle from day one.
           </p>
           <div className="cta-actions">
             <SignedOut>
               {clerkEnabled ? (
                 <>
-                  <SignInButton
-                    mode="modal"
-                    forceRedirectUrl="/boards/new"
-                    signUpForceRedirectUrl="/boards/new"
+                  <Link
+                    href="https://vantageclaw.ai/consultation"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="btn-large white"
                   >
-                    <button type="button" className="btn-large white">
-                      Create Board
-                    </button>
-                  </SignInButton>
+                    Book a Demo <ArrowIcon />
+                  </Link>
                   <SignInButton
                     mode="modal"
-                    forceRedirectUrl="/boards"
-                    signUpForceRedirectUrl="/boards"
+                    forceRedirectUrl="/onboarding"
+                    signUpForceRedirectUrl="/onboarding"
                   >
                     <button type="button" className="btn-large outline">
-                      View Boards
+                      Sign In
                     </button>
                   </SignInButton>
                 </>
               ) : (
                 <>
                   <Link href="/boards/new" className="btn-large white">
-                    Create Board
+                    Get Started
                   </Link>
                   <Link href="/boards" className="btn-large outline">
                     View Boards
