@@ -89,5 +89,5 @@ VantageClaw fork of abhi1693/openclaw-mission-control. Separate git repo (not a 
 ## Build & Deploy
 - NEVER build on VPS (OOM). Build locally, transfer images.
 - Backend: `docker build -t mc-backend -f backend/Dockerfile .`
-- Frontend: `docker build -t mc-frontend --build-arg NEXT_PUBLIC_API_URL=http://vantageclaw.basa-dab.ts.net:8000 --build-arg NEXT_PUBLIC_AUTH_MODE=local -f frontend/Dockerfile frontend/`
+- Frontend: `docker build -t mc-frontend --build-arg NEXT_PUBLIC_API_URL=https://app.vantageclaw.ai --build-arg NEXT_PUBLIC_AUTH_MODE=clerk --build-arg NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_... -f frontend/Dockerfile frontend/`
 - After deploy: `docker compose -f docker-compose.prod.yml -f docker-compose.mission-control.yml --env-file .env.production up -d mc-backend mc-frontend`
