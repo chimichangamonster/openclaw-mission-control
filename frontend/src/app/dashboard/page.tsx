@@ -908,6 +908,32 @@ export default function DashboardPage() {
               </div>
             ) : null}
 
+            {boards.length === 0 && agents.length === 0 && !boardsQuery.isLoading && !agentsQuery.isLoading ? (
+              <section className="mb-4 rounded-xl border border-blue-200 bg-gradient-to-br from-blue-50 to-slate-50 p-5 md:p-6 shadow-sm">
+                <h3 className="text-lg font-semibold text-slate-900">Getting Started</h3>
+                <p className="mt-1 text-sm text-slate-600">
+                  Welcome to VantageClaw. Set up your workspace in a few steps:
+                </p>
+                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  {[
+                    { label: "Create a board", href: "/boards/new", done: boards.length > 0, description: "Organize tasks and route work to agents" },
+                    { label: "Connect email", href: "/org-settings", done: false, description: "Link Outlook or Zoho for email triage" },
+                    { label: "Add an API key", href: "/org-settings", done: false, description: "Bring your own OpenRouter key for AI" },
+                    { label: "Explore chat", href: "/chat", done: false, description: "Talk to your AI agent directly" },
+                  ].map((step) => (
+                    <Link
+                      key={step.label}
+                      href={step.href}
+                      className="flex flex-col gap-1 rounded-lg border border-slate-200 bg-white p-3 transition hover:-translate-y-0.5 hover:shadow-md"
+                    >
+                      <span className="text-sm font-medium text-slate-800">{step.label}</span>
+                      <span className="text-xs text-slate-500">{step.description}</span>
+                    </Link>
+                  ))}
+                </div>
+              </section>
+            ) : null}
+
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
               <TopMetricCard
                 title="Online Agents"

@@ -119,7 +119,7 @@ class TestIndustryTemplates:
         from app.services.industry_templates import list_templates
 
         templates = list_templates()
-        assert len(templates) == 5
+        assert len(templates) == 17
         ids = {t["id"] for t in templates}
         assert "construction" in ids
         assert "waste_management" in ids

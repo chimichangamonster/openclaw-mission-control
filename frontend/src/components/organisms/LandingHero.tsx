@@ -198,24 +198,44 @@ export function LandingHero() {
         <div className="features-grid">
           {[
             {
-              title: "Boards as ops maps",
+              title: "Multi-agent fleet",
               description:
-                "Keep tasks, priorities, dependencies, and ownership visible at a glance.",
+                "Specialized AI agents for every domain — each with the right model, tools, and knowledge for its job.",
+            },
+            {
+              title: "48+ skills, no code",
+              description:
+                "Document intake, invoicing, scheduling, competitor intel, email triage — all configurable without writing code.",
+            },
+            {
+              title: "Model orchestration",
+              description:
+                "Route each sub-task to the cheapest model that can handle it. Cut AI costs 60-80% without losing quality.",
             },
             {
               title: "Approvals that move",
               description:
-                "Queue, comment, and approve without losing context or slowing execution.",
+                "Human-in-the-loop approval queues. Agents propose, humans decide. No unsupervised actions.",
             },
             {
-              title: "Realtime signals",
+              title: "Per-org isolation",
               description:
-                "See work change as it happens: tasks, agent status, and approvals update live.",
+                "Each client gets their own gateway, workspace, and encrypted data store. No cross-tenant leakage.",
+            },
+            {
+              title: "Realtime monitoring",
+              description:
+                "Live agent status, cost tracking, session health, and audit trails — all in one dashboard.",
+            },
+            {
+              title: "Industry templates",
+              description:
+                "Construction, waste management, staffing, professional services — pre-built workflows for your vertical.",
             },
             {
               title: "Audit trail built in",
               description:
-                "Every decision leaves a trail, so the board stays explainable and reviewable.",
+                "Every agent decision leaves a trail. SOC 2-ready infrastructure with encrypted backups.",
             },
           ].map((feature, idx) => (
             <div key={feature.title} className="feature-card">
@@ -224,6 +244,83 @@ export function LandingHero() {
               </div>
               <h3>{feature.title}</h3>
               <p>{feature.description}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="pricing-section" id="pricing">
+        <div className="pricing-header">
+          <h2>Simple, transparent pricing</h2>
+          <p>Start managed. Scale to dedicated. Go enterprise when you need full control.</p>
+        </div>
+        <div className="pricing-grid">
+          {[
+            {
+              tier: "Managed",
+              price: "$299",
+              period: "/mo",
+              description: "We run it. You use it.",
+              features: [
+                "Hosted on our infrastructure",
+                "Up to 3 agents",
+                "Email + calendar integration",
+                "Document processing",
+                "Onboarding + 30-day setup",
+              ],
+            },
+            {
+              tier: "Dedicated",
+              price: "$799",
+              period: "/mo",
+              highlight: true,
+              description: "Your infrastructure, our management.",
+              features: [
+                "Everything in Managed",
+                "Unlimited agents",
+                "BYOK API keys",
+                "Custom LLM endpoints",
+                "Priority support",
+                "Custom skill development",
+              ],
+            },
+            {
+              tier: "Enterprise",
+              price: "Custom",
+              period: "",
+              description: "Self-hosted. Data never leaves your network.",
+              features: [
+                "Everything in Dedicated",
+                "Source license",
+                "On-prem or private cloud",
+                "SLA + dedicated support",
+                "Regional compliance (CAC, GDPR)",
+                "White-label option",
+              ],
+            },
+          ].map((plan) => (
+            <div
+              key={plan.tier}
+              className={`pricing-card ${plan.highlight ? "pricing-highlight" : ""}`}
+            >
+              <div className="pricing-card-header">
+                <h3>{plan.tier}</h3>
+                <div className="pricing-amount">
+                  <span className="pricing-price">{plan.price}</span>
+                  {plan.period ? (
+                    <span className="pricing-period">{plan.period}</span>
+                  ) : null}
+                </div>
+                <p className="pricing-description">{plan.description}</p>
+              </div>
+              <ul className="pricing-features">
+                {plan.features.map((f) => (
+                  <li key={f}>
+                    <span className="pricing-check">&#10003;</span>
+                    {f}
+                  </li>
+                ))}
+              </ul>
             </div>
           ))}
         </div>

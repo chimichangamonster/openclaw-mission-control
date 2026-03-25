@@ -132,11 +132,9 @@ export default function AgentsPage() {
         title="Agents"
         description={`${agents.length} agent${agents.length === 1 ? "" : "s"} total.`}
         headerActions={
-          agents.length > 0 ? (
-            <Button onClick={() => router.push("/agents/new")}>
-              New agent
-            </Button>
-          ) : null
+          <Button onClick={() => router.push("/agents/new")}>
+            New agent
+          </Button>
         }
         isAdmin={isAdmin}
         adminOnlyMessage="Only organization owners and admins can access agents."

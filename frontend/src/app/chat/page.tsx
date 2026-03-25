@@ -29,7 +29,6 @@ import { cn } from "@/lib/utils";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const BOARD_ID = "fc95c061-3c32-4c82-a87d-9e21225e59fd";
 const MAX_UPLOAD_SIZE = 10 * 1024 * 1024; // 10 MB
 const ALLOWED_UPLOAD_TYPES = new Set([
   "image/png", "image/jpeg", "image/gif", "image/webp", "image/svg+xml",
@@ -163,6 +162,29 @@ function parseHistory(history: unknown[]): ChatMessage[] {
 export default function ChatPage() {
   const { isSignedIn } = useAuth();
 
+  // Board resolution — pick first board with a gateway
+  const [boardId, setBoardId] = useState<string | null>(null);
+  const [boardResolving, setBoardResolving] = useState(true);
+
+  useEffect(() => {
+    if (!isSignedIn) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const raw: any = await customFetch("/api/v1/boards?limit=200", { method: "GET" });
+        if (cancelled) return;
+        const data = raw?.data ?? raw;
+        const items: any[] = data?.items ?? [];
+        const withGateway = items.find((b: any) => b.gateway_id);
+        if (withGateway) {
+          setBoardId(withGateway.id);
+        }
+      } catch { /* ignore */ }
+      finally { if (!cancelled) setBoardResolving(false); }
+    })();
+    return () => { cancelled = true; };
+  }, [isSignedIn]);
+
   // Session resolution
   const [sessionKey, setSessionKey] = useState<string | null>(null);
   const [sessionTokens, setSessionTokens] = useState<{ total: number; input: number; output: number; model: string } | null>(null);
@@ -199,13 +221,19 @@ export default function ChatPage() {
   // ─── Resolve The Claw's session on mount ──────────────────────────────────
 
   useEffect(() => {
-    if (!isSignedIn) return;
+    if (!isSignedIn || !boardId) {
+      if (!boardResolving && !boardId) {
+        setResolveError("No boards with a gateway found. Create a board first.");
+        setResolving(false);
+      }
+      return;
+    }
     let cancelled = false;
 
     (async () => {
       try {
         const raw: any = await customFetch(
-          `/api/v1/gateways/sessions?board_id=${BOARD_ID}`,
+          `/api/v1/gateways/sessions?board_id=${boardId}`,
           { method: "GET" },
         );
         if (cancelled) return;
@@ -235,7 +263,7 @@ export default function ChatPage() {
     return () => {
       cancelled = true;
     };
-  }, [isSignedIn]);
+  }, [isSignedIn, boardId, boardResolving]);
 
   // ─── Poll session tokens ───────────────────────────────────────────────────
 
@@ -244,7 +272,7 @@ export default function ChatPage() {
     const interval = setInterval(async () => {
       try {
         const raw: any = await customFetch(
-          `/api/v1/gateways/sessions?board_id=${BOARD_ID}`,
+          `/api/v1/gateways/sessions?board_id=${boardId}`,
           { method: "GET" },
         );
         const data = raw?.data ?? raw;
@@ -271,7 +299,7 @@ export default function ChatPage() {
     setMessagesLoading(true);
     try {
       const raw: any = await customFetch(
-        `/api/v1/gateways/sessions/${encodeURIComponent(key)}/history?board_id=${BOARD_ID}`,
+        `/api/v1/gateways/sessions/${encodeURIComponent(key)}/history?board_id=${boardId}`,
         { method: "GET" },
       );
       const data = raw?.data ?? raw;
@@ -378,7 +406,7 @@ export default function ChatPage() {
     formData.append("file", file);
 
     const baseUrl = process.env.NEXT_PUBLIC_API_URL || "";
-    const url = `${baseUrl}/api/v1/gateways/sessions/${encodeURIComponent(sessionKey)}/upload?board_id=${BOARD_ID}`;
+    const url = `${baseUrl}/api/v1/gateways/sessions/${encodeURIComponent(sessionKey)}/upload?board_id=${boardId}`;
 
     // Build auth headers (can't use customFetch — it forces Content-Type: application/json)
     const headers: Record<string, string> = {};
@@ -463,7 +491,7 @@ export default function ChatPage() {
         }));
       }
       await customFetch(
-        `/api/v1/gateways/sessions/${encodeURIComponent(sessionKey)}/message?board_id=${BOARD_ID}`,
+        `/api/v1/gateways/sessions/${encodeURIComponent(sessionKey)}/message?board_id=${boardId}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -495,7 +523,7 @@ export default function ChatPage() {
     const poll = setInterval(async () => {
       try {
         const raw: any = await customFetch(
-          `/api/v1/gateways/sessions/${encodeURIComponent(sessionKey)}/history?board_id=${BOARD_ID}`,
+          `/api/v1/gateways/sessions/${encodeURIComponent(sessionKey)}/history?board_id=${boardId}`,
           { method: "GET" },
         );
         const data = raw?.data ?? raw;
@@ -520,7 +548,7 @@ export default function ChatPage() {
     if (!sessionKey) return;
     try {
       await customFetch(
-        `/api/v1/gateways/sessions/${encodeURIComponent(sessionKey)}/abort?board_id=${BOARD_ID}`,
+        `/api/v1/gateways/sessions/${encodeURIComponent(sessionKey)}/abort?board_id=${boardId}`,
         { method: "POST" },
       );
     } catch { /* ignore */ }
@@ -535,7 +563,7 @@ export default function ChatPage() {
     setCommandLoading("compact");
     try {
       await customFetch(
-        `/api/v1/gateways/sessions/${encodeURIComponent(sessionKey)}/compact?board_id=${BOARD_ID}`,
+        `/api/v1/gateways/sessions/${encodeURIComponent(sessionKey)}/compact?board_id=${boardId}`,
         { method: "POST" },
       );
       await fetchHistory(sessionKey);
@@ -549,7 +577,7 @@ export default function ChatPage() {
     setCommandLoading("clear");
     try {
       await customFetch(
-        `/api/v1/gateways/sessions/${encodeURIComponent(sessionKey)}/reset?board_id=${BOARD_ID}`,
+        `/api/v1/gateways/sessions/${encodeURIComponent(sessionKey)}/reset?board_id=${boardId}`,
         { method: "POST" },
       );
       setMessages([]);
