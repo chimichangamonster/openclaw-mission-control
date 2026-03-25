@@ -43,11 +43,17 @@ import { Input } from "@/components/ui/input";
 import SearchableSelect from "@/components/ui/searchable-select";
 import { isOnboardingComplete } from "@/lib/onboarding";
 import { getSupportedTimezones } from "@/lib/timezones";
-import { getApiBaseUrl } from "@/lib/api-base";
+
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
+
+type ConfigCategory = {
+  key: string;
+  label: string;
+  item_count: number;
+};
 
 type IndustryTemplate = {
   id: string;
@@ -55,7 +61,7 @@ type IndustryTemplate = {
   description: string;
   icon: string;
   skill_count: number;
-  config_categories: string[];
+  config_categories: ConfigCategory[];
   skills?: string[];
   onboarding_step_count?: number;
   feature_flags?: string[];
@@ -206,6 +212,8 @@ export default function OnboardingPage() {
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [templateApplied, setTemplateApplied] = useState(false);
   const [recommendedTemplate, setRecommendedTemplate] = useState<string | null>(null);
+  const [excludedCategories, setExcludedCategories] = useState<Set<string>>(new Set());
+  const [applyingTemplate, setApplyingTemplate] = useState(false);
 
   // API Key
   const [apiKey, setApiKey] = useState("");
@@ -236,16 +244,17 @@ export default function OnboardingPage() {
         setProfileSaved(true);
         setStep("industry");
         // Auto-detect industry after profile save
-        const baseUrl = getApiBaseUrl();
         customFetch<{ status: number; data: AutoDetectResult }>(
-          `${baseUrl}/api/v1/industry-templates/auto-detect`,
+          `/api/v1/industry-templates/auto-detect`,
           { method: "GET" },
         )
           .then((res) => {
+            const HIDDEN_TEMPLATES = ["day_trading", "sports_betting"];
             if (
               res.status === 200 &&
               res.data.template_id &&
-              res.data.confidence >= 0.4
+              res.data.confidence >= 0.4 &&
+              !HIDDEN_TEMPLATES.includes(res.data.template_id)
             ) {
               setRecommendedTemplate(res.data.template_id);
             }
@@ -287,24 +296,26 @@ export default function OnboardingPage() {
   // Load templates
   useEffect(() => {
     if (!isSignedIn) return;
-    const baseUrl = getApiBaseUrl();
     customFetch<{ status: number; data: IndustryTemplate[] }>(
-      `${baseUrl}/api/v1/industry-templates`,
+      `/api/v1/industry-templates`,
       { method: "GET" },
     ).then((res) => {
-      if (res.status === 200) setTemplates(res.data);
+      if (res.status === 200) {
+        // Hide trading/betting templates — these are personal test tools, not business verticals
+        const HIDDEN_TEMPLATES = ["day_trading", "sports_betting"];
+        setTemplates(res.data.filter((t: IndustryTemplate) => !HIDDEN_TEMPLATES.includes(t.id)));
+      }
     }).catch(() => {});
   }, [isSignedIn]);
 
   // Load feature flags
   const loadFeatures = useCallback(async () => {
-    const baseUrl = getApiBaseUrl();
     try {
-      const res = await customFetch<{ status: number; data: Record<string, boolean> }>(
-        `${baseUrl}/api/v1/organization-settings/feature-flags`,
+      const res = await customFetch<{ status: number; data: { feature_flags: Record<string, boolean> } }>(
+        `/api/v1/organization-settings/feature-flags`,
         { method: "GET" },
       );
-      if (res.status === 200) setFeatures(res.data);
+      if (res.status === 200) setFeatures(res.data.feature_flags);
     } catch {
       // fallback
     }
@@ -312,10 +323,9 @@ export default function OnboardingPage() {
 
   // Load onboarding status
   const loadOnboardingStatus = useCallback(async () => {
-    const baseUrl = getApiBaseUrl();
     try {
       const res = await customFetch<{ status: number; data: OnboardingStatus }>(
-        `${baseUrl}/api/v1/industry-templates/onboarding/status`,
+        `/api/v1/industry-templates/onboarding/status`,
         { method: "GET" },
       );
       if (res.status === 200) setOnboardingStatus(res.data);
@@ -347,20 +357,42 @@ export default function OnboardingPage() {
     }
   };
 
-  const handleApplyTemplate = async (templateId: string) => {
-    const baseUrl = getApiBaseUrl();
+  const handleSelectTemplate = (templateId: string) => {
+    setSelectedTemplate(templateId);
+    setExcludedCategories(new Set());
     setError(null);
+  };
+
+  const handleToggleCategory = (categoryKey: string) => {
+    setExcludedCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(categoryKey)) {
+        next.delete(categoryKey);
+      } else {
+        next.add(categoryKey);
+      }
+      return next;
+    });
+  };
+
+  const handleApplyTemplate = async () => {
+    if (!selectedTemplate) return;
+    setError(null);
+    setApplyingTemplate(true);
     try {
-      await customFetch(`${baseUrl}/api/v1/industry-templates/${templateId}/apply`, {
+      await customFetch(`/api/v1/industry-templates/${selectedTemplate}/apply`, {
         method: "POST",
-        body: JSON.stringify({}),
+        body: JSON.stringify({
+          exclude_categories: Array.from(excludedCategories),
+        }),
       });
-      setSelectedTemplate(templateId);
       setTemplateApplied(true);
       await loadFeatures();
       setStep("api-key");
     } catch {
       setError("Failed to apply template.");
+    } finally {
+      setApplyingTemplate(false);
     }
   };
 
@@ -375,10 +407,9 @@ export default function OnboardingPage() {
       setStep("features");
       return;
     }
-    const baseUrl = getApiBaseUrl();
     setError(null);
     try {
-      await customFetch(`${baseUrl}/api/v1/organization-settings/openrouter-key`, {
+      await customFetch(`/api/v1/organization-settings/openrouter-key`, {
         method: "POST",
         body: JSON.stringify({ key: apiKey.trim() }),
       });
@@ -390,12 +421,11 @@ export default function OnboardingPage() {
   };
 
   const handleSaveFeatures = async () => {
-    const baseUrl = getApiBaseUrl();
     setError(null);
     try {
-      await customFetch(`${baseUrl}/api/v1/organization-settings/feature-flags`, {
+      await customFetch(`/api/v1/organization-settings`, {
         method: "PUT",
-        body: JSON.stringify(features),
+        body: JSON.stringify({ feature_flags: features }),
       });
       setFeaturesSaved(true);
       await loadOnboardingStatus();
@@ -477,65 +507,134 @@ export default function OnboardingPage() {
           if (b.id === recommendedTemplate) return 1;
           return 0;
         });
+        const activeTemplate = templates.find((t) => t.id === selectedTemplate);
         return (
           <div className="space-y-6">
             <p className="text-sm text-[color:var(--text-muted)]">
               Select your industry to pre-configure features, skills, and settings.
               You can customize everything later.
             </p>
-            <div className="grid gap-4 md:grid-cols-2">
-              {sortedTemplates.map((t) => {
-                const isRecommended = t.id === recommendedTemplate;
-                return (
-                  <button
-                    key={t.id}
-                    onClick={() => handleApplyTemplate(t.id)}
-                    className={`relative text-left rounded-xl border p-4 transition-all hover:shadow-md ${
-                      selectedTemplate === t.id
-                        ? "border-blue-500 bg-blue-50 dark:bg-blue-950"
-                        : isRecommended
+
+            {/* Template grid — hidden once a template is selected for customization */}
+            {!selectedTemplate && (
+              <div className="grid gap-4 md:grid-cols-2">
+                {sortedTemplates.map((t) => {
+                  const isRecommended = t.id === recommendedTemplate;
+                  return (
+                    <button
+                      key={t.id}
+                      onClick={() => handleSelectTemplate(t.id)}
+                      className={`relative text-left rounded-xl border p-4 transition-all hover:shadow-md ${
+                        isRecommended
                           ? "border-amber-400 bg-amber-50/50 dark:border-amber-600 dark:bg-amber-950/30 hover:border-amber-500"
                           : "border-[color:var(--border)] hover:border-blue-300"
-                    }`}
-                  >
-                    {isRecommended && (
-                      <span className="absolute -top-2.5 right-3 inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-900 px-2.5 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-200">
-                        <Sparkles className="h-3 w-3" />
-                        Recommended for you
-                      </span>
-                    )}
-                    <div className="flex items-center gap-3 mb-2">
-                      <span className="text-2xl">{t.icon}</span>
-                      <h3 className="font-semibold text-[color:var(--text)]">
-                        {t.name}
-                      </h3>
-                    </div>
-                    <p className="text-sm text-[color:var(--text-muted)]">
-                      {t.description}
-                    </p>
-                    <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-[color:var(--text-muted)]">
-                      <span className="inline-flex items-center gap-1">
-                        <Layers className="h-3 w-3" />
-                        {t.skill_count} skills included
-                      </span>
-                      {t.onboarding_step_count != null && t.onboarding_step_count > 0 && (
-                        <span className="inline-flex items-center gap-1">
-                          <ListChecks className="h-3 w-3" />
-                          {t.onboarding_step_count} setup steps
+                      }`}
+                    >
+                      {isRecommended && (
+                        <span className="absolute -top-2.5 right-3 inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-900 px-2.5 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-200">
+                          <Sparkles className="h-3 w-3" />
+                          Recommended
                         </span>
                       )}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+                      <div className="flex items-center gap-3 mb-2">
+                        <span className="text-2xl">{t.icon}</span>
+                        <h3 className="font-semibold text-[color:var(--text)]">
+                          {t.name}
+                        </h3>
+                      </div>
+                      <p className="text-sm text-[color:var(--text-muted)]">
+                        {t.description}
+                      </p>
+                      <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-[color:var(--text-muted)]">
+                        <span className="inline-flex items-center gap-1">
+                          <Layers className="h-3 w-3" />
+                          {t.skill_count} skills
+                        </span>
+                        {t.onboarding_step_count != null && t.onboarding_step_count > 0 && (
+                          <span className="inline-flex items-center gap-1">
+                            <ListChecks className="h-3 w-3" />
+                            {t.onboarding_step_count} setup steps
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Customize panel — shown after selecting a template */}
+            {selectedTemplate && activeTemplate && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950 p-4">
+                  <span className="text-2xl">{activeTemplate.icon}</span>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-[color:var(--text)]">
+                      {activeTemplate.name}
+                    </h3>
+                    <p className="text-xs text-[color:var(--text-muted)]">
+                      {activeTemplate.description}
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedTemplate(null);
+                      setExcludedCategories(new Set());
+                    }}
+                  >
+                    <RotateCcw className="h-3 w-3" /> Change
+                  </Button>
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-medium text-[color:var(--text)] mb-3">
+                    Choose what to set up
+                  </h3>
+                  <p className="text-xs text-[color:var(--text-muted)] mb-3">
+                    Uncheck anything your business doesn&apos;t need. You can always add these later.
+                  </p>
+                  <div className="space-y-2">
+                    {activeTemplate.config_categories.map((cat) => (
+                      <label
+                        key={cat.key}
+                        className="flex items-center gap-3 rounded-lg border border-[color:var(--border)] p-3 cursor-pointer hover:bg-[color:var(--surface-muted)] transition-colors"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={!excludedCategories.has(cat.key)}
+                          onChange={() => handleToggleCategory(cat.key)}
+                          className="h-4 w-4 shrink-0 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <span className="text-sm font-medium text-[color:var(--text)]">
+                            {cat.label}
+                          </span>
+                          <span className="ml-2 text-xs text-[color:var(--text-muted)]">
+                            ({cat.item_count} defaults)
+                          </span>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="flex gap-3 pt-2">
-              <Button variant="outline" onClick={goBack}>
+              <Button variant="outline" onClick={selectedTemplate ? () => { setSelectedTemplate(null); setExcludedCategories(new Set()); } : goBack}>
                 <ArrowLeft className="h-4 w-4" /> Back
               </Button>
-              <Button variant="outline" onClick={handleSkipTemplate} className="ml-auto">
-                Skip for now <ArrowRight className="h-4 w-4" />
-              </Button>
+              {selectedTemplate ? (
+                <Button onClick={handleApplyTemplate} disabled={applyingTemplate} className="ml-auto">
+                  {applyingTemplate ? "Applying..." : "Apply & Continue"} <ArrowRight className="h-4 w-4" />
+                </Button>
+              ) : (
+                <Button variant="outline" onClick={handleSkipTemplate} className="ml-auto">
+                  Skip for now <ArrowRight className="h-4 w-4" />
+                </Button>
+              )}
             </div>
           </div>
         );

@@ -45,7 +45,6 @@ const MARKETPLACE_SKILLS_SORTABLE_COLUMNS = [
   "name",
   "category",
   "risk",
-  "source",
   "updated_at",
 ];
 const MARKETPLACE_DEFAULT_PAGE_SIZE = 25;
@@ -769,18 +768,18 @@ export default function SkillsMarketplacePage() {
     <>
       <DashboardPageLayout
         signedOut={{
-          message: "Sign in to manage marketplace skills.",
+          message: "Sign in to manage skills.",
           forceRedirectUrl: "/skills/marketplace",
         }}
-        title="Skills Marketplace"
+        title="Skill Library"
         description={
           selectedPack
-            ? `${totalSkills} skill${
+            ? `${totalSkills} curated skill${
                 totalSkills === 1 ? "" : "s"
               } for ${selectedPack.name}.`
-            : `${totalSkills} skill${
+            : `${totalSkills} curated skill${
                 totalSkills === 1 ? "" : "s"
-              } synced from packs.`
+              } available.`
         }
         isAdmin={isAdmin}
         adminOnlyMessage="Only organization owners and admins can manage skills."

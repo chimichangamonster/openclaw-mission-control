@@ -743,6 +743,125 @@ async def dependency_status():
     return {"ok": all_ok, "dependencies": checks}
 
 
+@app.get("/api/v1/system/health", tags=["health"], summary="Aggregated System Health")
+async def system_health():
+    """Aggregate platform health into a single status: healthy / degraded / down.
+
+    Checks: PostgreSQL, Redis, gateway listener, circuit breakers, recent errors,
+    and cron job health.
+    """
+    from app.core.resilience import gateway_rpc_breaker, openrouter_breaker
+    from app.core.prometheus import gateway_listener_connected
+    from app.services.error_tracker import ERROR_PREFIX
+
+    issues: list[str] = []
+    components: dict[str, dict] = {}
+
+    # ── PostgreSQL ─────────────────────────────────────────────────────────
+    try:
+        from app.db.session import async_engine
+        async with async_engine.connect() as conn:
+            await conn.execute(__import__("sqlalchemy").text("SELECT 1"))
+        components["postgresql"] = {"status": "ok"}
+    except Exception as exc:
+        components["postgresql"] = {"status": "down", "error": str(exc)[:100]}
+        issues.append("postgresql down")
+
+    # ── Redis ──────────────────────────────────────────────────────────────
+    try:
+        import redis as redis_lib
+        r = redis_lib.Redis.from_url(
+            settings.rate_limit_redis_url or "redis://redis:6379", socket_timeout=2,
+        )
+        r.ping()
+        components["redis"] = {"status": "ok"}
+    except Exception as exc:
+        components["redis"] = {"status": "down", "error": str(exc)[:100]}
+        issues.append("redis down")
+
+    # ── Gateway Listener ───────────────────────────────────────────────────
+    try:
+        gw_connected = gateway_listener_connected._value.get()  # type: ignore[union-attr]
+        if gw_connected == 1:
+            components["gateway_listener"] = {"status": "ok"}
+        else:
+            components["gateway_listener"] = {"status": "disconnected"}
+            issues.append("gateway listener disconnected")
+    except Exception:
+        components["gateway_listener"] = {"status": "unknown"}
+
+    # ── Circuit Breakers ───────────────────────────────────────────────────
+    cb_issues = []
+    for name, breaker in [("openrouter", openrouter_breaker), ("gateway_rpc", gateway_rpc_breaker)]:
+        state = breaker.state
+        if state == "open":
+            cb_issues.append(f"{name} circuit breaker open")
+        components[f"cb_{name}"] = {"state": state, "failures": breaker._failure_count}
+    issues.extend(cb_issues)
+
+    # ── Recent Errors (last 1 hour) ────────────────────────────────────────
+    error_count_1h = 0
+    try:
+        from app.db.session import async_session_maker
+        from app.models.activity_events import ActivityEvent
+        from app.core.time import utcnow
+        from datetime import timedelta
+        from sqlalchemy import func
+
+        async with async_session_maker() as session:
+            one_hour_ago = utcnow() - timedelta(hours=1)
+            result = await session.execute(
+                __import__("sqlalchemy").select(func.count(ActivityEvent.id)).where(
+                    ActivityEvent.event_type.startswith(ERROR_PREFIX),
+                    ActivityEvent.created_at >= one_hour_ago,
+                )
+            )
+            error_count_1h = result.scalar() or 0
+    except Exception:
+        pass
+
+    components["recent_errors"] = {"count_1h": error_count_1h}
+    if error_count_1h >= 10:
+        issues.append(f"{error_count_1h} errors in last hour")
+
+    # ── Cron Health (last failed status) ───────────────────────────────────
+    cron_failed = 0
+    try:
+        import json
+        from pathlib import Path
+        jobs_path = Path("/app/gateway-cron/jobs.json")
+        if jobs_path.exists():
+            jobs = json.loads(jobs_path.read_text())
+            for job in jobs:
+                if job.get("last_status") in ("error", "failed"):
+                    cron_failed += 1
+            components["cron_jobs"] = {"failed": cron_failed, "total": len(jobs)}
+        else:
+            components["cron_jobs"] = {"status": "no_data"}
+    except Exception:
+        components["cron_jobs"] = {"status": "unknown"}
+
+    if cron_failed > 0:
+        issues.append(f"{cron_failed} cron job(s) in failed state")
+
+    # ── Overall Status ─────────────────────────────────────────────────────
+    critical = any(
+        k in ("postgresql down", "redis down") for k in issues
+    )
+    if critical:
+        status = "down"
+    elif issues:
+        status = "degraded"
+    else:
+        status = "healthy"
+
+    return {
+        "status": status,
+        "issues": issues,
+        "components": components,
+    }
+
+
 api_v1 = APIRouter(prefix="/api/v1")
 api_v1.include_router(auth_router)
 api_v1.include_router(agent_router)

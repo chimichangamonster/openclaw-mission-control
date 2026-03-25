@@ -13,6 +13,7 @@ import {
   Folder,
   Building2,
   Calendar,
+  HelpCircle,
   LayoutGrid,
   Mail,
   MessageSquare,
@@ -402,7 +403,7 @@ export function DashboardSidebar() {
                     )}
                   >
                     <Store className="h-4 w-4" />
-                    Marketplace
+                    Skill Library
                   </Link>
                   <Link
                     href="/skills/packs"
@@ -467,6 +468,20 @@ export function DashboardSidebar() {
                 </Link>
               ) : null}
             </div>
+          </div>
+          <div className="mt-2">
+            <Link
+              href="/help"
+              className={cn(
+                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-[color:var(--text)] transition",
+                pathname.startsWith("/help")
+                  ? "bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)] font-medium"
+                  : "hover:bg-[color:var(--surface-muted)]",
+              )}
+            >
+              <HelpCircle className="h-4 w-4" />
+              Help & Support
+            </Link>
           </div>
         </nav>
       </div>

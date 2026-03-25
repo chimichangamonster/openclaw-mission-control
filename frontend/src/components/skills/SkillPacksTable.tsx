@@ -74,20 +74,7 @@ export function SkillPacksTable({
           </div>
         ),
       },
-      {
-        accessorKey: "source_url",
-        header: "Pack URL",
-        cell: ({ row }) => (
-          <Link
-            href={row.original.source_url}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-1 text-sm font-medium text-slate-700 hover:text-blue-600"
-          >
-            {truncate(row.original.source_url, 48)}
-          </Link>
-        ),
-      },
+      // Pack URL column hidden — internal repo details not exposed to users
       {
         accessorKey: "branch",
         header: "Branch",

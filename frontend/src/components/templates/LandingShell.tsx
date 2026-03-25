@@ -31,6 +31,7 @@ export function LandingShell({ children }: { children: ReactNode }) {
 
           <div className="nav-links">
             <Link href="#capabilities">Capabilities</Link>
+            <Link href="#security">Security</Link>
             <Link href="#pricing">Pricing</Link>
             <Link href="/boards">Boards</Link>
             <Link href="/dashboard">Dashboard</Link>

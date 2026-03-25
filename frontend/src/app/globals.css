@@ -768,6 +768,114 @@ body {
   color: var(--neutral-700);
 }
 
+/* ── Trust & Security Section ────────────────────────────────── */
+
+.landing-enterprise .trust-section {
+  padding: 5rem 2.5rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.landing-enterprise .trust-header {
+  text-align: center;
+  margin-bottom: 3rem;
+}
+
+.landing-enterprise .trust-header h2 {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--primary-navy);
+  margin-bottom: 1rem;
+  letter-spacing: -0.02em;
+}
+
+.landing-enterprise .trust-header p {
+  font-size: 16px;
+  color: var(--neutral-700);
+  max-width: 640px;
+  margin: 0 auto;
+  line-height: 1.6;
+}
+
+.landing-enterprise .trust-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.5rem;
+  margin-bottom: 2.5rem;
+}
+
+.landing-enterprise .trust-card {
+  background: var(--neutral-50);
+  border: 1px solid var(--neutral-200);
+  border-radius: 16px;
+  padding: 2rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.landing-enterprise .trust-card:hover {
+  border-color: var(--primary-navy);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+}
+
+.landing-enterprise .trust-icon {
+  font-size: 28px;
+  margin-bottom: 1rem;
+}
+
+.landing-enterprise .trust-card h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--primary-navy);
+  margin-bottom: 0.75rem;
+}
+
+.landing-enterprise .trust-card p {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--neutral-700);
+}
+
+.landing-enterprise .soc2-banner {
+  background: linear-gradient(135deg, var(--primary-navy), #1e3a5f);
+  border-radius: 20px;
+  padding: 3rem;
+  color: #ffffff;
+}
+
+.landing-enterprise .soc2-content h3 {
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  color: #ffffff;
+}
+
+.landing-enterprise .soc2-content p {
+  font-size: 15px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.85);
+  max-width: 640px;
+  margin-bottom: 1.5rem;
+}
+
+.landing-enterprise .soc2-controls {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+}
+
+.landing-enterprise .soc2-control {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.landing-enterprise .soc2-check {
+  color: #4ade80;
+  font-weight: 700;
+}
+
 /* ── Pricing Section ──────────────────────────────────────────── */
 
 .landing-enterprise .pricing-section {
@@ -1081,6 +1189,14 @@ body {
     grid-template-columns: repeat(2, 1fr);
   }
 
+  .landing-enterprise .trust-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .landing-enterprise .soc2-controls {
+    grid-template-columns: 1fr;
+  }
+
   .landing-enterprise .footer-content {
     grid-template-columns: 1fr 1fr;
   }
@@ -1114,6 +1230,22 @@ body {
   }
 
   .landing-enterprise .features-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .landing-enterprise .trust-section {
+    padding: 4.5rem 1.25rem;
+  }
+
+  .landing-enterprise .trust-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .landing-enterprise .soc2-banner {
+    padding: 2rem;
+  }
+
+  .landing-enterprise .soc2-controls {
     grid-template-columns: 1fr;
   }
 

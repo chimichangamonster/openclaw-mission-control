@@ -249,6 +249,80 @@ export function LandingHero() {
         </div>
       </section>
 
+      <section className="trust-section" id="security">
+        <div className="trust-header">
+          <h2>Built for trust. Engineered for compliance.</h2>
+          <p>
+            When AI agents handle your invoicing, email, and client data, security
+            isn't optional — it's the foundation.
+          </p>
+        </div>
+        <div className="trust-grid">
+          <div className="trust-card">
+            <div className="trust-icon">&#x1F6E1;</div>
+            <h3>Curated skills, not a marketplace</h3>
+            <p>
+              Open skill marketplaces like ClawHub saw 820+ malicious skills in a
+              single incident. VantageClaw maintains 48 skills in-house — every one
+              reviewed, tested, and mounted read-only. No community uploads. No
+              supply chain risk.
+            </p>
+          </div>
+          <div className="trust-card">
+            <div className="trust-icon">&#x1F512;</div>
+            <h3>AES-256-GCM encryption</h3>
+            <p>
+              All secrets and API keys encrypted at rest with authenticated
+              encryption. HKDF-SHA256 key derivation with versioned wire format
+              supports key rotation without downtime.
+            </p>
+          </div>
+          <div className="trust-card">
+            <div className="trust-icon">&#x1F50D;</div>
+            <h3>Audit trail with dual-write</h3>
+            <p>
+              Every action logged to both PostgreSQL and centralized log aggregation
+              — tamper-independent copies. Anti-backdating prevents log manipulation.
+              Full audit history for compliance reviews.
+            </p>
+          </div>
+          <div className="trust-card">
+            <div className="trust-icon">&#x1F3E2;</div>
+            <h3>Per-org gateway isolation</h3>
+            <p>
+              Each client organization gets its own gateway container, workspace,
+              encrypted data store, and skill set. No cross-tenant data leakage.
+              RBAC with 5 role levels.
+            </p>
+          </div>
+        </div>
+        <div className="soc2-banner">
+          <div className="soc2-content">
+            <h3>SOC 2-ready infrastructure</h3>
+            <p>
+              VantageClaw has implemented controls across all five SOC 2 Trust
+              Service Criteria — Security, Availability, Confidentiality, Processing
+              Integrity, and Privacy. Formal Type I certification is in progress.
+            </p>
+            <div className="soc2-controls">
+              {[
+                "Encrypted backups with automated verification",
+                "Vulnerability scanning (pip-audit, Trivy, Bandit)",
+                "Platform admin role separation (owner vs operator)",
+                "Per-org data retention policies",
+                "Input sanitization and sensitive data redaction",
+                "Content filtering for regulated deployments",
+              ].map((control) => (
+                <div key={control} className="soc2-control">
+                  <span className="soc2-check">&#10003;</span>
+                  {control}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section className="pricing-section" id="pricing">
         <div className="pricing-header">
           <h2>Simple, transparent pricing</h2>

@@ -183,29 +183,7 @@ export function MarketplaceSkillsTable({
           </Badge>
         ),
       },
-      {
-        accessorKey: "source",
-        header: "Source",
-        cell: ({ row }) => {
-          const sourceHref = row.original.source || row.original.source_url;
-
-          if (!sourceHref) {
-            return <span className="text-sm text-slate-400">No source</span>;
-          }
-
-          return (
-            <Link
-              href={sourceHref}
-              target="_blank"
-              rel="noreferrer"
-              className="text-sm font-medium text-slate-700 hover:text-blue-600 hover:underline"
-              title={sourceHref}
-            >
-              {truncate(sourceHref, 36)}
-            </Link>
-          );
-        },
-      },
+      // Source column hidden — internal implementation detail, not exposed to users
       {
         id: "installed_on",
         header: "Installed On",
