@@ -19,7 +19,15 @@ import {
 } from "lucide-react";
 
 import { DashboardSidebar } from "@/components/organisms/DashboardSidebar";
+import { WelcomeModal } from "@/components/organisms/WelcomeModal";
+import {
+  BudgetSpendWidget,
+  CronJobsWidget,
+  UpcomingEventsWidget,
+  InvoiceSummaryWidget,
+} from "@/components/organisms/dashboard";
 import { DashboardShell } from "@/components/templates/DashboardShell";
+import { useFeatureFlags } from "@/lib/use-feature-flags";
 import { Markdown } from "@/components/atoms/Markdown";
 import { SignedOutPanel } from "@/components/auth/SignedOutPanel";
 import { ApiError } from "@/api/mutator";
@@ -478,6 +486,7 @@ function InfoBlock({
 export default function DashboardPage() {
   const router = useRouter();
   const { isSignedIn } = useAuth();
+  const { isFeatureEnabled } = useFeatureFlags(Boolean(isSignedIn));
 
   const boardsQuery = useListBoardsApiV1BoardsGet<listBoardsApiV1BoardsGetResponse, ApiError>(
     { limit: 200 },
@@ -900,6 +909,7 @@ export default function DashboardPage() {
       </SignedOut>
       <SignedIn>
         <DashboardSidebar />
+        <WelcomeModal />
         <main className="flex-1 overflow-y-auto bg-slate-50">
           <div className="p-4 md:p-8">
             {metricsQuery.error ? (
@@ -966,6 +976,13 @@ export default function DashboardPage() {
               />
             </div>
 
+            {(isFeatureEnabled("cost_tracker") || isFeatureEnabled("cron_jobs")) ? (
+              <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                {isFeatureEnabled("cost_tracker") ? <BudgetSpendWidget /> : null}
+                {isFeatureEnabled("cron_jobs") ? <CronJobsWidget /> : null}
+              </div>
+            ) : null}
+
             <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
               <InfoBlock
                 title="Workload"
@@ -985,6 +1002,13 @@ export default function DashboardPage() {
                 rows={gatewayRows}
               />
             </div>
+
+            {(isFeatureEnabled("google_calendar") || isFeatureEnabled("bookkeeping")) ? (
+              <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                {isFeatureEnabled("bookkeeping") ? <InvoiceSummaryWidget /> : null}
+                {isFeatureEnabled("google_calendar") ? <UpcomingEventsWidget /> : null}
+              </div>
+            ) : null}
 
             <section className="mt-4 rounded-xl border border-slate-200 bg-white p-4 md:p-6 shadow-sm">
               <div className="mb-3 flex items-center justify-between gap-3">
