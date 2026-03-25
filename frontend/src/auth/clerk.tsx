@@ -44,6 +44,8 @@ export function SignedIn(props: { children: ReactNode }) {
   if (isWeChatAuthMode()) {
     return hasWeChatAuthToken() ? <>{props.children}</> : null;
   }
+  // Dual-mode: WeChat token present alongside Clerk → treat as signed in
+  if (hasWeChatAuthToken()) return <>{props.children}</>;
   if (!isClerkEnabled()) return null;
   return <ClerkSignedIn>{props.children}</ClerkSignedIn>;
 }
@@ -55,6 +57,8 @@ export function SignedOut(props: { children: ReactNode }) {
   if (isWeChatAuthMode()) {
     return hasWeChatAuthToken() ? null : <>{props.children}</>;
   }
+  // Dual-mode: WeChat token present → not signed out
+  if (hasWeChatAuthToken()) return null;
   if (!isClerkEnabled()) return <>{props.children}</>;
   return <ClerkSignedOut>{props.children}</ClerkSignedOut>;
 }
@@ -80,7 +84,7 @@ export function useUser() {
       user: null,
     } as const;
   }
-  if (isWeChatAuthMode()) {
+  if (isWeChatAuthMode() || hasWeChatAuthToken()) {
     return {
       isLoaded: true,
       isSignedIn: hasWeChatAuthToken(),
@@ -104,7 +108,7 @@ export function useAuth() {
       getToken: async () => token,
     } as const;
   }
-  if (isWeChatAuthMode()) {
+  if (isWeChatAuthMode() || hasWeChatAuthToken()) {
     const token = getWeChatAuthToken();
     return {
       isLoaded: true,

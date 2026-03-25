@@ -55,6 +55,9 @@ class Settings(BaseSettings):
     wechat_app_secret: str = ""
     wechat_agent_id: str = ""
 
+    # WeChat as secondary login alongside Clerk (dual-mode)
+    wechat_login_enabled: bool = False
+
     cors_origins: str = ""
     base_url: str = ""
 

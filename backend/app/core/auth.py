@@ -522,6 +522,22 @@ async def get_auth_context(
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
         return wechat_auth
 
+    # Dual-mode: try WeChat HMAC token before Clerk JWT when enabled.
+    # WeChat tokens have format "base64.hex" (1 dot), JWTs have "x.y.z" (2 dots).
+    if settings.wechat_login_enabled and settings.wechat_app_secret:
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header[7:]
+            if token.count(".") == 1:
+                wechat_auth = await _resolve_wechat_auth_context(
+                    request=request,
+                    session=session,
+                    required=False,
+                )
+                if wechat_auth is not None:
+                    return wechat_auth
+                # Fall through to Clerk if WeChat verification failed
+
     request_state = await _authenticate_clerk_request(request)
     if request_state.status != AuthStatus.SIGNED_IN or not isinstance(request_state.payload, dict):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
@@ -568,6 +584,20 @@ async def get_auth_context_optional(
             session=session,
             required=False,
         )
+
+    # Dual-mode: try WeChat HMAC token before Clerk JWT when enabled.
+    if settings.wechat_login_enabled and settings.wechat_app_secret:
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header[7:]
+            if token.count(".") == 1:
+                wechat_auth = await _resolve_wechat_auth_context(
+                    request=request,
+                    session=session,
+                    required=False,
+                )
+                if wechat_auth is not None:
+                    return wechat_auth
 
     request_state = await _authenticate_clerk_request(request)
     if request_state.status != AuthStatus.SIGNED_IN or not isinstance(request_state.payload, dict):

@@ -9,6 +9,7 @@ import {
   getLocalAuthToken,
   isLocalAuthMode,
 } from "@/auth/localAuth";
+import { clearWeChatAuthToken } from "@/auth/wechatAuth";
 import { LocalAuthLogin } from "@/components/organisms/LocalAuthLogin";
 
 export function AuthProvider({ children }: { children: ReactNode }) {

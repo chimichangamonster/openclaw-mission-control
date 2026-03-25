@@ -1,4 +1,5 @@
 import { getLocalAuthToken, isLocalAuthMode } from "@/auth/localAuth";
+import { getWeChatAuthToken } from "@/auth/wechatAuth";
 import { getApiBaseUrl } from "@/lib/api-base";
 
 type ClerkSession = {
@@ -51,6 +52,12 @@ export const customFetch = async <T>(
     const token = getLocalAuthToken();
     if (token) {
       headers.set("Authorization", `Bearer ${token}`);
+    }
+  }
+  if (!headers.has("Authorization")) {
+    const wechatToken = getWeChatAuthToken();
+    if (wechatToken) {
+      headers.set("Authorization", `Bearer ${wechatToken}`);
     }
   }
   if (!headers.has("Authorization")) {

@@ -7,6 +7,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.core.auth import AuthContext, get_auth_context
+from app.core.config import settings
 from app.core.time import utcnow
 from app.db.session import async_session_maker
 from app.models.users import CURRENT_TERMS_VERSION
@@ -109,4 +110,17 @@ async def accept_terms(auth: AuthContext = AUTH_CONTEXT_DEP) -> dict[str, Any]:
         "ok": True,
         "terms_version": CURRENT_TERMS_VERSION,
         "accepted_at": now.isoformat(),
+    }
+
+
+@router.get("/providers", summary="List available auth providers")
+async def list_auth_providers() -> dict:
+    """Return which sign-in providers are enabled (no auth required)."""
+    return {
+        "primary": settings.auth_mode.value,
+        "wechat_login": (
+            settings.wechat_login_enabled
+            and bool(settings.wechat_corp_id)
+            and bool(settings.wechat_app_secret)
+        ),
     }
