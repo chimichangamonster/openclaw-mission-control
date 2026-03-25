@@ -21,6 +21,7 @@ import {
   Sun,
   TrendingUp,
   Settings,
+  Shield,
   Store,
   Clock,
   Tags,
@@ -284,6 +285,18 @@ export function DashboardSidebar() {
                 Cost & Usage
               </Link>
               ) : null}
+              <Link
+                href="/audit"
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-[color:var(--text)] transition",
+                  pathname.startsWith("/audit")
+                    ? "bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)] font-medium"
+                    : "hover:bg-[color:var(--surface-muted)]",
+                )}
+              >
+                <Shield className="h-4 w-4" />
+                Audit Log
+              </Link>
               <Link
                 href="/org-settings"
                 className={cn(

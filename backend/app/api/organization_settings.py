@@ -683,20 +683,47 @@ async def get_llm_routing_info(
 async def get_audit_log(
     org_ctx: OrganizationContext = Depends(require_org_member),
     limit: int = 50,
+    offset: int = 0,
+    action: str | None = None,
+    user_id: str | None = None,
 ):
-    """Get recent audit log entries for the organization."""
+    """Get audit log entries for the organization with optional filtering."""
     from app.models.audit_log import AuditLog
 
     org_id = org_ctx.organization.id
 
     async with async_session_maker() as session:
-        result = await session.execute(
+        stmt = (
             select(AuditLog)
             .where(AuditLog.organization_id == org_id)
-            .order_by(AuditLog.created_at.desc())  # type: ignore[union-attr]
-            .limit(limit)
         )
+        if action:
+            stmt = stmt.where(AuditLog.action == action)
+        if user_id:
+            from uuid import UUID as _UUID
+            try:
+                stmt = stmt.where(AuditLog.user_id == _UUID(user_id))
+            except ValueError:
+                pass
+
+        # Total count for pagination
+        from sqlalchemy import func
+        count_stmt = select(func.count()).select_from(stmt.subquery())
+        total = (await session.execute(count_stmt)).scalar_one()
+
+        stmt = stmt.order_by(AuditLog.created_at.desc()).offset(offset).limit(limit)  # type: ignore[union-attr]
+        result = await session.execute(stmt)
         rows = result.scalars().all()
+
+        # Resolve user names
+        user_ids = {r.user_id for r in rows if r.user_id}
+        user_names: dict[str, str] = {}
+        if user_ids:
+            from app.models.users import User
+            users_result = await session.execute(
+                select(User.id, User.name).where(User.id.in_(user_ids))  # type: ignore[union-attr]
+            )
+            user_names = {str(uid): uname or "" for uid, uname in users_result.all()}
 
     return {
         "entries": [
@@ -707,9 +734,13 @@ async def get_audit_log(
                 "resource_id": str(r.resource_id) if r.resource_id else None,
                 "details": r.details,
                 "user_id": str(r.user_id) if r.user_id else None,
+                "user_name": user_names.get(str(r.user_id), "") if r.user_id else None,
                 "ip_address": r.ip_address,
                 "created_at": r.created_at.isoformat(),
             }
             for r in rows
         ],
+        "total": total,
+        "limit": limit,
+        "offset": offset,
     }
