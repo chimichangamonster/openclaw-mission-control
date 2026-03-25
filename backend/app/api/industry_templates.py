@@ -14,7 +14,7 @@ from app.db.session import async_session_maker
 from app.models.org_config import OrgConfigData, OrgOnboardingStep
 from app.models.organization_settings import OrganizationSettings
 from app.services.audit import log_audit
-from app.services.industry_templates import TEMPLATES, get_template, list_templates
+from app.services.industry_templates import TEMPLATES, detect_industry, get_template, list_templates
 from app.services.organizations import OrganizationContext
 
 router = APIRouter(prefix="/industry-templates", tags=["industry-templates"])
@@ -26,6 +26,27 @@ _ADMIN_DEP = Depends(require_org_role("admin"))
 async def list_available_templates(org_ctx: OrganizationContext = ORG_MEMBER_DEP):
     """List all available industry templates."""
     return list_templates()
+
+
+@router.get("/auto-detect")
+async def auto_detect_template(org_ctx: OrganizationContext = ORG_MEMBER_DEP):
+    """Auto-detect the best industry template based on org name and metadata.
+
+    Returns the recommended template_id and confidence score.
+    """
+    org = org_ctx.organization
+    result = detect_industry(
+        org_name=org.name,
+        org_description=getattr(org, "description", "") or "",
+        domain=getattr(org, "slug", "") or "",
+    )
+    # Enrich with template details if a match was found
+    if result["template_id"]:
+        template = get_template(result["template_id"])
+        if template:
+            result["template_name"] = template.name
+            result["template_icon"] = template.icon
+    return result
 
 
 @router.get("/{template_id}")

@@ -259,7 +259,80 @@ def list_templates() -> list[dict]:
             "description": t.description,
             "icon": t.icon,
             "skill_count": len(t.skills),
+            "skills": t.skills,
             "config_categories": list(t.default_config.keys()),
+            "onboarding_step_count": len(t.onboarding_steps),
+            "feature_flags": list(t.feature_flags.keys()),
         }
         for t in TEMPLATES.values()
     ]
+
+
+# ---------------------------------------------------------------------------
+# Industry auto-detection from org name / description
+# ---------------------------------------------------------------------------
+
+_INDUSTRY_KEYWORDS: dict[str, list[str]] = {
+    "construction": [
+        "construction", "contracting", "contractor", "building", "builder",
+        "trades", "plumbing", "plumber", "electrical", "electrician",
+        "hvac", "roofing", "roofer", "framing", "drywall", "concrete",
+        "excavation", "excavating", "demolition", "renovation", "remodel",
+        "carpentry", "carpenter", "masonry", "paving", "landscape",
+        "general contractor", "gc", "infrastructure", "civil",
+    ],
+    "waste": [
+        "waste", "recycling", "disposal", "hauling", "garbage", "trash",
+        "junk", "removal", "sanitation", "environmental", "cleanup",
+        "clean-up", "compost", "landfill", "dumpster", "bin",
+        "biomedical", "hazardous", "remediation",
+    ],
+    "staffing": [
+        "staffing", "recruitment", "recruiting", "temp", "temporary",
+        "placement", "hiring", "hr", "human resources", "workforce",
+        "employment", "agency", "personnel", "labour", "labor",
+        "manpower", "talent",
+    ],
+    "trading": [
+        "trading", "investing", "investment", "capital", "securities",
+        "brokerage", "portfolio", "hedge", "fund", "asset management",
+        "fintech", "financial", "wealth", "equity", "stock",
+    ],
+    "betting": [
+        "betting", "wagering", "sportsbook", "handicapping", "odds",
+        "gambling", "casino", "sports analytics",
+    ],
+}
+
+
+def detect_industry(
+    org_name: str,
+    org_description: str = "",
+    domain: str = "",
+) -> dict:
+    """Detect the most likely industry template from org context.
+
+    Returns ``{"template_id": str | None, "confidence": float, "all_scores": dict}``.
+    Confidence is 0.0–1.0. Returns None if no match above threshold.
+    """
+    text = f"{org_name} {org_description} {domain}".lower()
+    scores: dict[str, int] = {}
+
+    for template_id, keywords in _INDUSTRY_KEYWORDS.items():
+        score = sum(1 for kw in keywords if kw in text)
+        if score > 0:
+            scores[template_id] = score
+
+    if not scores:
+        return {"template_id": None, "confidence": 0.0, "all_scores": {}}
+
+    best = max(scores, key=scores.get)  # type: ignore[arg-type]
+    best_score = scores[best]
+    # Normalize: 1 keyword match = 0.4, 2 = 0.6, 3+ = 0.8+
+    confidence = min(1.0, 0.2 + best_score * 0.2)
+
+    return {
+        "template_id": best,
+        "confidence": round(confidence, 2),
+        "all_scores": {k: round(min(1.0, 0.2 + v * 0.2), 2) for k, v in scores.items()},
+    }

@@ -22,9 +22,11 @@ import {
   Globe,
   Key,
   Layers,
+  ListChecks,
   RotateCcw,
   Save,
   Settings,
+  Sparkles,
   User,
 } from "lucide-react";
 
@@ -54,6 +56,14 @@ type IndustryTemplate = {
   icon: string;
   skill_count: number;
   config_categories: string[];
+  skills?: string[];
+  onboarding_step_count?: number;
+  feature_flags?: string[];
+};
+
+type AutoDetectResult = {
+  template_id: string | null;
+  confidence: number;
 };
 
 type OnboardingStatus = {
@@ -82,6 +92,101 @@ const STEPS = [
 type StepKey = (typeof STEPS)[number]["key"];
 
 // ---------------------------------------------------------------------------
+// Feature flag metadata — grouped with human-readable descriptions
+// ---------------------------------------------------------------------------
+
+const FEATURE_GROUPS: {
+  label: string;
+  flags: { key: string; name: string; description: string }[];
+}[] = [
+  {
+    label: "Business Operations",
+    flags: [
+      {
+        key: "bookkeeping",
+        name: "Bookkeeping & Invoicing",
+        description: "Expense tracking, invoicing, GST calculations",
+      },
+      {
+        key: "document_generation",
+        name: "Document Generation",
+        description: "Proposals, reports, PDF generation",
+      },
+      {
+        key: "email",
+        name: "Email Integration",
+        description: "Sync and triage email from Outlook/Zoho",
+      },
+      {
+        key: "google_calendar",
+        name: "Google Calendar",
+        description: "Schedule events, manage calendar",
+      },
+      {
+        key: "microsoft_graph",
+        name: "Microsoft 365",
+        description: "OneDrive, Outlook Calendar, SharePoint",
+      },
+    ],
+  },
+  {
+    label: "Trading & Markets",
+    flags: [
+      {
+        key: "paper_trading",
+        name: "Paper Trading",
+        description: "Simulated stock trading with portfolios",
+      },
+      {
+        key: "paper_bets",
+        name: "Sports Betting",
+        description: "Odds comparison, bankroll management",
+      },
+      {
+        key: "watchlist",
+        name: "Stock Watchlist",
+        description: "Track tickers, RSI alerts, volume monitoring",
+      },
+      {
+        key: "polymarket",
+        name: "Prediction Markets",
+        description: "Polymarket trading research",
+      },
+      {
+        key: "crypto_trading",
+        name: "Crypto Trading",
+        description: "Swing trading, Fear & Greed index",
+      },
+    ],
+  },
+  {
+    label: "System",
+    flags: [
+      {
+        key: "cron_jobs",
+        name: "Scheduled Jobs",
+        description: "Automated daily/weekly agent tasks",
+      },
+      {
+        key: "approvals",
+        name: "Approvals",
+        description: "Human-in-the-loop review for agent actions",
+      },
+      {
+        key: "cost_tracker",
+        name: "Cost Tracker",
+        description: "Monitor AI spending and model usage",
+      },
+      {
+        key: "wechat",
+        name: "WeChat/WeCom",
+        description: "Enterprise WeChat messaging and login",
+      },
+    ],
+  },
+];
+
+// ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
 
@@ -100,6 +205,7 @@ export default function OnboardingPage() {
   const [templates, setTemplates] = useState<IndustryTemplate[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [templateApplied, setTemplateApplied] = useState(false);
+  const [recommendedTemplate, setRecommendedTemplate] = useState<string | null>(null);
 
   // API Key
   const [apiKey, setApiKey] = useState("");
@@ -129,6 +235,22 @@ export default function OnboardingPage() {
       onSuccess: () => {
         setProfileSaved(true);
         setStep("industry");
+        // Auto-detect industry after profile save
+        const baseUrl = getApiBaseUrl();
+        customFetch<{ status: number; data: AutoDetectResult }>(
+          `${baseUrl}/api/v1/industry-templates/auto-detect`,
+          { method: "GET" },
+        )
+          .then((res) => {
+            if (
+              res.status === 200 &&
+              res.data.template_id &&
+              res.data.confidence >= 0.4
+            ) {
+              setRecommendedTemplate(res.data.template_id);
+            }
+          })
+          .catch(() => {});
       },
       onError: (err) => {
         setError(err.message || "Something went wrong.");
@@ -348,7 +470,13 @@ export default function OnboardingPage() {
           </form>
         );
 
-      case "industry":
+      case "industry": {
+        // Sort templates so recommended one appears first
+        const sortedTemplates = [...templates].sort((a, b) => {
+          if (a.id === recommendedTemplate) return -1;
+          if (b.id === recommendedTemplate) return 1;
+          return 0;
+        });
         return (
           <div className="space-y-6">
             <p className="text-sm text-[color:var(--text-muted)]">
@@ -356,31 +484,50 @@ export default function OnboardingPage() {
               You can customize everything later.
             </p>
             <div className="grid gap-4 md:grid-cols-2">
-              {templates.map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => handleApplyTemplate(t.id)}
-                  className={`text-left rounded-xl border p-4 transition-all hover:shadow-md ${
-                    selectedTemplate === t.id
-                      ? "border-blue-500 bg-blue-50 dark:bg-blue-950"
-                      : "border-[color:var(--border)] hover:border-blue-300"
-                  }`}
-                >
-                  <div className="flex items-center gap-3 mb-2">
-                    <span className="text-2xl">{t.icon}</span>
-                    <h3 className="font-semibold text-[color:var(--text)]">
-                      {t.name}
-                    </h3>
-                  </div>
-                  <p className="text-sm text-[color:var(--text-muted)]">
-                    {t.description}
-                  </p>
-                  <div className="mt-3 flex items-center gap-2 text-xs text-[color:var(--text-muted)]">
-                    <Layers className="h-3 w-3" />
-                    {t.skill_count} skills
-                  </div>
-                </button>
-              ))}
+              {sortedTemplates.map((t) => {
+                const isRecommended = t.id === recommendedTemplate;
+                return (
+                  <button
+                    key={t.id}
+                    onClick={() => handleApplyTemplate(t.id)}
+                    className={`relative text-left rounded-xl border p-4 transition-all hover:shadow-md ${
+                      selectedTemplate === t.id
+                        ? "border-blue-500 bg-blue-50 dark:bg-blue-950"
+                        : isRecommended
+                          ? "border-amber-400 bg-amber-50/50 dark:border-amber-600 dark:bg-amber-950/30 hover:border-amber-500"
+                          : "border-[color:var(--border)] hover:border-blue-300"
+                    }`}
+                  >
+                    {isRecommended && (
+                      <span className="absolute -top-2.5 right-3 inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-900 px-2.5 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-200">
+                        <Sparkles className="h-3 w-3" />
+                        Recommended for you
+                      </span>
+                    )}
+                    <div className="flex items-center gap-3 mb-2">
+                      <span className="text-2xl">{t.icon}</span>
+                      <h3 className="font-semibold text-[color:var(--text)]">
+                        {t.name}
+                      </h3>
+                    </div>
+                    <p className="text-sm text-[color:var(--text-muted)]">
+                      {t.description}
+                    </p>
+                    <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-[color:var(--text-muted)]">
+                      <span className="inline-flex items-center gap-1">
+                        <Layers className="h-3 w-3" />
+                        {t.skill_count} skills included
+                      </span>
+                      {t.onboarding_step_count != null && t.onboarding_step_count > 0 && (
+                        <span className="inline-flex items-center gap-1">
+                          <ListChecks className="h-3 w-3" />
+                          {t.onboarding_step_count} setup steps
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
             <div className="flex gap-3 pt-2">
               <Button variant="outline" onClick={goBack}>
@@ -392,18 +539,20 @@ export default function OnboardingPage() {
             </div>
           </div>
         );
+      }
 
       case "api-key":
         return (
           <div className="space-y-6">
             <p className="text-sm text-[color:var(--text-muted)]">
-              VantageClaw uses OpenRouter to connect to AI models. Add your API key
-              to get started, or skip to use the platform default.
+              VantageClaw uses OpenRouter to connect to AI models. Add your own API key
+              for dedicated usage, or skip this step entirely.
             </p>
             <div className="space-y-2">
               <label className="text-sm font-medium text-[color:var(--text)] flex items-center gap-2">
                 <Key className="h-4 w-4 text-[color:var(--text-muted)]" />
                 OpenRouter API Key
+                <span className="text-xs font-normal text-[color:var(--text-muted)]">(optional)</span>
               </label>
               <Input
                 type="password"
@@ -428,43 +577,116 @@ export default function OnboardingPage() {
               <Button variant="outline" onClick={goBack}>
                 <ArrowLeft className="h-4 w-4" /> Back
               </Button>
-              <Button onClick={handleSaveApiKey} className="ml-auto">
-                {apiKey.trim() ? "Save Key &" : "Skip &"} Continue{" "}
-                <ArrowRight className="h-4 w-4" />
-              </Button>
+              {apiKey.trim() ? (
+                <Button onClick={handleSaveApiKey} className="ml-auto">
+                  Save Key & Continue <ArrowRight className="h-4 w-4" />
+                </Button>
+              ) : (
+                <Button onClick={handleSaveApiKey} className="ml-auto">
+                  Skip for Now <ArrowRight className="h-4 w-4" />
+                </Button>
+              )}
             </div>
+            {!apiKey.trim() && (
+              <p className="text-xs text-center text-[color:var(--text-muted)]">
+                You can add your API key later in Organization Settings.
+              </p>
+            )}
           </div>
         );
 
-      case "features":
+      case "features": {
+        // Build a lookup of known flags for O(1) access
+        const knownFlags = new Set(
+          FEATURE_GROUPS.flatMap((g) => g.flags.map((f) => f.key)),
+        );
+        // Collect any flags from the backend that aren't in our metadata
+        const unknownFlags = Object.keys(features).filter(
+          (k) => !knownFlags.has(k),
+        );
+
         return (
           <div className="space-y-6">
             <p className="text-sm text-[color:var(--text-muted)]">
               Enable the features your organization needs. You can change these
-              anytime in Org Settings.
+              anytime in Organization Settings.
             </p>
-            <div className="grid gap-3 md:grid-cols-2">
-              {Object.entries(features).map(([key, enabled]) => (
-                <label
-                  key={key}
-                  className="flex items-center gap-3 rounded-lg border border-[color:var(--border)] p-3 cursor-pointer hover:bg-[color:var(--surface-muted)] transition-colors"
-                >
-                  <input
-                    type="checkbox"
-                    checked={enabled}
-                    onChange={(e) =>
-                      setFeatures((prev) => ({
-                        ...prev,
-                        [key]: e.target.checked,
-                      }))
-                    }
-                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="text-sm font-medium text-[color:var(--text)]">
-                    {key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
-                  </span>
-                </label>
-              ))}
+            <div className="space-y-6">
+              {FEATURE_GROUPS.map((group) => {
+                // Only show group if at least one flag exists in the features map
+                const visibleFlags = group.flags.filter(
+                  (f) => f.key in features,
+                );
+                if (visibleFlags.length === 0) return null;
+                return (
+                  <div key={group.label}>
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-[color:var(--text-muted)] mb-3">
+                      {group.label}
+                    </h3>
+                    <div className="space-y-2">
+                      {visibleFlags.map((flag) => (
+                        <label
+                          key={flag.key}
+                          className="flex items-start gap-3 rounded-lg border border-[color:var(--border)] p-3 cursor-pointer hover:bg-[color:var(--surface-muted)] transition-colors"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={features[flag.key] ?? false}
+                            onChange={(e) =>
+                              setFeatures((prev) => ({
+                                ...prev,
+                                [flag.key]: e.target.checked,
+                              }))
+                            }
+                            className="mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          />
+                          <div className="min-w-0">
+                            <span className="text-sm font-medium text-[color:var(--text)]">
+                              {flag.name}
+                            </span>
+                            <p className="text-xs text-[color:var(--text-muted)] mt-0.5">
+                              {flag.description}
+                            </p>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+              {/* Render any flags not in our metadata as a fallback */}
+              {unknownFlags.length > 0 && (
+                <div>
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-[color:var(--text-muted)] mb-3">
+                    Other
+                  </h3>
+                  <div className="space-y-2">
+                    {unknownFlags.map((key) => (
+                      <label
+                        key={key}
+                        className="flex items-center gap-3 rounded-lg border border-[color:var(--border)] p-3 cursor-pointer hover:bg-[color:var(--surface-muted)] transition-colors"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={features[key] ?? false}
+                          onChange={(e) =>
+                            setFeatures((prev) => ({
+                              ...prev,
+                              [key]: e.target.checked,
+                            }))
+                          }
+                          className="h-4 w-4 shrink-0 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className="text-sm font-medium text-[color:var(--text)]">
+                          {key
+                            .replace(/_/g, " ")
+                            .replace(/\b\w/g, (c) => c.toUpperCase())}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
             <div className="flex gap-3 pt-2">
               <Button variant="outline" onClick={goBack}>
@@ -476,6 +698,7 @@ export default function OnboardingPage() {
             </div>
           </div>
         );
+      }
 
       case "checklist":
         return (
@@ -573,15 +796,15 @@ export default function OnboardingPage() {
           <div className="w-full max-w-3xl">
             {/* Stepper */}
             <nav className="mb-8">
-              <ol className="flex items-center gap-2">
+              <ol className="flex items-center gap-1 sm:gap-2">
                 {STEPS.map((s, i) => {
                   const Icon = s.icon;
                   const isActive = s.key === step;
                   const isPast = i < stepIndex;
                   return (
-                    <li key={s.key} className="flex items-center gap-2 flex-1">
+                    <li key={s.key} className="flex items-center gap-1 sm:gap-2 flex-1 min-w-0">
                       <div
-                        className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+                        className={`flex items-center justify-center gap-1.5 sm:gap-2 rounded-full px-2 py-1 sm:px-3 sm:py-1.5 text-xs font-medium transition-colors shrink-0 ${
                           isActive
                             ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200"
                             : isPast
@@ -589,16 +812,20 @@ export default function OnboardingPage() {
                               : "bg-[color:var(--surface-muted)] text-[color:var(--text-muted)]"
                         }`}
                       >
+                        {/* Mobile: show check or step number. Desktop: show check or icon */}
                         {isPast ? (
-                          <Check className="h-3.5 w-3.5" />
+                          <Check className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                         ) : (
-                          <Icon className="h-3.5 w-3.5" />
+                          <>
+                            <span className="sm:hidden text-[10px]">{i + 1}</span>
+                            <Icon className="hidden sm:block h-3.5 w-3.5" />
+                          </>
                         )}
-                        <span className="hidden sm:inline">{s.label}</span>
+                        <span className="hidden md:inline">{s.label}</span>
                       </div>
                       {i < STEPS.length - 1 && (
                         <div
-                          className={`h-px flex-1 ${
+                          className={`h-px flex-1 min-w-2 ${
                             isPast ? "bg-green-300 dark:bg-green-700" : "bg-[color:var(--border)]"
                           }`}
                         />
