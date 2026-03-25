@@ -60,6 +60,7 @@ from app.api.skill_config import router as skill_config_router
 from app.api.industry_templates import router as industry_templates_router
 from app.api.platform_admin import router as platform_admin_router
 from app.api.wechat_auth import router as wechat_auth_router
+from app.api.document_intake import router as document_intake_router
 from app.api.wecom import router as wecom_router
 from app.core.config import settings
 from app.core.error_handling import install_error_handling
@@ -777,6 +778,7 @@ api_v1.include_router(industry_templates_router)
 api_v1.include_router(platform_admin_router)
 api_v1.include_router(wechat_auth_router)
 api_v1.include_router(wecom_router)
+api_v1.include_router(document_intake_router)
 app.include_router(api_v1)
 
 add_pagination(app)

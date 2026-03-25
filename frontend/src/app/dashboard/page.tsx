@@ -397,7 +397,7 @@ function TopMetricCard({
             ) : null}
           </div>
           <div className="mt-2 flex items-end gap-2">
-            <p className="font-heading text-4xl font-bold text-slate-900">{value}</p>
+            <p className="font-heading text-3xl md:text-4xl font-bold text-slate-900">{value}</p>
             {secondary ? (
               <p className="pb-1 text-xs text-slate-500">{secondary}</p>
             ) : null}

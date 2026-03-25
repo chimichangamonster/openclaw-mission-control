@@ -149,7 +149,7 @@ function CostCalculator({
 
         {/* Result */}
         <div className="mt-4 rounded-lg bg-white border border-amber-200 px-4 py-3">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <div>
               <div className="flex items-baseline gap-2">
                 <span className="text-2xl font-bold text-amber-900">${monthlyCost.toFixed(2)}</span>
@@ -157,7 +157,7 @@ function CostCalculator({
               </div>
               <p className="text-[10px] text-slate-500 mt-0.5">${annualCost.toFixed(0)}/year · ${dailyCost.toFixed(2)}/day conversations · ${(dailyCronCost * 30).toFixed(2)}/mo crons</p>
             </div>
-            <div className="text-right">
+            <div className="sm:text-right">
               <p className="text-[10px] text-slate-500">{dailyConversations} conv/day</p>
               <p className="text-[10px] text-slate-500">${avgConvCost.toFixed(4)}/conv avg</p>
             </div>
@@ -479,7 +479,7 @@ export default function OrgSettingsPage() {
       title="Organization Settings"
       description="API keys, integrations, data policy, and audit trail."
     >
-      <div className="mx-auto max-w-3xl space-y-6 p-6">
+      <div className="mx-auto max-w-3xl space-y-6 px-4 py-4 md:p-6">
         <div>
           <h1 className="text-xl font-bold text-slate-900">Organization Settings</h1>
           <p className="text-sm text-slate-500">API keys, integrations, data policy, and audit trail</p>

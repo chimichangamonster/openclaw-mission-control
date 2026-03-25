@@ -144,9 +144,67 @@ export default function EmailPage() {
           </Link>
         </div>
       ) : (
-        <div className="flex gap-6">
-          {/* Sidebar filters */}
-          <div className="w-48 shrink-0 space-y-4">
+        <div className="flex flex-col md:flex-row gap-4 md:gap-6">
+          {/* Mobile filter bar */}
+          <div className="flex flex-col gap-2 md:hidden">
+            {accounts.length > 1 ? (
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {accounts.map((acct) => (
+                  <button
+                    key={acct.id}
+                    onClick={() => setSelectedAccountId(acct.id)}
+                    className={cn(
+                      "shrink-0 rounded-full px-3 py-1.5 text-xs transition",
+                      selectedAccountId === acct.id
+                        ? "bg-blue-100 font-medium text-blue-800"
+                        : "bg-slate-100 text-slate-700",
+                    )}
+                  >
+                    {acct.email_address}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {folders.map((f) => {
+                const Icon = f.icon;
+                return (
+                  <button
+                    key={f.key}
+                    onClick={() => setFolder(f.key)}
+                    className={cn(
+                      "flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs transition",
+                      folder === f.key
+                        ? "bg-blue-100 font-medium text-blue-800"
+                        : "bg-slate-100 text-slate-700",
+                    )}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                    {f.label}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {triageOptions.map((t) => (
+                <button
+                  key={t.key}
+                  onClick={() => setTriageFilter(t.key)}
+                  className={cn(
+                    "shrink-0 rounded-full px-3 py-1.5 text-xs transition",
+                    triageFilter === t.key
+                      ? "bg-blue-100 font-medium text-blue-800"
+                      : "bg-slate-100 text-slate-700",
+                  )}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Sidebar filters (desktop) */}
+          <div className="hidden md:block w-48 shrink-0 space-y-4">
             {/* Account selector */}
             {accounts.length > 1 ? (
               <div>
@@ -284,7 +342,7 @@ export default function EmailPage() {
                       </Link>
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-1">
-                      <span className="text-xs text-slate-500">
+                      <span className="hidden sm:inline text-xs text-slate-500">
                         {new Date(msg.received_at).toLocaleDateString()}
                       </span>
                       <div className="flex gap-1">

@@ -100,6 +100,15 @@ class EmailForwardCreate(SQLModel):
     body_text: str | None = None
 
 
+class EmailSendCreate(SQLModel):
+    """Payload for sending a new email (not a reply)."""
+
+    to: NonEmptyStr
+    subject: NonEmptyStr
+    body: NonEmptyStr
+    body_html: str | None = None
+
+
 class EmailSyncTriggerResponse(SQLModel):
     """Response for triggering an email sync."""
 

@@ -37,6 +37,7 @@ dependencies = [
     "python-multipart>=0.0.18",
     "prometheus-client>=0.22.0",
     "prometheus-fastapi-instrumentator>=7.0.0",
+    "pypdf>=5.0",
 ]
 
 [project.optional-dependencies]

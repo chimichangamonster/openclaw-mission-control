@@ -23,6 +23,7 @@ from app.schemas.email import (
     EmailMessageRead,
     EmailMessageUpdate,
     EmailReplyCreate,
+    EmailSendCreate,
 )
 from app.services.email.token_manager import get_valid_access_token
 
@@ -270,6 +271,68 @@ async def agent_reply_to_email(
             "approval_id": str(approval.id),
             "to": msg.sender_email,
             "subject": msg.subject,
+        },
+    )
+
+    return {"status": "pending_approval", "approval_id": str(approval.id)}
+
+
+@router.post("/send", status_code=status.HTTP_202_ACCEPTED)
+async def agent_send_email(
+    payload: EmailSendCreate,
+    agent_ctx: AgentAuthContext = AGENT_CTX_DEP,
+    session: AsyncSession = SESSION_DEP,
+) -> dict[str, str]:
+    """Agent proposes sending a new email — creates an approval instead of sending directly."""
+    agent = agent_ctx.agent
+    if agent.board_id is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
+
+    from app.models.approvals import Approval
+    from app.models.boards import Board
+
+    board = await session.get(Board, agent.board_id)
+    if board is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+
+    # Find a shared email account for the org
+    from app.services.email_send import NoEmailAccountError, get_org_shared_email_account
+
+    try:
+        account = await get_org_shared_email_account(session, board.organization_id)
+    except NoEmailAccountError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="No shared email account connected for this organization.",
+        )
+
+    approval = Approval(
+        id=uuid4(),
+        board_id=board.id,
+        agent_id=agent.id,
+        action_type="email_send",
+        payload={
+            "reason": f"Send email to {payload.to}: {payload.subject}",
+            "account_id": str(account.id),
+            "to": payload.to,
+            "subject": payload.subject,
+            "body_text": payload.body,
+            "body_html": payload.body_html,
+            "from_account": account.email_address,
+        },
+        confidence=80.0,
+        status="pending",
+        created_at=utcnow(),
+    )
+    session.add(approval)
+    await session.commit()
+
+    logger.info(
+        "email.send.approval_created",
+        extra={
+            "approval_id": str(approval.id),
+            "to": payload.to,
+            "subject": payload.subject,
         },
     )
 

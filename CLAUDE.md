@@ -63,6 +63,23 @@ VantageClaw fork of abhi1693/openclaw-mission-control. Separate git repo (not a 
 - `GET /microsoft-graph/calendar/calendars` — List Outlook calendars
 - Outlook Calendar uses existing Microsoft Graph OAuth (no separate connection needed — `Calendars.ReadWrite` scope already included)
 
+## Document Intake Endpoints
+- `POST /document-intake/process` — upload document for text extraction + LLM classification (multipart, max 20MB, PDF/images/text)
+- `POST /document-intake/agent/process` — agent-accessible version (same logic)
+- Returns: `{filename, content_type, extracted_text, classification: {type, confidence, summary}, page_count}`
+- Classification types: invoice, receipt, contract, report, field_report, purchase_order, timesheet, safety_report, permit, correspondence, other
+
+## Email Send & Invoice Endpoints
+- `POST /email/accounts/{id}/send` — standalone email send (to, subject, body, optional body_html)
+- `POST /agent/email/send` — agent email send via HITL approval flow
+- `POST /bookkeeping/invoices/{id}/send` — generate invoice PDF + deliver via email, WeCom, or both + mark status as "sent"
+  - `delivery`: `"email"` (default), `"wecom"`, or `"both"`
+  - `wecom_user_id`: required when delivery includes wecom
+
+## WeCom Send Endpoints
+- `POST /wecom/send` — send text or news (rich link card) message to WeCom user (admin-gated, content-filtered)
+  - `msg_type`: `"text"` (default) or `"news"` (requires title + url)
+
 ## Environment Variables (mc-backend)
 - `OPENROUTER_API_KEY` — required for cost tracking page (added to docker-compose.mission-control.yml)
 - `GATEWAY_WORKSPACES_ROOT` — parent directory for per-org gateway workspaces (e.g., `/app/gateway-workspaces`)

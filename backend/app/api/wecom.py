@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from pydantic import BaseModel
 from fastapi.responses import PlainTextResponse
 from sqlmodel import col, select
 
@@ -228,6 +229,86 @@ async def test_connection(
         )
     except Exception as exc:
         return WeComTestResult(success=False, message=str(exc)[:300])
+
+
+# ---------------------------------------------------------------------------
+# Outbound message sending (authenticated)
+# ---------------------------------------------------------------------------
+
+
+class WeComSendRequest(BaseModel):
+    """Send a message to a WeCom user."""
+    to_user: str  # WeCom user ID or "@all"
+    content: str  # Text message body
+    msg_type: str = "text"  # "text" or "news"
+    # Fields for news (link card) messages
+    title: str | None = None
+    url: str | None = None
+    pic_url: str | None = None
+
+
+class WeComSendResult(BaseModel):
+    success: bool
+    message: str
+
+
+@router.post("/send", dependencies=_AUTH_DEPS, status_code=200)
+async def send_wecom_message(
+    payload: WeComSendRequest,
+    ctx: OrganizationContext = ORG_MEMBER_DEP,
+    session: "AsyncSession" = SESSION_DEP,
+) -> WeComSendResult:
+    """Send a message to a WeCom user via the org's active connection.
+
+    Supports text messages and news (rich link card) messages.
+    """
+    if not is_org_admin(ctx):
+        raise HTTPException(status_code=403, detail="Admin access required.")
+
+    org_id = ctx.organization.id
+    from app.services.wecom_send import NoWeComConnectionError, get_org_wecom_connection
+
+    try:
+        connection = await get_org_wecom_connection(session, org_id)
+    except NoWeComConnectionError:
+        raise HTTPException(
+            status_code=422,
+            detail="No active WeCom connection for this organization.",
+        )
+
+    # Apply content filtering
+    filter_region = await get_org_filter_region(session, org_id)
+    filtered_content = filter_content(payload.content, region=filter_region)
+
+    if payload.msg_type == "news":
+        if not payload.title or not payload.url:
+            raise HTTPException(
+                status_code=422,
+                detail="title and url are required for news messages.",
+            )
+        from app.services.wecom.reply import send_news_message
+
+        success = await send_news_message(
+            to_user=payload.to_user,
+            title=filter_content(payload.title, region=filter_region),
+            description=filtered_content,
+            url=payload.url,
+            pic_url=payload.pic_url or "",
+            connection=connection,
+            session=session,
+        )
+    else:
+        success = await send_active_reply(
+            content=filtered_content,
+            to_user=payload.to_user,
+            connection=connection,
+            session=session,
+        )
+
+    if not success:
+        return WeComSendResult(success=False, message="WeCom API call failed. Check logs.")
+
+    return WeComSendResult(success=True, message=f"Message sent to {payload.to_user}")
 
 
 # ---------------------------------------------------------------------------

@@ -1,4 +1,4 @@
-"""Bookkeeping invoices — CRUD, generate from timesheets, status updates."""
+"""Bookkeeping invoices — CRUD, generate from timesheets, status updates, email send."""
 
 from __future__ import annotations
 
@@ -10,11 +10,13 @@ from pydantic import BaseModel
 from sqlmodel import select
 
 from app.api.deps import ORG_ACTOR_DEP
+from app.core.logging import get_logger
 from app.core.time import utcnow
 from app.db.session import async_session_maker
 from app.models.bookkeeping import BkInvoice, BkInvoiceLine, BkTimesheet, BkPlacement, BkWorker, BkClient
 from app.services.organizations import OrganizationContext
 
+logger = get_logger(__name__)
 router = APIRouter(prefix="/invoices")
 
 GST_RATE = 0.05  # Alberta: 5% GST
@@ -40,6 +42,15 @@ class InvoiceFromTimesheets(BaseModel):
 
 class StatusUpdate(BaseModel):
     status: str
+
+
+class InvoiceSendRequest(BaseModel):
+    subject: str | None = None
+    message: str | None = None
+    company_name: str | None = None
+    company_email: str | None = None
+    delivery: str = "email"  # "email", "wecom", or "both"
+    wecom_user_id: str | None = None  # required when delivery includes wecom
 
 
 @router.post("", status_code=201)
@@ -239,6 +250,225 @@ async def update_invoice_status(invoice_id: str, payload: StatusUpdate, org_ctx:
         await session.commit()
         await session.refresh(invoice)
         return _serialize_invoice(invoice)
+
+
+@router.post("/{invoice_id}/send", status_code=200)
+async def send_invoice_email(
+    invoice_id: str,
+    payload: InvoiceSendRequest | None = None,
+    org_ctx: OrganizationContext = ORG_ACTOR_DEP,
+):
+    """Generate the invoice PDF and email it to the client's contact email.
+
+    Optionally customize the email subject and message body.  Updates the
+    invoice status to ``"sent"`` on success.
+    """
+    body = payload or InvoiceSendRequest()
+    org_id = org_ctx.organization.id
+
+    async with async_session_maker() as session:
+        # Fetch invoice
+        result = await session.execute(
+            select(BkInvoice).where(
+                BkInvoice.id == invoice_id,
+                BkInvoice.organization_id == org_id,
+            )
+        )
+        invoice = result.scalars().first()
+        if not invoice:
+            raise HTTPException(status_code=404, detail="Invoice not found")
+
+        # Fetch client
+        client_result = await session.execute(
+            select(BkClient).where(BkClient.id == invoice.client_id)
+        )
+        client = client_result.scalars().first()
+        if not client:
+            raise HTTPException(status_code=404, detail="Client not found")
+
+        # Fetch line items
+        lines_result = await session.execute(
+            select(BkInvoiceLine)
+            .where(BkInvoiceLine.invoice_id == invoice.id)
+            .order_by(BkInvoiceLine.created_at)
+        )
+        lines = lines_result.scalars().all()
+
+        # Generate PDF
+        from app.services.invoice_pdf import generate_invoice_pdf
+
+        invoice_data = {
+            "id": str(invoice.id),
+            "invoice_number": invoice.invoice_number,
+            "subtotal": invoice.subtotal,
+            "gst_amount": invoice.gst_amount,
+            "total": invoice.total,
+            "issued_date": str(invoice.issued_date) if invoice.issued_date else str(date.today()),
+            "due_date": str(invoice.due_date) if invoice.due_date else None,
+            "notes": invoice.notes,
+        }
+        client_data = {
+            "name": client.name,
+            "contact_name": client.contact_name or "",
+            "contact_email": client.contact_email or "",
+            "address": client.address or "",
+        }
+        line_items = [
+            {
+                "description": l.description,
+                "quantity": l.quantity,
+                "unit_price": l.unit_price,
+                "amount": l.amount,
+            }
+            for l in lines
+        ] if lines else None
+
+        company = {
+            "name": body.company_name or "Vantage Solutions",
+            "address": "Alberta, Canada",
+            "email": body.company_email or "info@vantagesolutions.ca",
+            "phone": "",
+            "gst_number": "",
+        }
+        pdf_bytes = generate_invoice_pdf(
+            invoice=invoice_data,
+            client=client_data,
+            company=company,
+            lines=line_items,
+        )
+
+        inv_number = invoice.invoice_number or str(invoice.id)[:8].upper()
+        filename = f"invoice-{inv_number}.pdf"
+        subject = body.subject or f"Invoice {inv_number} from {company['name']}"
+        message_body = body.message or (
+            f"Please find attached invoice {inv_number} for ${invoice.total:,.2f}."
+            f"\n\nDue date: {invoice.due_date or 'Upon receipt'}."
+            f"\n\nThank you for your business."
+        )
+        message_html = (
+            f"<p>Please find attached invoice <strong>{inv_number}</strong> "
+            f"for <strong>${invoice.total:,.2f}</strong>.</p>"
+            f"<p>Due date: {invoice.due_date or 'Upon receipt'}.</p>"
+            f"<p>Thank you for your business.</p>"
+        )
+        if body.message:
+            message_html = f"<p>{body.message}</p>"
+
+        delivery = body.delivery or "email"
+        sent_via: list[str] = []
+
+        # ── Email delivery ─────────────────────────────────────────────
+        if delivery in ("email", "both"):
+            if not client.contact_email:
+                raise HTTPException(
+                    status_code=422,
+                    detail="Client has no contact email address. Update the client record first.",
+                )
+            from app.services.email_send import NoEmailAccountError, get_org_shared_email_account, send_email
+
+            try:
+                email_account = await get_org_shared_email_account(session, org_id)
+            except NoEmailAccountError:
+                raise HTTPException(
+                    status_code=422,
+                    detail="No shared email account connected. Connect an email account first.",
+                )
+
+            await send_email(
+                session,
+                email_account,
+                to=client.contact_email,
+                subject=subject,
+                body=message_body,
+                body_html=message_html,
+                attachments=[
+                    {
+                        "filename": filename,
+                        "content_bytes": pdf_bytes,
+                        "content_type": "application/pdf",
+                    }
+                ],
+            )
+            sent_via.append("email")
+
+        # ── WeCom delivery ─────────────────────────────────────────────
+        if delivery in ("wecom", "both"):
+            if not body.wecom_user_id:
+                raise HTTPException(
+                    status_code=422,
+                    detail="wecom_user_id is required for WeCom delivery.",
+                )
+            from app.services.wecom_send import NoWeComConnectionError, get_org_wecom_connection, send_wecom_news
+
+            try:
+                wecom_conn = await get_org_wecom_connection(session, org_id)
+            except NoWeComConnectionError:
+                raise HTTPException(
+                    status_code=422,
+                    detail="No active WeCom connection for this organization.",
+                )
+
+            # Generate HMAC-signed download URL for the PDF
+            from app.core.file_tokens import create_file_token
+
+            token_path = f"invoices/{filename}"
+            # Store PDF to workspace so file_serve can find it
+            from app.core.workspace import resolve_org_workspace
+
+            workspace = resolve_org_workspace(org_ctx.organization)
+            invoice_dir = workspace / "invoices"
+            invoice_dir.mkdir(parents=True, exist_ok=True)
+            (invoice_dir / filename).write_bytes(pdf_bytes)
+
+            file_token = create_file_token(token_path, expires_hours=168)  # 7 days
+            from app.core.config import settings
+            download_url = f"{settings.base_url}/api/v1/files/download?token={file_token}"
+
+            description = (
+                f"Amount: ${invoice.total:,.2f}\n"
+                f"Due: {invoice.due_date or 'Upon receipt'}\n"
+                f"Client: {client.name}"
+            )
+
+            success = await send_wecom_news(
+                session,
+                wecom_conn,
+                to_user=body.wecom_user_id,
+                title=f"Invoice {inv_number}",
+                description=description,
+                url=download_url,
+            )
+            if not success:
+                raise HTTPException(
+                    status_code=502,
+                    detail="Failed to deliver invoice via WeCom. Check WeCom connection.",
+                )
+            sent_via.append("wecom")
+
+        # Update status to sent
+        invoice.status = "sent"
+        if not invoice.issued_date:
+            invoice.issued_date = date.today()
+        invoice.updated_at = utcnow()
+        session.add(invoice)
+        await session.commit()
+        await session.refresh(invoice)
+
+        logger.info(
+            "invoice.sent",
+            extra={
+                "invoice_id": str(invoice.id),
+                "delivery": delivery,
+                "sent_via": sent_via,
+            },
+        )
+
+        return {
+            "ok": True,
+            "invoice_id": str(invoice.id),
+            "sent_via": sent_via,
+            "status": "sent",
+        }
 
 
 def _serialize_invoice(inv: BkInvoice) -> dict:

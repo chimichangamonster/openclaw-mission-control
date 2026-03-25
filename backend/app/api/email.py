@@ -25,6 +25,7 @@ from app.schemas.email import (
     EmailMessageRead,
     EmailMessageUpdate,
     EmailReplyCreate,
+    EmailSendCreate,
     EmailSyncTriggerResponse,
 )
 from app.services.email.queue import QueuedEmailSync, enqueue_email_sync
@@ -339,6 +340,31 @@ async def forward_email(
             subject=f"Fwd: {msg.subject or ''}",
             body=body,
         )
+    return {"ok": True}
+
+
+@router.post(
+    "/accounts/{account_id}/send",
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def send_new_email(
+    account_id: UUID,
+    payload: EmailSendCreate,
+    ctx: OrganizationContext = ORG_MEMBER_DEP,
+    session: AsyncSession = SESSION_DEP,
+) -> dict[str, bool]:
+    """Send a new email (not a reply) from the given account."""
+    account = await _get_account_or_404(account_id, ctx, session)
+    from app.services.email_send import send_email
+
+    await send_email(
+        session,
+        account,
+        to=payload.to,
+        subject=payload.subject,
+        body=payload.body,
+        body_html=payload.body_html,
+    )
     return {"ok": True}
 
 

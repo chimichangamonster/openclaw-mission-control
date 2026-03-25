@@ -110,9 +110,18 @@ async def send_message(
     to: str,
     subject: str,
     body: str,
+    mail_format: str = "plaintext",
     in_reply_to: str | None = None,
+    attachments: list[dict] | None = None,
 ) -> dict:
-    """Send or reply to an email via Zoho Mail API."""
+    """Send or reply to an email via Zoho Mail API.
+
+    Args:
+        mail_format: ``"plaintext"`` or ``"html"``.
+        attachments: Optional list of dicts with keys ``filename``, ``content_bytes``
+            (raw bytes), and ``content_type`` (MIME type string).  Attachments are
+            uploaded first, then referenced in the send payload.
+    """
     url = f"{BASE_URL}/{account_id}/messages"
     # Get the from address from account info
     from_address = None
@@ -131,10 +140,30 @@ async def send_message(
         "toAddress": to,
         "subject": subject,
         "content": body,
-        "mailFormat": "plaintext",
+        "mailFormat": mail_format,
     }
     if in_reply_to:
         payload["inReplyTo"] = in_reply_to
+
+    # Upload attachments if provided
+    if attachments:
+        attach_ids: list[str] = []
+        async with httpx.AsyncClient() as client:
+            for att in attachments:
+                upload_url = f"{BASE_URL}/{account_id}/messages/attachments"
+                files = {"attach": (att["filename"], att["content_bytes"], att["content_type"])}
+                resp = await client.post(
+                    upload_url,
+                    headers={"Authorization": f"Zoho-oauthtoken {access_token}"},
+                    files=files,
+                )
+                if resp.status_code == 200:
+                    data = resp.json().get("data", {})
+                    attach_id = data.get("storeName") or data.get("attachmentId")
+                    if attach_id:
+                        attach_ids.append(attach_id)
+        if attach_ids:
+            payload["attachments"] = [{"storeName": aid} for aid in attach_ids]
 
     async with httpx.AsyncClient() as client:
         resp = await client.post(

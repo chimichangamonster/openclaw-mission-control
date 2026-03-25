@@ -635,7 +635,7 @@ export default function ChatPage() {
                         style={{ width: `${Math.min(100, pct * 100)}%` }}
                       />
                     </div>
-                    <span className="text-[10px] tabular-nums text-[color:var(--text-quiet)]">
+                    <span className="hidden sm:inline text-[10px] tabular-nums text-[color:var(--text-quiet)]">
                       {sessionTokens.total >= 1000
                         ? `${(sessionTokens.total / 1000).toFixed(1)}K`
                         : sessionTokens.total}
@@ -695,7 +695,7 @@ export default function ChatPage() {
                       setInput(suggestion);
                       textareaRef.current?.focus();
                     }}
-                    className="rounded-full border border-[color:var(--border)] bg-[color:var(--surface)] px-4 py-2 text-xs text-[color:var(--text)] hover:bg-[color:var(--surface-muted)] transition"
+                    className="rounded-full border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-1.5 md:px-4 md:py-2 text-xs text-[color:var(--text)] hover:bg-[color:var(--surface-muted)] transition"
                   >
                     {suggestion}
                   </button>
@@ -718,7 +718,7 @@ export default function ChatPage() {
                 ) : null}
                 <div
                   className={cn(
-                    "max-w-[75%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed",
+                    "max-w-[90%] md:max-w-[75%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed",
                     msg.role === "user"
                       ? "bg-[color:var(--accent-strong)] text-white rounded-br-md"
                       : "bg-[color:var(--surface-muted)] text-[color:var(--text)] rounded-bl-md",

@@ -107,20 +107,37 @@ async def send_message(
     body: str,
     content_type: str = "Text",
     reply_to_message_id: str | None = None,
+    attachments: list[dict] | None = None,
 ) -> dict:
-    """Send or reply to an email via Graph API."""
+    """Send or reply to an email via Graph API.
+
+    Args:
+        attachments: Optional list of dicts with keys ``filename``, ``content_bytes``
+            (raw bytes), and ``content_type`` (MIME type string).
+    """
     if reply_to_message_id:
         url = f"{GRAPH_URL}/me/messages/{reply_to_message_id}/reply"
         payload = {"comment": body}
     else:
+        import base64
+
         url = f"{GRAPH_URL}/me/sendMail"
-        payload = {
-            "message": {
-                "subject": subject,
-                "body": {"contentType": content_type, "content": body},
-                "toRecipients": [{"emailAddress": {"address": to}}],
-            }
+        message: dict = {
+            "subject": subject,
+            "body": {"contentType": content_type, "content": body},
+            "toRecipients": [{"emailAddress": {"address": to}}],
         }
+        if attachments:
+            message["attachments"] = [
+                {
+                    "@odata.type": "#microsoft.graph.fileAttachment",
+                    "name": att["filename"],
+                    "contentType": att["content_type"],
+                    "contentBytes": base64.b64encode(att["content_bytes"]).decode(),
+                }
+                for att in attachments
+            ]
+        payload = {"message": message}
 
     async with httpx.AsyncClient() as client:
         resp = await client.post(url, headers=_headers(access_token), json=payload)
