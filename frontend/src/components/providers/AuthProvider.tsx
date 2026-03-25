@@ -39,6 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <ClerkProvider
       publishableKey={publishableKey}
       afterSignOutUrl={afterSignOutUrl}
+      clerkJSUrl="https://cdn.jsdelivr.net/npm/@clerk/clerk-js@5/dist/clerk.browser.js"
     >
       {children}
     </ClerkProvider>
