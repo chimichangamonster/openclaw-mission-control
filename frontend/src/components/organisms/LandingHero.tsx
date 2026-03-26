@@ -414,7 +414,7 @@ export function LandingHero() {
             {section.custom.length > 0 && (
               <>
                 <p style={{ fontSize: "0.8rem", color: "var(--accent, #3b82f6)", marginBottom: "0.75rem", paddingLeft: "1rem", fontWeight: 500 }}>
-                  Custom development &mdash; $150/hr
+                  Custom development &mdash; $150/hr &mdash; scoped during discovery
                 </p>
                 <div className="trust-grid">
                   {section.custom.map((c) => (
