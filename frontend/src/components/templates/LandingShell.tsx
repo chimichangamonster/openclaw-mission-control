@@ -25,59 +25,38 @@ export function LandingShell({ children }: { children: ReactNode }) {
             </div>
             <div className="logo-text">
               <div className="logo-name">VantageClaw</div>
-              <div className="logo-tagline">Mission Control</div>
+              <div className="logo-tagline">AI Operations</div>
             </div>
           </Link>
 
           <div className="nav-links">
             <Link href="#capabilities">Capabilities</Link>
-            <Link href="/security">Security</Link>
-            <Link href="/compliance">Compliance</Link>
+            <Link href="#use-cases">Industries</Link>
             <Link href="#pricing">Pricing</Link>
-            <Link href="/dashboard">Dashboard</Link>
           </div>
 
           <div className="nav-cta">
             <SignedOut>
               {clerkEnabled ? (
-                <>
-                  <SignInButton
-                    mode="modal"
-                    forceRedirectUrl="/onboarding"
-                    signUpForceRedirectUrl="/onboarding"
-                  >
-                    <button type="button" className="btn-secondary">
-                      Sign In
-                    </button>
-                  </SignInButton>
-                  <SignInButton
-                    mode="modal"
-                    forceRedirectUrl="/onboarding"
-                    signUpForceRedirectUrl="/onboarding"
-                  >
-                    <button type="button" className="btn-primary">
-                      Start Free Trial
-                    </button>
-                  </SignInButton>
-                </>
+                <SignInButton
+                  mode="modal"
+                  forceRedirectUrl="/onboarding"
+                  signUpForceRedirectUrl="/onboarding"
+                >
+                  <button type="button" className="btn-primary">
+                    Sign In
+                  </button>
+                </SignInButton>
               ) : (
-                <>
-                  <Link href="/boards" className="btn-secondary">
-                    Boards
-                  </Link>
-                  <Link href="/onboarding" className="btn-primary">
-                    Get started
-                  </Link>
-                </>
+                <Link href="/boards" className="btn-primary">
+                  Get started
+                </Link>
               )}
             </SignedOut>
 
             <SignedIn>
-              <Link href="/boards/new" className="btn-secondary">
-                Create Board
-              </Link>
-              <Link href="/boards" className="btn-primary">
-                Open Boards
+              <Link href="/dashboard" className="btn-secondary">
+                Dashboard
               </Link>
               <UserMenu />
             </SignedIn>
@@ -91,26 +70,25 @@ export function LandingShell({ children }: { children: ReactNode }) {
         <div className="footer-content">
           <div className="footer-brand">
             <h3>VantageClaw</h3>
-            <p>A calm command center for boards, agents, and approvals.</p>
-            <div className="footer-tagline">Realtime Execution Visibility</div>
+            <p>AI operations for Canadian small businesses. Built by Vantage Solutions, Edmonton AB.</p>
+            <div className="footer-tagline">henry@vantagesolutions.ca</div>
           </div>
 
           <div className="footer-column">
-            <h4>Product</h4>
+            <h4>Platform</h4>
             <div className="footer-links">
               <Link href="#capabilities">Capabilities</Link>
-              <Link href="/boards">Boards</Link>
-              <Link href="/activity">Activity</Link>
-              <Link href="/dashboard">Dashboard</Link>
+              <Link href="#use-cases">Industries</Link>
+              <Link href="#pricing">Pricing</Link>
             </div>
           </div>
 
           <div className="footer-column">
             <h4>Platform</h4>
             <div className="footer-links">
-              <Link href="/gateways">Gateways</Link>
-              <Link href="/agents">Agents</Link>
               <Link href="/dashboard">Dashboard</Link>
+              <Link href="/chat">Chat</Link>
+              <Link href="/activity">Activity</Link>
             </div>
           </div>
 
@@ -119,31 +97,20 @@ export function LandingShell({ children }: { children: ReactNode }) {
             <div className="footer-links">
               <SignedOut>
                 {clerkEnabled ? (
-                  <>
-                    <SignInButton
-                      mode="modal"
-                      forceRedirectUrl="/onboarding"
-                      signUpForceRedirectUrl="/onboarding"
-                    >
-                      <button type="button">Sign In</button>
-                    </SignInButton>
-                    <SignInButton
-                      mode="modal"
-                      forceRedirectUrl="/onboarding"
-                      signUpForceRedirectUrl="/onboarding"
-                    >
-                      <button type="button">Create Account</button>
-                    </SignInButton>
-                  </>
+                  <SignInButton
+                    mode="modal"
+                    forceRedirectUrl="/onboarding"
+                    signUpForceRedirectUrl="/onboarding"
+                  >
+                    <button type="button">Sign In</button>
+                  </SignInButton>
                 ) : (
                   <Link href="/boards">Boards</Link>
                 )}
-                <Link href="/onboarding">Onboarding</Link>
               </SignedOut>
               <SignedIn>
-                <Link href="/boards">Open Boards</Link>
-                <Link href="/boards/new">Create Board</Link>
                 <Link href="/dashboard">Dashboard</Link>
+                <Link href="/chat">Chat</Link>
               </SignedIn>
             </div>
           </div>
@@ -151,12 +118,12 @@ export function LandingShell({ children }: { children: ReactNode }) {
 
         <div className="footer-bottom">
           <div className="footer-copyright">
-            © {new Date().getFullYear()} VantageClaw. All rights reserved.
+            &copy; {new Date().getFullYear()} VantageClaw. Built by Vantage Solutions.
           </div>
           <div className="footer-bottom-links">
             <Link href="#capabilities">Capabilities</Link>
-            <Link href="/boards">Boards</Link>
-            <Link href="/activity">Activity</Link>
+            <Link href="#use-cases">Industries</Link>
+            <Link href="#pricing">Pricing</Link>
           </div>
         </div>
       </footer>

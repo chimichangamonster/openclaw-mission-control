@@ -13,6 +13,7 @@ from app.core.logging import TRACE_LEVEL
 from app.models.boards import Board
 from app.models.gateways import Gateway
 from app.schemas.gateway_api import (
+    CreateSessionResponse,
     GatewayResolveQuery,
     GatewaySessionHistoryResponse,
     GatewaySessionMessageRequest,
@@ -29,6 +30,7 @@ from app.services.openclaw.gateway_rpc import (
     OpenClawGatewayError,
     abort_chat,
     compact_session,
+    delete_session,
     ensure_session,
     get_chat_history,
     openclaw_call,
@@ -145,10 +147,19 @@ class GatewaySessionService(OpenClawDBService):
                 ),
                 None,
             )
-        if not params.board_id:
+        if not params.board_id or params.board_id == "null":
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail="board_id or gateway_url is required",
+            )
+        try:
+            from uuid import UUID as _UUID
+
+            _UUID(params.board_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="board_id must be a valid UUID",
             )
         board = await Board.objects.by_id(params.board_id).first(self.session)
         if board is None:
@@ -367,6 +378,66 @@ class GatewaySessionService(OpenClawDBService):
             )
         return GatewaySessionResponse(session=session_entry)
 
+    async def create_session(
+        self,
+        *,
+        label: str,
+        board_id: str | None,
+        organization_id: UUID,
+        user: User | None,
+    ) -> CreateSessionResponse:
+        """Create a new named chat session on the gateway."""
+        import uuid as _uuid
+
+        board, config, main_session = await self.require_gateway(board_id, user=user)
+        self._require_same_org(board, organization_id)
+        if user is None:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
+        await require_board_access(self.session, user=user, board=board, write=True)
+
+        # Derive session key from the main session prefix
+        short_id = _uuid.uuid4().hex[:8]
+        if main_session:
+            prefix = main_session.rsplit(":", 1)[0]
+            session_key = f"{prefix}:chat-{short_id}"
+        else:
+            session_key = f"chat-{short_id}"
+
+        try:
+            result = await ensure_session(session_key, config=config, label=label)
+            session_entry = result.get("entry", result) if isinstance(result, dict) else result
+        except OpenClawGatewayError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=str(exc),
+            ) from exc
+        return CreateSessionResponse(session_key=session_key, session=session_entry)
+
+    async def rename_session(
+        self,
+        *,
+        session_id: str,
+        label: str,
+        board_id: str | None,
+        organization_id: UUID,
+        user: User | None,
+    ) -> GatewaySessionResponse:
+        """Rename an existing chat session."""
+        board, config, _ = await self.require_gateway(board_id, user=user)
+        self._require_same_org(board, organization_id)
+        if user is None:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
+        await require_board_access(self.session, user=user, board=board, write=True)
+        try:
+            result = await ensure_session(session_id, config=config, label=label)
+            session_entry = result.get("entry", result) if isinstance(result, dict) else result
+        except OpenClawGatewayError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=str(exc),
+            ) from exc
+        return GatewaySessionResponse(session=session_entry)
+
     async def get_session_history(
         self,
         *,
@@ -510,7 +581,10 @@ class GatewaySessionService(OpenClawDBService):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
         await require_board_access(self.session, user=user, board=board, write=True)
         try:
-            await reset_session(session_id, config=config)
+            # Delete the session (removes persisted JSONL file) instead of
+            # just resetting in-memory state, so stale conversation history
+            # doesn't get reloaded on gateway restart.
+            await delete_session(session_id, config=config)
         except OpenClawGatewayError as exc:
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,

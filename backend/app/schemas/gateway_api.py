@@ -34,6 +34,25 @@ class ChatUploadResponse(SQLModel):
     size_bytes: int
 
 
+class CreateSessionRequest(SQLModel):
+    """Request payload for creating a new named chat session."""
+
+    label: NonEmptyStr
+
+
+class CreateSessionResponse(SQLModel):
+    """Response after creating a new chat session."""
+
+    session_key: str
+    session: object
+
+
+class RenameSessionRequest(SQLModel):
+    """Request payload for renaming a chat session."""
+
+    label: NonEmptyStr
+
+
 class GatewayResolveQuery(SQLModel):
     """Query parameters used to resolve which gateway to target."""
 

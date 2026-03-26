@@ -17,6 +17,8 @@ from app.db.session import get_session
 from app.schemas.common import OkResponse
 from app.schemas.gateway_api import (
     ChatUploadResponse,
+    CreateSessionRequest,
+    CreateSessionResponse,
     GatewayCommandsResponse,
     GatewayResolveQuery,
     GatewaySessionHistoryResponse,
@@ -24,6 +26,7 @@ from app.schemas.gateway_api import (
     GatewaySessionResponse,
     GatewaySessionsResponse,
     GatewaysStatusResponse,
+    RenameSessionRequest,
 )
 from app.services.openclaw.gateway_rpc import GATEWAY_EVENTS, GATEWAY_METHODS, PROTOCOL_VERSION
 from app.services.openclaw.session_service import GatewaySessionService
@@ -154,6 +157,44 @@ async def list_gateway_sessions(
     """List sessions for a gateway associated with a board."""
     service = GatewaySessionService(session)
     return await service.get_sessions(
+        board_id=board_id,
+        organization_id=ctx.organization.id,
+        user=auth.user,
+    )
+
+
+@router.post("/sessions", response_model=CreateSessionResponse, status_code=status.HTTP_201_CREATED)
+async def create_gateway_session(
+    payload: CreateSessionRequest,
+    board_id: str | None = BOARD_ID_QUERY,
+    session: AsyncSession = SESSION_DEP,
+    auth: AuthContext = AUTH_DEP,
+    ctx: OrganizationContext = ORG_ADMIN_DEP,
+) -> CreateSessionResponse:
+    """Create a new named chat session on the gateway."""
+    service = GatewaySessionService(session)
+    return await service.create_session(
+        label=payload.label,
+        board_id=board_id,
+        organization_id=ctx.organization.id,
+        user=auth.user,
+    )
+
+
+@router.patch("/sessions/{session_id}", response_model=GatewaySessionResponse)
+async def rename_gateway_session(
+    session_id: str,
+    payload: RenameSessionRequest,
+    board_id: str | None = BOARD_ID_QUERY,
+    session: AsyncSession = SESSION_DEP,
+    auth: AuthContext = AUTH_DEP,
+    ctx: OrganizationContext = ORG_ADMIN_DEP,
+) -> GatewaySessionResponse:
+    """Rename an existing chat session."""
+    service = GatewaySessionService(session)
+    return await service.rename_session(
+        session_id=session_id,
+        label=payload.label,
         board_id=board_id,
         organization_id=ctx.organization.id,
         user=auth.user,

@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 
 import {
@@ -33,102 +32,82 @@ export function LandingHero() {
 
   return (
     <>
+      {/* Hero */}
       <section className="hero">
         <div className="hero-content">
-          <Image
-            src="/logo.png"
-            alt="VantageClaw"
-            width={120}
-            height={120}
-            className="mx-auto mb-6 rounded-2xl shadow-lg"
-          />
-          <div className="hero-label">VantageClaw Mission Control</div>
+          <div className="hero-label">AI Operations for Canadian SMBs</div>
           <h1>
-            Command <span className="hero-highlight">autonomous work.</span>
+            Tell it to <span className="hero-highlight">do the work.</span>
             <br />
-            Keep human oversight.
+            It does.
           </h1>
           <p>
-            Track tasks, approvals, and agent health in one unified command
-            center. Get real-time signals when work changes, without losing the
-            thread of execution.
+            VantageClaw is an AI assistant configured for your business. It
+            reads your documents, drafts your invoices, monitors your
+            competitors, manages your schedule, and waits for your approval
+            before anything goes out. Your data stays on your server.
           </p>
 
           <div className="hero-actions">
             <SignedOut>
               {clerkEnabled ? (
-                <>
-                  <Link
-                    href="https://vantageclaw.ai/consultation"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="btn-large primary"
-                  >
-                    Book a Demo <ArrowIcon />
-                  </Link>
-                  <SignInButton
-                    mode="modal"
-                    forceRedirectUrl="/onboarding"
-                    signUpForceRedirectUrl="/onboarding"
-                  >
-                    <button type="button" className="btn-large secondary">
-                      Sign In
-                    </button>
-                  </SignInButton>
-                </>
+                <SignInButton
+                  mode="modal"
+                  forceRedirectUrl="/onboarding"
+                  signUpForceRedirectUrl="/onboarding"
+                >
+                  <button type="button" className="btn-large primary">
+                    Sign In <ArrowIcon />
+                  </button>
+                </SignInButton>
               ) : (
-                <>
-                  <Link href="/boards" className="btn-large primary">
-                    Get Started <ArrowIcon />
-                  </Link>
-                  <Link href="/boards/new" className="btn-large secondary">
-                    Create Board
-                  </Link>
-                </>
+                <Link href="/boards" className="btn-large primary">
+                  Get Started <ArrowIcon />
+                </Link>
               )}
             </SignedOut>
-
             <SignedIn>
-              <Link href="/boards" className="btn-large primary">
-                Open Boards <ArrowIcon />
-              </Link>
-              <Link href="/boards/new" className="btn-large secondary">
-                Create Board
+              <Link href="/dashboard" className="btn-large primary">
+                Dashboard <ArrowIcon />
               </Link>
             </SignedIn>
           </div>
 
           <div className="hero-features">
-            {["Agent-First Operations", "Approval Queues", "Live Signals"].map(
-              (label) => (
-                <div key={label} className="hero-feature">
-                  <div className="feature-icon">✓</div>
-                  <span>{label}</span>
-                </div>
-              ),
-            )}
+            {[
+              "Your Data, Your Server",
+              "Configured for Your Industry",
+              "Human Approves Everything",
+              "48 Business Skills",
+            ].map((label) => (
+              <div key={label} className="hero-feature">
+                <div className="feature-icon">&#10003;</div>
+                <span>{label}</span>
+              </div>
+            ))}
           </div>
         </div>
 
+        {/* What it looks like in practice */}
         <div className="command-surface">
           <div className="surface-header">
-            <div className="surface-title">Command Surface</div>
+            <div className="surface-title">Your AI Assistant</div>
             <div className="live-indicator">
               <div className="live-dot" />
               LIVE
             </div>
           </div>
           <div className="surface-subtitle">
-            <h3>Ship work without losing the thread.</h3>
+            <h3>What it actually does.</h3>
             <p>
-              Tasks, approvals, and agent status stay synced across the board.
+              Not a chatbot. An assistant that does the work.
             </p>
           </div>
           <div className="metrics-row">
             {[
-              { label: "Boards", value: "12" },
-              { label: "Agents", value: "08" },
-              { label: "Tasks", value: "46" },
+              { label: "Business Skills", value: "48" },
+              { label: "Industries", value: "17" },
+              { label: "Setup Time", value: "1 day" },
             ].map((item) => (
               <div key={item.label} className="metric">
                 <div className="metric-value">{item.value}</div>
@@ -138,14 +117,15 @@ export function LandingHero() {
           </div>
           <div className="surface-content">
             <div className="content-section">
-              <h4>Board — In Progress</h4>
+              <h4>You say</h4>
               {[
-                "Cut release candidate",
-                "Triage approvals backlog",
-                "Stabilize agent handoffs",
+                "\"Invoice ABC Construction for 40 hours at $150/hr\"",
+                "\"What did our competitors post this week?\"",
+                "\"Process this field report\"",
+                "\"Book a meeting with Sarah for Thursday\"",
               ].map((title) => (
                 <div key={title} className="status-item">
-                  <div className="status-icon progress">⊙</div>
+                  <div className="status-icon progress">&#9670;</div>
                   <div className="status-item-content">
                     <div className="status-item-title">{title}</div>
                   </div>
@@ -154,38 +134,18 @@ export function LandingHero() {
             </div>
 
             <div className="content-section">
-              <h4>Approvals — 3 Pending</h4>
+              <h4>It does</h4>
               {[
-                { title: "Deploy window confirmed", status: "ready" as const },
-                { title: "Copy reviewed", status: "waiting" as const },
-                { title: "Security sign-off", status: "waiting" as const },
-              ].map((item) => (
-                <div key={item.title} className="approval-item">
-                  <div className="approval-title">{item.title}</div>
-                  <div className={`approval-badge ${item.status}`}>
-                    {item.status}
+                "Generates a branded PDF invoice, ready to send",
+                "Scans websites, social media, news \u2014 delivers a summary",
+                "Reads the PDF, extracts data, classifies, flags issues",
+                "Checks both calendars, sends the invite",
+              ].map((title) => (
+                <div key={title} className="status-item">
+                  <div className="status-icon progress">&#9670;</div>
+                  <div className="status-item-content">
+                    <div className="status-item-title">{title}</div>
                   </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div
-            style={{
-              padding: "2rem",
-              borderTop: "1px solid var(--neutral-200)",
-            }}
-          >
-            <div className="content-section">
-              <h4>Signals — Updated Moments Ago</h4>
-              {[
-                { text: "Agent Delta moved task to review", time: "Now" },
-                { text: "Growth Ops hit WIP limit", time: "5m" },
-                { text: "Release pipeline stabilized", time: "12m" },
-              ].map((signal) => (
-                <div key={signal.text} className="signal-item">
-                  <div className="signal-text">{signal.text}</div>
-                  <div className="signal-time">{signal.time}</div>
                 </div>
               ))}
             </div>
@@ -193,48 +153,49 @@ export function LandingHero() {
         </div>
       </section>
 
+      {/* What You Get */}
       <section className="features-section" id="capabilities">
         <div className="features-grid">
           {[
             {
-              title: "Multi-agent fleet",
+              title: "Your own AI assistant",
               description:
-                "Specialized AI agents for every domain — each with the right model, tools, and knowledge for its job.",
+                "A dedicated AI bot in your own Discord server, configured with your business name, your industry language, your cost codes, and your workflows. It knows your business.",
             },
             {
-              title: "48+ skills, no code",
+              title: "48 business skills, ready to go",
               description:
-                "Document intake, invoicing, scheduling, competitor intel, email triage — all configurable without writing code.",
+                "Invoicing, document processing, expense capture, scheduling, competitor intelligence, proposals, social media, bookkeeping \u2014 pre-built and configurable for your industry.",
             },
             {
-              title: "Model orchestration",
+              title: "You control costs",
               description:
-                "Route each sub-task to the cheapest model that can handle it. Cut AI costs 60-80% without losing quality.",
+                "Host on your own server ($30\u201350/mo) or a Mac Mini at your office. Bring your own AI API key. No markup on infrastructure. Budget caps prevent surprise bills.",
             },
             {
-              title: "Approvals that move",
+              title: "Documents in, data out",
               description:
-                "Human-in-the-loop approval queues. Agents propose, humans decide. No unsupervised actions.",
+                "Upload any document \u2014 PDF, photo of a receipt, spreadsheet. The AI reads it, extracts the data, classifies it, and routes it to the right workflow automatically.",
             },
             {
-              title: "Per-org isolation",
+              title: "Your data never leaves your server",
               description:
-                "Each client gets their own gateway, workspace, and encrypted data store. No cross-tenant leakage.",
+                "Sensitive information is stripped before reaching AI models. Everything is encrypted at rest. Full audit trail. Canadian server option for data residency.",
             },
             {
-              title: "Realtime monitoring",
+              title: "AI proposes, you approve",
               description:
-                "Live agent status, cost tracking, session health, and audit trails — all in one dashboard.",
+                "Nothing goes out without your say. Email sends, invoice deliveries, and external actions all require your explicit approval. The AI drafts \u2014 you decide.",
             },
             {
-              title: "Industry templates",
+              title: "Configured for your industry",
               description:
-                "Construction, waste management, staffing, professional services — pre-built workflows for your vertical.",
+                "17 industry-specific templates: construction, waste management, staffing, healthcare, professional services, manufacturing, agriculture, and more.",
             },
             {
-              title: "Audit trail built in",
+              title: "Runs on a schedule",
               description:
-                "Every agent decision leaves a trail. SOC 2-ready infrastructure with encrypted backups.",
+                "Morning briefings, weekly competitor scans, invoice reminders, deadline alerts \u2014 your AI works while you sleep. Unlike ChatGPT, it doesn\u2019t wait for you to ask.",
             },
           ].map((feature, idx) => (
             <div key={feature.title} className="feature-card">
@@ -248,127 +209,450 @@ export function LandingHero() {
         </div>
       </section>
 
-      <section className="trust-section" id="security">
+      {/* Use Cases by Industry */}
+      <section className="trust-section" id="use-cases">
         <div className="trust-header">
-          <h2>Built for trust. Engineered for compliance.</h2>
+          <h2>What it does for your industry</h2>
           <p>
-            When AI agents handle your invoicing, email, and client data, security
-            isn't optional — it's the foundation.
+            Every example below is a real capability — not a roadmap item. Your
+            AI assistant reads documents, analyzes patterns, drafts outputs, and
+            waits for your approval. You don&apos;t need to learn AI. You just
+            describe what you need.
           </p>
         </div>
-        <div className="trust-grid">
-          <div className="trust-card">
-            <div className="trust-icon">&#x1F6E1;</div>
-            <h3>Curated skills, not a marketplace</h3>
-            <p>
-              Open skill marketplaces like ClawHub saw 820+ malicious skills in a
-              single incident. VantageClaw maintains 48 skills in-house — every one
-              reviewed, tested, and mounted read-only. No community uploads. No
-              supply chain risk.
-            </p>
-          </div>
-          <div className="trust-card">
-            <div className="trust-icon">&#x1F512;</div>
-            <h3>AES-256-GCM encryption</h3>
-            <p>
-              All secrets and API keys encrypted at rest with authenticated
-              encryption. HKDF-SHA256 key derivation with versioned wire format
-              supports key rotation without downtime.
-            </p>
-          </div>
-          <div className="trust-card">
-            <div className="trust-icon">&#x1F50D;</div>
-            <h3>Audit trail with dual-write</h3>
-            <p>
-              Every action logged to both PostgreSQL and centralized log aggregation
-              — tamper-independent copies. Anti-backdating prevents log manipulation.
-              Full audit history for compliance reviews.
-            </p>
-          </div>
-          <div className="trust-card">
-            <div className="trust-icon">&#x1F3E2;</div>
-            <h3>Per-org gateway isolation</h3>
-            <p>
-              Each client organization gets its own gateway container, workspace,
-              encrypted data store, and skill set. No cross-tenant data leakage.
-              RBAC with 5 role levels.
-            </p>
-          </div>
-        </div>
-        <div className="soc2-banner">
-          <div className="soc2-content">
-            <h3>SOC 2-ready infrastructure</h3>
-            <p>
-              VantageClaw has implemented controls across all five SOC 2 Trust
-              Service Criteria — Security, Availability, Confidentiality, Processing
-              Integrity, and Privacy. Formal Type I certification is in progress.
-            </p>
-            <div className="soc2-controls">
-              {[
-                "Encrypted backups with automated verification",
-                "Vulnerability scanning (pip-audit, Trivy, Bandit)",
-                "Platform admin role separation (owner vs operator)",
-                "Per-org data retention policies",
-                "Input sanitization and sensitive data redaction",
-                "Content filtering for regulated deployments",
-              ].map((control) => (
-                <div key={control} className="soc2-control">
-                  <span className="soc2-check">&#10003;</span>
-                  {control}
+
+        {/* Industry sections */}
+        {[
+          {
+            industry: "Any Small Business",
+            icon: "&#127970;",
+            cases: [
+              {
+                title: "Email triage",
+                text: "AI prioritizes your inbox, summarizes threads, and drafts replies for your approval. Never miss a critical email buried under newsletters.",
+              },
+              {
+                title: "Expense classification",
+                text: "Photograph a receipt or forward an invoice. AI extracts vendor, amount, and line items, then classifies using your cost codes. No more accountant rework.",
+              },
+              {
+                title: "Invoice generation",
+                text: "Describe the work in conversation. AI generates a branded PDF invoice with line items, tax, and payment terms.",
+              },
+              {
+                title: "Follow-up reminders",
+                text: "Track who hasn't responded to proposals, invoices, or requests. AI drafts nudge emails for your approval.",
+              },
+              {
+                title: "Meeting prep",
+                text: "Research a company before a call. AI generates a brief with their background, recent news, and a tailored call agenda.",
+              },
+              {
+                title: "Weekly summary reports",
+                text: "What happened this week, what's overdue, what's coming up next — generated automatically from your activity.",
+              },
+              {
+                title: "Social media drafting",
+                text: "AI drafts posts based on your business updates. Review and approve before publishing. Never auto-posted.",
+              },
+              {
+                title: "Customer follow-up",
+                text: "3 months since their last service? AI flags it and drafts a check-in email. You review and send.",
+              },
+              {
+                title: "Document organization",
+                text: "Upload a batch of files. AI classifies each one (invoice, contract, report, receipt) and extracts key metadata.",
+              },
+              {
+                title: "Scheduling coordination",
+                text: "AI resolves contact names to emails, checks calendar availability, and drafts meeting invites with agendas.",
+              },
+            ],
+          },
+          {
+            industry: "Sales & Consulting",
+            icon: "&#128188;",
+            cases: [
+              {
+                title: "Lead qualification",
+                text: "Mention a prospect and the AI scores them against your ideal client profile across 8 factors. Hot, warm, cool, or not a fit — with reasoning.",
+              },
+              {
+                title: "Proposal drafting",
+                text: "AI generates a statement of work with two pricing options, scope boundaries, and an out-of-scope section to prevent scope creep.",
+              },
+              {
+                title: "Competitor research",
+                text: "Weekly scans of competitor websites, news mentions, and social media. Summarized into a brief you can act on.",
+              },
+              {
+                title: "Pipeline tracking",
+                text: "Where's each deal? What's been stale for 7+ days? AI monitors your pipeline and flags deals that need attention.",
+              },
+              {
+                title: "Discovery call prep",
+                text: "AI researches the prospect's company, tech stack, recent news, and generates a tailored call agenda with post-call notes template.",
+              },
+            ],
+          },
+          {
+            industry: "Construction & Trades",
+            icon: "&#127959;",
+            cases: [
+              {
+                title: "Job cost tracking",
+                text: "Expenses mapped to projects and cost codes automatically. Know your margins in real-time, not three months after the job.",
+              },
+              {
+                title: "Field report processing",
+                text: "Upload a photo or PDF from the field. AI extracts data, classifies the document, and routes it to the right workflow.",
+              },
+              {
+                title: "Bid preparation",
+                text: "AI drafts bids from project specs using your historical pricing data and material costs. You review the numbers and send.",
+              },
+              {
+                title: "Subcontractor credential monitoring",
+                text: "Track insurance, WCB, and COR expiry dates. AI alerts you before credentials lapse so you're never caught with an uncovered sub on site.",
+              },
+              {
+                title: "Safety document classification",
+                text: "Upload safety docs and the AI maps them to COR audit elements. Know exactly which compliance requirements are covered and where the gaps are.",
+              },
+              {
+                title: "Change order detection",
+                text: "Client sends a revised drawing. AI compares to the original spec and flags what changed — dimensions, materials, quantities — and estimates the cost impact.",
+              },
+            ],
+          },
+          {
+            industry: "Millwork & Custom Fabrication",
+            icon: "&#129692;",
+            cases: [
+              {
+                title: "Spec sheet extraction",
+                text: "Customer sends a drawing (photo, PDF, CAD screenshot). AI extracts dimensions, material, finish, hardware, and quantity into a structured cut list.",
+              },
+              {
+                title: "Quote generation from drawings",
+                text: "From the extracted spec: '4 linear feet of white oak crown, mitered corners, satin finish' — AI drafts a quote using your rate sheet and material costs.",
+              },
+              {
+                title: "Material estimation",
+                text: "AI calculates sheet goods, linear footage, and edge banding needed for a job — with waste factor included. No more manual takeoffs for standard items.",
+              },
+              {
+                title: "Change order detection",
+                text: "Revised drawing comes in. AI compares to the original: 'Door width changed from 32\" to 36\", hinge count increased, adds $X to the quote.'",
+              },
+              {
+                title: "Shop drawing review",
+                text: "Upload the shop drawing and the original spec. AI flags discrepancies: spec calls for soft-close hinges but drawing shows standard.",
+              },
+              {
+                title: "Job status updates",
+                text: "Log progress in chat. AI drafts client update emails: 'Cabinet install 60% complete, waiting on glass inserts from supplier. ETA Thursday.'",
+              },
+            ],
+          },
+          {
+            industry: "Retail",
+            icon: "&#128722;",
+            cases: [
+              {
+                title: "Supplier invoice reconciliation",
+                text: "Upload the invoice and the PO. AI flags discrepancies: 'They billed 24 cases but your PO was for 20.' Catch billing errors before you pay.",
+              },
+              {
+                title: "Price comparison",
+                text: "Upload a competitor's flyer (photo works). AI extracts prices, compares to yours, and flags where you're being undercut.",
+              },
+              {
+                title: "Customer complaint analysis",
+                text: "Log complaints via email or chat. AI categorizes them (product, service, wait time) and spots patterns: '60% of complaints are Friday afternoon wait times.'",
+              },
+              {
+                title: "Staff scheduling",
+                text: "'Draft next week's schedule — Sarah can't do Tuesdays, need 3 people Saturday.' AI generates it, you adjust and post.",
+              },
+              {
+                title: "Loss prevention patterns",
+                text: "Staff logs shrinkage and waste daily. AI identifies trends: 'Produce waste spikes every Monday — are weekend orders too large?'",
+              },
+              {
+                title: "Seasonal planning",
+                text: "'What did we order for Canada Day last year?' AI searches through uploaded docs and emails for historical context.",
+              },
+              {
+                title: "Promotional content",
+                text: "AI drafts social posts and email campaigns for sales events. You review and approve — nothing goes out without your say.",
+              },
+              {
+                title: "Supplier communication",
+                text: "Forward supplier emails. AI extracts pricing changes, compares to previous orders, and flags increases worth negotiating.",
+              },
+            ],
+          },
+          {
+            industry: "Compliance & Safety",
+            icon: "&#128737;",
+            cases: [
+              {
+                title: "COR audit gap detection",
+                text: "AI monitors readiness across 14 COR elements, identifies missing evidence, and drafts corrective actions. Safety managers review and approve.",
+              },
+              {
+                title: "Incident pattern analysis",
+                text: "AI analyzes trends across incident reports and recommends engineering or administrative controls. 'Slip/fall incidents at loading dock up 40% — recommend anti-slip coating.'",
+              },
+              {
+                title: "Training expiry monitoring",
+                text: "Who needs recertification? AI tracks expiry dates and sends alerts before credentials lapse. Draft enrollment emails for approval.",
+              },
+              {
+                title: "Document version tracking",
+                text: "AI flags when regulations change and which of your documents reference outdated versions. Prioritizes what needs updating.",
+              },
+            ],
+          },
+          {
+            industry: "Healthcare & Clinics",
+            icon: "&#127973;",
+            cases: [
+              {
+                title: "Patient intake form processing",
+                text: "Upload handwritten intake forms. AI extracts and structures the data — name, DOB, medications, allergies — for staff to review and confirm.",
+              },
+              {
+                title: "Appointment reminder drafting",
+                text: "AI generates personalized reminders based on appointment type and patient history. Staff reviews and sends.",
+              },
+              {
+                title: "Insurance pre-auth documentation",
+                text: "AI drafts the pre-authorization narrative from clinical notes. Clinician reviews the language and submits. Cuts documentation time significantly.",
+              },
+              {
+                title: "Referral letter generation",
+                text: "'Draft a referral to Dr. Smith for the knee issue.' AI generates a properly formatted referral letter for the physician to review and sign.",
+              },
+            ],
+          },
+          {
+            industry: "Property Management",
+            icon: "&#127968;",
+            cases: [
+              {
+                title: "Tenant communication",
+                text: "AI drafts responses to maintenance requests, lease inquiries, and renewal notices. Property manager reviews tone and sends.",
+              },
+              {
+                title: "Maintenance request triage",
+                text: "Tenant emails 'water under the sink.' AI categorizes as plumbing/urgent, drafts a work order with priority level and vendor suggestion.",
+              },
+              {
+                title: "Lease document extraction",
+                text: "Upload a lease. AI extracts key dates — start, end, renewal deadline, rent increase schedule — and sets calendar reminders automatically.",
+              },
+              {
+                title: "Expense allocation",
+                text: "Assign maintenance costs to the correct property and unit for tax reporting. AI categorizes from invoices and receipts.",
+              },
+            ],
+          },
+          {
+            industry: "Agriculture",
+            icon: "&#127806;",
+            cases: [
+              {
+                title: "Crop log analysis",
+                text: "Farmer logs observations — weather, pest sightings, yields, soil conditions. AI spots patterns across seasons that are invisible in raw data.",
+              },
+              {
+                title: "Equipment maintenance scheduling",
+                text: "Upload equipment manuals. AI tracks service intervals per machine and flags upcoming maintenance before breakdowns happen.",
+              },
+              {
+                title: "Market price monitoring",
+                text: "AI summarizes commodity price trends from public data. Flags optimal sell windows and hold recommendations based on historical patterns.",
+              },
+              {
+                title: "Compliance documentation",
+                text: "Organic certification, pesticide application logs, water usage records — AI organizes submissions and flags gaps before audit deadlines.",
+              },
+            ],
+          },
+          {
+            industry: "Logistics & Trucking",
+            icon: "&#128666;",
+            cases: [
+              {
+                title: "Trip log processing",
+                text: "Upload driver logs. AI validates hours of service compliance, flags potential violations, and generates summary reports for dispatch.",
+              },
+              {
+                title: "Fuel expense analysis",
+                text: "AI tracks fuel costs per route and per driver. Identifies inefficient routes, unusual consumption patterns, and cost-saving opportunities.",
+              },
+              {
+                title: "Load documentation",
+                text: "Bill of lading extraction and cross-reference with delivery confirmations. AI flags missing signatures, discrepancies, and incomplete paperwork.",
+              },
+              {
+                title: "Carrier rate comparison",
+                text: "Forward quotes from multiple carriers. AI compares rates, transit times, and reliability history to recommend the best option.",
+              },
+            ],
+          },
+          {
+            industry: "Legal & Accounting Firms",
+            icon: "&#9878;",
+            cases: [
+              {
+                title: "Time entry assistance",
+                text: "Describe what you worked on in plain language. AI categorizes by client and matter code, calculates duration, and drafts the time entry.",
+              },
+              {
+                title: "Document review prep",
+                text: "Upload a contract. AI flags non-standard clauses, missing sections, and unusual terms — so the lawyer knows where to focus before reading 40 pages.",
+              },
+              {
+                title: "Client intake processing",
+                text: "New client emails their situation. AI drafts a conflict check summary, intake memo, and initial matter classification.",
+              },
+              {
+                title: "Deadline tracking",
+                text: "AI monitors filing deadlines, limitation periods, and regulatory due dates extracted from uploaded documents. Alerts before anything lapses.",
+              },
+            ],
+          },
+          {
+            industry: "Restaurants & Food Service",
+            icon: "&#127869;",
+            cases: [
+              {
+                title: "Menu costing",
+                text: "Upload supplier invoices and your menu. AI calculates food cost percentage per dish and flags items running below your margin target.",
+              },
+              {
+                title: "Health inspection prep",
+                text: "AI generates a pre-inspection checklist based on your jurisdiction's specific requirements. Walk through it before the inspector arrives.",
+              },
+              {
+                title: "Staff certification tracking",
+                text: "Food handler cards, WHMIS, first aid — AI monitors expiry dates across all staff and drafts renewal reminder emails.",
+              },
+              {
+                title: "Waste analysis",
+                text: "Log daily waste by category. AI identifies trends: 'Soup waste spikes Wednesday — consider reducing the Thursday prep batch by 30%.'",
+              },
+            ],
+          },
+          {
+            industry: "Developers & Technical Teams",
+            icon: "&#128187;",
+            cases: [
+              {
+                title: "Model A/B testing",
+                text: "Run the same prompt through Claude, GPT, DeepSeek, and Gemini. Compare output quality, latency, and cost. Pick the best model for each task type.",
+              },
+              {
+                title: "Multi-model pipelines",
+                text: "Cheap model extracts data, mid-tier validates and structures, expensive model makes the final decision. Each step uses the right tool for the job.",
+              },
+              {
+                title: "Cost simulation",
+                text: "Test a workflow against 300+ model pricing tiers before deploying to production. Know what a 1,000-user deployment costs before you commit.",
+              },
+              {
+                title: "Prompt versioning",
+                text: "Skills are markdown files, version controlled in git. Roll back a bad prompt like you'd roll back code. Full history of what changed and when.",
+              },
+              {
+                title: "Agent observability",
+                text: "Every LLM call logged with model, token count, latency, and cost. Prometheus metrics and Grafana dashboards included out of the box.",
+              },
+            ],
+          },
+        ].map((section) => (
+          <div key={section.industry} style={{ marginBottom: "3rem" }}>
+            <h3
+              style={{
+                fontSize: "1.5rem",
+                fontWeight: 600,
+                marginBottom: "1rem",
+                paddingLeft: "1rem",
+                borderLeft: "3px solid var(--accent, #3b82f6)",
+              }}
+            >
+              <span
+                dangerouslySetInnerHTML={{ __html: section.icon }}
+                style={{ marginRight: "0.5rem" }}
+              />{" "}
+              {section.industry}
+            </h3>
+            <div className="trust-grid">
+              {section.cases.map((c) => (
+                <div key={c.title} className="trust-card">
+                  <h3>{c.title}</h3>
+                  <p>{c.text}</p>
                 </div>
               ))}
             </div>
           </div>
-        </div>
+        ))}
       </section>
 
+      {/* How It Works */}
       <section className="pricing-section" id="pricing">
         <div className="pricing-header">
-          <h2>Simple, transparent pricing</h2>
-          <p>Start managed. Scale to dedicated. Go enterprise when you need full control.</p>
+          <h2>How it works</h2>
+          <p>
+            You tell us about your business. We configure your AI assistant.
+            You start using it.
+          </p>
         </div>
         <div className="pricing-grid">
           {[
             {
-              tier: "Managed",
-              price: "$299",
-              period: "/mo",
-              description: "We run it. You use it.",
+              tier: "You Host",
+              price: "$30\u201350",
+              period: "/mo server",
+              description: "Your own cloud server + AI API key",
               features: [
-                "Hosted on our infrastructure",
-                "Up to 3 agents",
-                "Email + calendar integration",
-                "Document processing",
-                "Onboarding + 30-day setup",
+                "Your data stays on your server",
+                "Cloud VPS (OVH, DigitalOcean, Vultr)",
+                "AI costs: $20\u201350/mo (pay-as-you-go)",
+                "Your own Discord server + AI bot",
+                "We configure everything for you",
               ],
             },
             {
-              tier: "Dedicated",
-              price: "$799",
-              period: "/mo",
+              tier: "Mac Mini",
+              price: "$0",
+              period: "/mo server",
               highlight: true,
-              description: "Your infrastructure, our management.",
+              description: "Run it at your office on your own hardware",
               features: [
-                "Everything in Managed",
-                "Unlimited agents",
-                "BYOK API keys",
-                "Custom LLM endpoints",
-                "Priority support",
-                "Custom skill development",
+                "Docker on Mac Mini at your location",
+                "Local AI for basic tasks (near-zero cost)",
+                "Cloud AI only for complex reasoning",
+                "No recurring server costs",
+                "Your own Discord server + AI bot",
+                "We set it up for you",
               ],
             },
             {
-              tier: "Enterprise",
-              price: "Custom",
-              period: "",
-              description: "Self-hosted. Data never leaves your network.",
+              tier: "We Host",
+              price: "$500",
+              period: "/mo",
+              description: "We run everything on Canadian infrastructure",
               features: [
-                "Everything in Dedicated",
-                "Source license",
-                "On-prem or private cloud",
-                "SLA + dedicated support",
-                "Regional compliance (CAC, GDPR)",
-                "White-label option",
+                "Dedicated Canadian server",
+                "AI costs included",
+                "Monitoring and maintenance included",
+                "Your own Discord server + AI bot",
+                "Priority support",
+                "Quarterly optimization reviews",
               ],
             },
           ].map((plan) => (
@@ -380,9 +664,7 @@ export function LandingHero() {
                 <h3>{plan.tier}</h3>
                 <div className="pricing-amount">
                   <span className="pricing-price">{plan.price}</span>
-                  {plan.period ? (
-                    <span className="pricing-period">{plan.period}</span>
-                  ) : null}
+                  <span className="pricing-period">{plan.period}</span>
                 </div>
                 <p className="pricing-description">{plan.description}</p>
               </div>
@@ -399,53 +681,35 @@ export function LandingHero() {
         </div>
       </section>
 
+      {/* CTA */}
       <section className="cta-section">
         <div className="cta-content">
-          <h2>Ready to automate your business operations?</h2>
+          <h2>Ready to put AI to work?</h2>
           <p>
-            Book a free consultation. We&apos;ll audit your workflows and show you
-            exactly which tasks your AI agents will handle from day one.
+            Sign in to see the platform, or reach out to get your business
+            configured — henry@vantagesolutions.ca
           </p>
           <div className="cta-actions">
             <SignedOut>
               {clerkEnabled ? (
-                <>
-                  <Link
-                    href="https://vantageclaw.ai/consultation"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="btn-large white"
-                  >
-                    Book a Demo <ArrowIcon />
-                  </Link>
-                  <SignInButton
-                    mode="modal"
-                    forceRedirectUrl="/onboarding"
-                    signUpForceRedirectUrl="/onboarding"
-                  >
-                    <button type="button" className="btn-large outline">
-                      Sign In
-                    </button>
-                  </SignInButton>
-                </>
+                <SignInButton
+                  mode="modal"
+                  forceRedirectUrl="/onboarding"
+                  signUpForceRedirectUrl="/onboarding"
+                >
+                  <button type="button" className="btn-large white">
+                    Sign In <ArrowIcon />
+                  </button>
+                </SignInButton>
               ) : (
-                <>
-                  <Link href="/boards/new" className="btn-large white">
-                    Get Started
-                  </Link>
-                  <Link href="/boards" className="btn-large outline">
-                    View Boards
-                  </Link>
-                </>
+                <Link href="/boards" className="btn-large white">
+                  Get Started
+                </Link>
               )}
             </SignedOut>
-
             <SignedIn>
-              <Link href="/boards/new" className="btn-large white">
-                Create Board
-              </Link>
-              <Link href="/boards" className="btn-large outline">
-                View Boards
+              <Link href="/dashboard" className="btn-large white">
+                Dashboard <ArrowIcon />
               </Link>
             </SignedIn>
           </div>

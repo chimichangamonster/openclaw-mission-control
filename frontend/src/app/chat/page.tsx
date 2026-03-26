@@ -17,7 +17,9 @@ import {
   X,
   FileText,
   Image as ImageIcon,
+  PanelLeft,
 } from "lucide-react";
+import { ChatSessionSidebar } from "@/components/ChatSessionSidebar";
 
 import { useAuth } from "@/auth/clerk";
 import { DashboardPageLayout } from "@/components/templates/DashboardPageLayout";
@@ -191,6 +193,11 @@ export default function ChatPage() {
   const [resolving, setResolving] = useState(true);
   const [resolveError, setResolveError] = useState<string | null>(null);
 
+  // Multi-session state
+  const [allSessions, setAllSessions] = useState<GatewaySession[]>([]);
+  const [mainSessionKey, setMainSessionKey] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+
   // Chat state
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [messagesLoading, setMessagesLoading] = useState(false);
@@ -212,11 +219,15 @@ export default function ChatPage() {
   const sseRef = useRef<EventSource | null>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sessionKeyRef = useRef<string | null>(null);
+  const boardIdRef = useRef<string | null>(null);
 
-  // Keep ref in sync for SSE callback
+  // Keep refs in sync for SSE/polling callbacks
   useEffect(() => {
     sessionKeyRef.current = sessionKey;
   }, [sessionKey]);
+  useEffect(() => {
+    boardIdRef.current = boardId;
+  }, [boardId]);
 
   // ─── Resolve The Claw's session on mount ──────────────────────────────────
 
@@ -241,8 +252,10 @@ export default function ChatPage() {
         const list: GatewaySession[] = (data?.sessions || []).filter(
           (s: any) => typeof s === "object" && s !== null && s.key,
         );
+        setAllSessions(list);
         const claw = findClawSession(list);
         if (claw) {
+          setMainSessionKey(claw.key);
           setSessionKey(claw.key);
           setSessionTokens({
             total: claw.totalTokens ?? 0,
@@ -268,17 +281,20 @@ export default function ChatPage() {
   // ─── Poll session tokens ───────────────────────────────────────────────────
 
   useEffect(() => {
-    if (!isSignedIn || !sessionKey) return;
+    if (!isSignedIn || !sessionKey || !boardId) return;
     const interval = setInterval(async () => {
+      const bid = boardIdRef.current;
+      if (!bid) return;
       try {
         const raw: any = await customFetch(
-          `/api/v1/gateways/sessions?board_id=${boardId}`,
+          `/api/v1/gateways/sessions?board_id=${bid}`,
           { method: "GET" },
         );
         const data = raw?.data ?? raw;
         const list: GatewaySession[] = (data?.sessions || []).filter(
           (s: any) => typeof s === "object" && s !== null && s.key,
         );
+        setAllSessions(list);
         const match = list.find((s) => s.key === sessionKey);
         if (match) {
           setSessionTokens({
@@ -291,11 +307,12 @@ export default function ChatPage() {
       } catch { /* ignore */ }
     }, 15_000);
     return () => clearInterval(interval);
-  }, [isSignedIn, sessionKey]);
+  }, [isSignedIn, sessionKey, boardId]);
 
   // ─── Fetch chat history ───────────────────────────────────────────────────
 
   const fetchHistory = useCallback(async (key: string) => {
+    if (!boardId) return;
     setMessagesLoading(true);
     try {
       const raw: any = await customFetch(
@@ -310,7 +327,7 @@ export default function ChatPage() {
     } finally {
       setMessagesLoading(false);
     }
-  }, []);
+  }, [boardId]);
 
   useEffect(() => {
     if (!sessionKey || !isSignedIn) return;
@@ -406,7 +423,9 @@ export default function ChatPage() {
     formData.append("file", file);
 
     const baseUrl = process.env.NEXT_PUBLIC_API_URL || "";
-    const url = `${baseUrl}/api/v1/gateways/sessions/${encodeURIComponent(sessionKey)}/upload?board_id=${boardId}`;
+    const bid = boardIdRef.current;
+    if (!bid) return null;
+    const url = `${baseUrl}/api/v1/gateways/sessions/${encodeURIComponent(sessionKey)}/upload?board_id=${bid}`;
 
     // Build auth headers (can't use customFetch — it forces Content-Type: application/json)
     const headers: Record<string, string> = {};
@@ -507,7 +526,7 @@ export default function ChatPage() {
       setIsSending(false);
       textareaRef.current?.focus();
     }
-  }, [sessionKey, input, isSending, pendingFiles]);
+  }, [sessionKey, input, isSending, pendingFiles, boardId]);
 
   // ─── Fallback polling when SSE is unavailable ────────────────────────────
   // If SSE isn't connected and agent is typing, poll history every 3s
@@ -521,9 +540,11 @@ export default function ChatPage() {
     if (!agentTyping || sseConnected || !sessionKey) return;
     const countBefore = lastMessageCountRef.current;
     const poll = setInterval(async () => {
+      const bid = boardIdRef.current;
+      if (!bid) return;
       try {
         const raw: any = await customFetch(
-          `/api/v1/gateways/sessions/${encodeURIComponent(sessionKey)}/history?board_id=${boardId}`,
+          `/api/v1/gateways/sessions/${encodeURIComponent(sessionKey)}/history?board_id=${bid}`,
           { method: "GET" },
         );
         const data = raw?.data ?? raw;
@@ -556,7 +577,7 @@ export default function ChatPage() {
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     // Refetch to get whatever partial response was generated
     setTimeout(() => { if (sessionKey) void fetchHistory(sessionKey); }, 500);
-  }, [sessionKey, fetchHistory]);
+  }, [sessionKey, boardId, fetchHistory]);
 
   const compactChat = useCallback(async () => {
     if (!sessionKey || commandLoading) return;
@@ -569,7 +590,7 @@ export default function ChatPage() {
       await fetchHistory(sessionKey);
     } catch { /* ignore */ }
     finally { setCommandLoading(null); }
-  }, [sessionKey, commandLoading, fetchHistory]);
+  }, [sessionKey, boardId, commandLoading, fetchHistory]);
 
   const clearChat = useCallback(async () => {
     if (!sessionKey || commandLoading) return;
@@ -580,10 +601,95 @@ export default function ChatPage() {
         `/api/v1/gateways/sessions/${encodeURIComponent(sessionKey)}/reset?board_id=${boardId}`,
         { method: "POST" },
       );
-      setMessages([]);
+      await fetchHistory(sessionKey);
     } catch { /* ignore */ }
     finally { setCommandLoading(null); }
-  }, [sessionKey, commandLoading]);
+  }, [sessionKey, boardId, commandLoading, fetchHistory]);
+
+  // ─── Session CRUD (multi-session) ─────────────────────────────────────────
+
+  const refreshSessions = useCallback(async () => {
+    const bid = boardIdRef.current;
+    if (!bid) return;
+    try {
+      const raw: any = await customFetch(
+        `/api/v1/gateways/sessions?board_id=${bid}`,
+        { method: "GET" },
+      );
+      const data = raw?.data ?? raw;
+      const list: GatewaySession[] = (data?.sessions || []).filter(
+        (s: any) => typeof s === "object" && s !== null && s.key,
+      );
+      setAllSessions(list);
+    } catch { /* ignore */ }
+  }, []);
+
+  const createSession = useCallback(async (label: string) => {
+    if (!boardId) return;
+    try {
+      const raw: any = await customFetch(
+        `/api/v1/gateways/sessions?board_id=${boardId}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ label }),
+        },
+      );
+      const data = raw?.data ?? raw;
+      if (data?.session_key) {
+        setSessionKey(data.session_key);
+        setSessionTokens({ total: 0, input: 0, output: 0, model: "" });
+      }
+      await refreshSessions();
+    } catch { /* ignore */ }
+  }, [boardId, refreshSessions]);
+
+  const renameSession = useCallback(async (key: string, label: string) => {
+    if (!boardId) return;
+    try {
+      await customFetch(
+        `/api/v1/gateways/sessions/${encodeURIComponent(key)}?board_id=${boardId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ label }),
+        },
+      );
+      await refreshSessions();
+    } catch { /* ignore */ }
+  }, [boardId, refreshSessions]);
+
+  const deleteSession = useCallback(async (key: string) => {
+    if (!boardId) return;
+    try {
+      await customFetch(
+        `/api/v1/gateways/sessions/${encodeURIComponent(key)}/reset?board_id=${boardId}`,
+        { method: "POST" },
+      );
+      if (sessionKey === key) {
+        setSessionKey(mainSessionKey);
+      }
+      await refreshSessions();
+    } catch { /* ignore */ }
+  }, [boardId, sessionKey, mainSessionKey, refreshSessions]);
+
+  const handleSelectSession = useCallback((key: string) => {
+    if (key === sessionKey) return;
+    setSessionKey(key);
+    setAgentTyping(false);
+    // Update token display from allSessions
+    const match = allSessions.find((s) => s.key === key);
+    if (match) {
+      setSessionTokens({
+        total: match.totalTokens ?? 0,
+        input: match.inputTokens ?? 0,
+        output: match.outputTokens ?? 0,
+        model: match.model ?? "",
+      });
+    } else {
+      setSessionTokens(null);
+    }
+  }, [sessionKey, allSessions]);
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
@@ -598,22 +704,67 @@ export default function ChatPage() {
       mainClassName="!overflow-hidden"
       contentClassName="!p-0 h-[calc(100vh-130px)]"
     >
-      <div className="flex h-full flex-col">
+      <div className="flex h-full">
+        {/* ─── Session sidebar ───────────────────────────────────────── */}
+        {sidebarOpen && (
+          <div className="hidden md:block">
+            <ChatSessionSidebar
+              sessions={allSessions}
+              activeSessionKey={sessionKey}
+              mainSessionKey={mainSessionKey}
+              onSelectSession={handleSelectSession}
+              onCreateSession={createSession}
+              onRenameSession={renameSession}
+              onDeleteSession={deleteSession}
+              onClose={() => setSidebarOpen(false)}
+              isLoading={resolving}
+            />
+          </div>
+        )}
+        {/* Mobile sidebar overlay */}
+        {sidebarOpen && (
+          <div className="fixed inset-0 z-40 md:hidden">
+            <div className="absolute inset-0 bg-black/40" onClick={() => setSidebarOpen(false)} />
+            <div className="relative z-50 h-full">
+              <ChatSessionSidebar
+                sessions={allSessions}
+                activeSessionKey={sessionKey}
+                mainSessionKey={mainSessionKey}
+                onSelectSession={(key) => { handleSelectSession(key); setSidebarOpen(false); }}
+                onCreateSession={createSession}
+                onRenameSession={renameSession}
+                onDeleteSession={deleteSession}
+                onClose={() => setSidebarOpen(false)}
+                isLoading={resolving}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* ─── Main chat area ────────────────────────────────────────── */}
+        <div className="flex h-full flex-1 flex-col min-w-0">
         {/* ─── Header bar ──────────────────────────────────────────────── */}
         <div className="flex items-center justify-between border-b border-[color:var(--border)] bg-[color:var(--surface)] px-4 py-3">
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="rounded-md p-1.5 text-[color:var(--text-quiet)] hover:bg-[color:var(--surface-muted)] hover:text-[color:var(--text)] transition"
+              title={sidebarOpen ? "Hide conversations" : "Show conversations"}
+            >
+              <PanelLeft className="h-4 w-4" />
+            </button>
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-500">
               <Bot className="h-4.5 w-4.5 text-white" />
             </div>
             <div>
               <p className="text-sm font-medium text-[color:var(--text)]">
-                The Claw
+                {sessionKey === mainSessionKey ? "The Claw" : (allSessions.find((s) => s.key === sessionKey)?.displayName || "Conversation")}
               </p>
               {agentTyping ? (
                 <p className="text-xs text-emerald-600">typing...</p>
               ) : (
                 <p className="text-xs text-[color:var(--text-quiet)]">
-                  #general
+                  {sessionKey === mainSessionKey ? "#general" : "chat session"}
                 </p>
               )}
             </div>
@@ -898,6 +1049,7 @@ export default function ChatPage() {
             </div>
           </div>
         ) : null}
+      </div>
       </div>
     </DashboardPageLayout>
   );
