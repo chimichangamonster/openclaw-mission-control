@@ -160,7 +160,7 @@ export function LandingHero() {
             {
               title: "Your own AI assistant",
               description:
-                "A dedicated AI bot in your own Discord server, configured with your business name, your industry language, your cost codes, and your workflows. It knows your business.",
+                "A dedicated AI bot in your own messaging channel, configured with your business name, your industry language, your cost codes, and your workflows. It knows your business.",
             },
             {
               title: "48 business skills, ready to go",
