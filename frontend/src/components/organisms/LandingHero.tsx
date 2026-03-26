@@ -212,12 +212,12 @@ export function LandingHero() {
       {/* Use Cases by Industry */}
       <section className="trust-section" id="use-cases">
         <div className="trust-header">
-          <h2>What it does for your industry</h2>
+          <h2>What&apos;s possible for your industry</h2>
           <p>
-            Every example below is a real capability — not a roadmap item. Your
-            AI assistant reads documents, analyzes patterns, drafts outputs, and
-            waits for your approval. You don&apos;t need to learn AI. You just
-            describe what you need.
+            Included capabilities ship with your $1,000 setup — existing skills,
+            just configured for your business. Custom workflows are built for
+            your specific needs at $150/hr and plug directly into the same
+            platform.
           </p>
         </div>
 
@@ -226,352 +226,158 @@ export function LandingHero() {
           {
             industry: "Any Small Business",
             icon: "&#127970;",
-            cases: [
-              {
-                title: "Email triage",
-                text: "AI prioritizes your inbox, summarizes threads, and drafts replies for your approval. Never miss a critical email buried under newsletters.",
-              },
-              {
-                title: "Expense classification",
-                text: "Photograph a receipt or forward an invoice. AI extracts vendor, amount, and line items, then classifies using your cost codes. No more accountant rework.",
-              },
-              {
-                title: "Invoice generation",
-                text: "Describe the work in conversation. AI generates a branded PDF invoice with line items, tax, and payment terms.",
-              },
-              {
-                title: "Follow-up reminders",
-                text: "Track who hasn't responded to proposals, invoices, or requests. AI drafts nudge emails for your approval.",
-              },
-              {
-                title: "Meeting prep",
-                text: "Research a company before a call. AI generates a brief with their background, recent news, and a tailored call agenda.",
-              },
-              {
-                title: "Weekly summary reports",
-                text: "What happened this week, what's overdue, what's coming up next — generated automatically from your activity.",
-              },
-              {
-                title: "Social media drafting",
-                text: "AI drafts posts based on your business updates. Review and approve before publishing. Never auto-posted.",
-              },
-              {
-                title: "Customer follow-up",
-                text: "3 months since their last service? AI flags it and drafts a check-in email. You review and send.",
-              },
-              {
-                title: "Document organization",
-                text: "Upload a batch of files. AI classifies each one (invoice, contract, report, receipt) and extracts key metadata.",
-              },
-              {
-                title: "Scheduling coordination",
-                text: "AI resolves contact names to emails, checks calendar availability, and drafts meeting invites with agendas.",
-              },
+            included: [
+              { title: "Email triage", text: "AI prioritizes your inbox, summarizes threads, and drafts replies for your approval. Never miss a critical email buried under newsletters." },
+              { title: "Expense classification", text: "Photograph a receipt or forward an invoice. AI extracts vendor, amount, and line items, then classifies using your cost codes. No more accountant rework." },
+              { title: "Invoice generation", text: "Describe the work in conversation. AI generates a branded PDF invoice with line items, tax, and payment terms." },
+              { title: "Follow-up reminders", text: "Track who hasn\u2019t responded to proposals, invoices, or requests. AI drafts nudge emails for your approval." },
+              { title: "Meeting prep", text: "Research a company before a call. AI generates a brief with their background, recent news, and a tailored call agenda." },
+              { title: "Weekly summary reports", text: "What happened this week, what\u2019s overdue, what\u2019s coming up next \u2014 generated automatically from your activity." },
+              { title: "Social media drafting", text: "AI drafts posts based on your business updates. Review and approve before publishing. Never auto-posted." },
+              { title: "Customer follow-up", text: "3 months since their last service? AI flags it and drafts a check-in email. You review and send." },
+              { title: "Document organization", text: "Upload a batch of files. AI classifies each one (invoice, contract, report, receipt) and extracts key metadata." },
+              { title: "Scheduling coordination", text: "AI resolves contact names to emails, checks calendar availability, and drafts meeting invites with agendas." },
             ],
+            custom: [],
           },
           {
             industry: "Sales & Consulting",
             icon: "&#128188;",
-            cases: [
-              {
-                title: "Lead qualification",
-                text: "Mention a prospect and the AI scores them against your ideal client profile across 8 factors. Hot, warm, cool, or not a fit — with reasoning.",
-              },
-              {
-                title: "Proposal drafting",
-                text: "AI generates a statement of work with two pricing options, scope boundaries, and an out-of-scope section to prevent scope creep.",
-              },
-              {
-                title: "Competitor research",
-                text: "Weekly scans of competitor websites, news mentions, and social media. Summarized into a brief you can act on.",
-              },
-              {
-                title: "Pipeline tracking",
-                text: "Where's each deal? What's been stale for 7+ days? AI monitors your pipeline and flags deals that need attention.",
-              },
-              {
-                title: "Discovery call prep",
-                text: "AI researches the prospect's company, tech stack, recent news, and generates a tailored call agenda with post-call notes template.",
-              },
+            included: [
+              { title: "Lead qualification", text: "Mention a prospect and the AI scores them against your ideal client profile across 8 factors. Hot, warm, cool, or not a fit \u2014 with reasoning." },
+              { title: "Proposal drafting", text: "AI generates a statement of work with two pricing options, scope boundaries, and an out-of-scope section to prevent scope creep." },
+              { title: "Competitor research", text: "Weekly scans of competitor websites, news mentions, and social media. Summarized into a brief you can act on." },
+              { title: "Pipeline tracking", text: "Where\u2019s each deal? What\u2019s been stale for 7+ days? AI monitors your pipeline and flags deals that need attention." },
+              { title: "Discovery call prep", text: "AI researches the prospect\u2019s company, tech stack, recent news, and generates a tailored call agenda with post-call notes template." },
             ],
+            custom: [],
           },
           {
             industry: "Construction & Trades",
             icon: "&#127959;",
-            cases: [
-              {
-                title: "Job cost tracking",
-                text: "Expenses mapped to projects and cost codes automatically. Know your margins in real-time, not three months after the job.",
-              },
-              {
-                title: "Field report processing",
-                text: "Upload a photo or PDF from the field. AI extracts data, classifies the document, and routes it to the right workflow.",
-              },
-              {
-                title: "Bid preparation",
-                text: "AI drafts bids from project specs using your historical pricing data and material costs. You review the numbers and send.",
-              },
-              {
-                title: "Subcontractor credential monitoring",
-                text: "Track insurance, WCB, and COR expiry dates. AI alerts you before credentials lapse so you're never caught with an uncovered sub on site.",
-              },
-              {
-                title: "Safety document classification",
-                text: "Upload safety docs and the AI maps them to COR audit elements. Know exactly which compliance requirements are covered and where the gaps are.",
-              },
-              {
-                title: "Change order detection",
-                text: "Client sends a revised drawing. AI compares to the original spec and flags what changed — dimensions, materials, quantities — and estimates the cost impact.",
-              },
+            included: [
+              { title: "Job cost tracking", text: "Expenses mapped to projects and cost codes automatically. Know your margins in real-time, not three months after the job." },
+              { title: "Field report processing", text: "Upload a photo or PDF from the field. AI extracts data, classifies the document, and routes it to the right workflow." },
+            ],
+            custom: [
+              { title: "Bid preparation", text: "AI reads project specs, extracts quantities and scope, and drafts bids using your historical pricing. Estimator verifies takeoff, PM reviews and submits." },
+              { title: "Subcontractor credential monitoring", text: "Track insurance, WCB, and COR expiry dates. AI alerts you before credentials lapse so you\u2019re never caught with an uncovered sub on site." },
+              { title: "Safety document classification", text: "Upload safety docs and the AI maps them to COR audit elements. Know exactly which compliance requirements are covered and where the gaps are." },
+              { title: "Change order detection", text: "Client sends a revised drawing. AI compares to the original spec and flags what changed \u2014 dimensions, materials, quantities \u2014 and estimates the cost impact." },
             ],
           },
           {
             industry: "Millwork & Custom Fabrication",
             icon: "&#129692;",
-            cases: [
-              {
-                title: "Spec sheet extraction",
-                text: "Customer sends a drawing (photo, PDF, CAD screenshot). AI extracts dimensions, material, finish, hardware, and quantity into a structured cut list.",
-              },
-              {
-                title: "Quote generation from drawings",
-                text: "From the extracted spec: '4 linear feet of white oak crown, mitered corners, satin finish' — AI drafts a quote using your rate sheet and material costs.",
-              },
-              {
-                title: "Material estimation",
-                text: "AI calculates sheet goods, linear footage, and edge banding needed for a job — with waste factor included. No more manual takeoffs for standard items.",
-              },
-              {
-                title: "Change order detection",
-                text: "Revised drawing comes in. AI compares to the original: 'Door width changed from 32\" to 36\", hinge count increased, adds $X to the quote.'",
-              },
-              {
-                title: "Shop drawing review",
-                text: "Upload the shop drawing and the original spec. AI flags discrepancies: spec calls for soft-close hinges but drawing shows standard.",
-              },
-              {
-                title: "Job status updates",
-                text: "Log progress in chat. AI drafts client update emails: 'Cabinet install 60% complete, waiting on glass inserts from supplier. ETA Thursday.'",
-              },
+            included: [
+              { title: "Job status updates", text: "Log progress in chat. AI drafts client update emails: \u2018Cabinet install 60% complete, waiting on glass inserts from supplier. ETA Thursday.\u2019" },
+            ],
+            custom: [
+              { title: "Spec sheet extraction", text: "Customer sends a drawing (photo, PDF, CAD screenshot). AI extracts dimensions, material, finish, hardware, and quantity into a structured cut list." },
+              { title: "Quote generation from drawings", text: "From the extracted spec: \u20184 linear feet of white oak crown, mitered corners, satin finish\u2019 \u2014 AI drafts a quote using your rate sheet and material costs." },
+              { title: "Material estimation", text: "AI calculates sheet goods, linear footage, and edge banding needed for a job \u2014 with waste factor included. No more manual takeoffs for standard items." },
+              { title: "Change order detection", text: "Revised drawing comes in. AI compares to the original: \u2018Door width changed from 32\" to 36\", hinge count increased, adds $X to the quote.\u2019" },
+              { title: "Shop drawing review", text: "Upload the shop drawing and the original spec. AI flags discrepancies: spec calls for soft-close hinges but drawing shows standard." },
             ],
           },
           {
             industry: "Retail",
             icon: "&#128722;",
-            cases: [
-              {
-                title: "Supplier invoice reconciliation",
-                text: "Upload the invoice and the PO. AI flags discrepancies: 'They billed 24 cases but your PO was for 20.' Catch billing errors before you pay.",
-              },
-              {
-                title: "Price comparison",
-                text: "Upload a competitor's flyer (photo works). AI extracts prices, compares to yours, and flags where you're being undercut.",
-              },
-              {
-                title: "Customer complaint analysis",
-                text: "Log complaints via email or chat. AI categorizes them (product, service, wait time) and spots patterns: '60% of complaints are Friday afternoon wait times.'",
-              },
-              {
-                title: "Staff scheduling",
-                text: "'Draft next week's schedule — Sarah can't do Tuesdays, need 3 people Saturday.' AI generates it, you adjust and post.",
-              },
-              {
-                title: "Loss prevention patterns",
-                text: "Staff logs shrinkage and waste daily. AI identifies trends: 'Produce waste spikes every Monday — are weekend orders too large?'",
-              },
-              {
-                title: "Seasonal planning",
-                text: "'What did we order for Canada Day last year?' AI searches through uploaded docs and emails for historical context.",
-              },
-              {
-                title: "Promotional content",
-                text: "AI drafts social posts and email campaigns for sales events. You review and approve — nothing goes out without your say.",
-              },
-              {
-                title: "Supplier communication",
-                text: "Forward supplier emails. AI extracts pricing changes, compares to previous orders, and flags increases worth negotiating.",
-              },
+            included: [
+              { title: "Staff scheduling", text: "\u2018Draft next week\u2019s schedule \u2014 Sarah can\u2019t do Tuesdays, need 3 people Saturday.\u2019 AI generates it, you adjust and post." },
+              { title: "Seasonal planning", text: "\u2018What did we order for Canada Day last year?\u2019 AI searches through uploaded docs and emails for historical context." },
+              { title: "Promotional content", text: "AI drafts social posts and email campaigns for sales events. You review and approve \u2014 nothing goes out without your say." },
+              { title: "Supplier communication", text: "Forward supplier emails. AI extracts pricing changes, compares to previous orders, and flags increases worth negotiating." },
             ],
-          },
-          {
-            industry: "Compliance & Safety",
-            icon: "&#128737;",
-            cases: [
-              {
-                title: "COR audit gap detection",
-                text: "AI monitors readiness across 14 COR elements, identifies missing evidence, and drafts corrective actions. Safety managers review and approve.",
-              },
-              {
-                title: "Incident pattern analysis",
-                text: "AI analyzes trends across incident reports and recommends engineering or administrative controls. 'Slip/fall incidents at loading dock up 40% — recommend anti-slip coating.'",
-              },
-              {
-                title: "Training expiry monitoring",
-                text: "Who needs recertification? AI tracks expiry dates and sends alerts before credentials lapse. Draft enrollment emails for approval.",
-              },
-              {
-                title: "Document version tracking",
-                text: "AI flags when regulations change and which of your documents reference outdated versions. Prioritizes what needs updating.",
-              },
-            ],
-          },
-          {
-            industry: "Healthcare & Clinics",
-            icon: "&#127973;",
-            cases: [
-              {
-                title: "Patient intake form processing",
-                text: "Upload handwritten intake forms. AI extracts and structures the data — name, DOB, medications, allergies — for staff to review and confirm.",
-              },
-              {
-                title: "Appointment reminder drafting",
-                text: "AI generates personalized reminders based on appointment type and patient history. Staff reviews and sends.",
-              },
-              {
-                title: "Insurance pre-auth documentation",
-                text: "AI drafts the pre-authorization narrative from clinical notes. Clinician reviews the language and submits. Cuts documentation time significantly.",
-              },
-              {
-                title: "Referral letter generation",
-                text: "'Draft a referral to Dr. Smith for the knee issue.' AI generates a properly formatted referral letter for the physician to review and sign.",
-              },
+            custom: [
+              { title: "Supplier invoice reconciliation", text: "Upload the invoice and the PO. AI flags discrepancies: \u2018They billed 24 cases but your PO was for 20.\u2019 Catch billing errors before you pay." },
+              { title: "Price comparison", text: "Upload a competitor\u2019s flyer (photo works). AI extracts prices, compares to yours, and flags where you\u2019re being undercut." },
+              { title: "Customer complaint analysis", text: "Log complaints via email or chat. AI categorizes them (product, service, wait time) and spots patterns: \u201860% of complaints are Friday afternoon wait times.\u2019" },
+              { title: "Loss prevention patterns", text: "Staff logs shrinkage and waste daily. AI identifies trends: \u2018Produce waste spikes every Monday \u2014 are weekend orders too large?\u2019" },
             ],
           },
           {
             industry: "Property Management",
             icon: "&#127968;",
-            cases: [
-              {
-                title: "Tenant communication",
-                text: "AI drafts responses to maintenance requests, lease inquiries, and renewal notices. Property manager reviews tone and sends.",
-              },
-              {
-                title: "Maintenance request triage",
-                text: "Tenant emails 'water under the sink.' AI categorizes as plumbing/urgent, drafts a work order with priority level and vendor suggestion.",
-              },
-              {
-                title: "Lease document extraction",
-                text: "Upload a lease. AI extracts key dates — start, end, renewal deadline, rent increase schedule — and sets calendar reminders automatically.",
-              },
-              {
-                title: "Expense allocation",
-                text: "Assign maintenance costs to the correct property and unit for tax reporting. AI categorizes from invoices and receipts.",
-              },
+            included: [
+              { title: "Tenant communication", text: "AI drafts responses to maintenance requests, lease inquiries, and renewal notices. Property manager reviews tone and sends." },
+              { title: "Maintenance request triage", text: "Tenant emails \u2018water under the sink.\u2019 AI categorizes as plumbing/urgent, drafts a work order with priority level and vendor suggestion." },
+              { title: "Lease document extraction", text: "Upload a lease. AI extracts key dates \u2014 start, end, renewal deadline, rent increase schedule \u2014 and sets calendar reminders automatically." },
+              { title: "Expense allocation", text: "Assign maintenance costs to the correct property and unit for tax reporting. AI categorizes from invoices and receipts." },
             ],
+            custom: [],
           },
           {
-            industry: "Agriculture",
-            icon: "&#127806;",
-            cases: [
-              {
-                title: "Crop log analysis",
-                text: "Farmer logs observations — weather, pest sightings, yields, soil conditions. AI spots patterns across seasons that are invisible in raw data.",
-              },
-              {
-                title: "Equipment maintenance scheduling",
-                text: "Upload equipment manuals. AI tracks service intervals per machine and flags upcoming maintenance before breakdowns happen.",
-              },
-              {
-                title: "Market price monitoring",
-                text: "AI summarizes commodity price trends from public data. Flags optimal sell windows and hold recommendations based on historical patterns.",
-              },
-              {
-                title: "Compliance documentation",
-                text: "Organic certification, pesticide application logs, water usage records — AI organizes submissions and flags gaps before audit deadlines.",
-              },
+            industry: "Healthcare & Clinics",
+            icon: "&#127973;",
+            included: [
+              { title: "Appointment reminder drafting", text: "AI generates personalized reminders based on appointment type and patient history. Staff reviews and sends." },
+              { title: "Referral letter generation", text: "\u2018Draft a referral to Dr. Smith for the knee issue.\u2019 AI generates a properly formatted referral letter for the physician to review and sign." },
+            ],
+            custom: [
+              { title: "Patient intake form processing", text: "Upload handwritten intake forms. AI extracts and structures the data \u2014 name, DOB, medications, allergies \u2014 for staff to review and confirm." },
+              { title: "Insurance pre-auth documentation", text: "AI drafts the pre-authorization narrative from clinical notes. Clinician reviews the language and submits. Cuts documentation time significantly." },
             ],
           },
           {
             industry: "Logistics & Trucking",
             icon: "&#128666;",
-            cases: [
-              {
-                title: "Trip log processing",
-                text: "Upload driver logs. AI validates hours of service compliance, flags potential violations, and generates summary reports for dispatch.",
-              },
-              {
-                title: "Fuel expense analysis",
-                text: "AI tracks fuel costs per route and per driver. Identifies inefficient routes, unusual consumption patterns, and cost-saving opportunities.",
-              },
-              {
-                title: "Load documentation",
-                text: "Bill of lading extraction and cross-reference with delivery confirmations. AI flags missing signatures, discrepancies, and incomplete paperwork.",
-              },
-              {
-                title: "Carrier rate comparison",
-                text: "Forward quotes from multiple carriers. AI compares rates, transit times, and reliability history to recommend the best option.",
-              },
+            included: [
+              { title: "Carrier rate comparison", text: "Forward quotes from multiple carriers. AI compares rates, transit times, and reliability history to recommend the best option." },
             ],
-          },
-          {
-            industry: "Legal & Accounting Firms",
-            icon: "&#9878;",
-            cases: [
-              {
-                title: "Time entry assistance",
-                text: "Describe what you worked on in plain language. AI categorizes by client and matter code, calculates duration, and drafts the time entry.",
-              },
-              {
-                title: "Document review prep",
-                text: "Upload a contract. AI flags non-standard clauses, missing sections, and unusual terms — so the lawyer knows where to focus before reading 40 pages.",
-              },
-              {
-                title: "Client intake processing",
-                text: "New client emails their situation. AI drafts a conflict check summary, intake memo, and initial matter classification.",
-              },
-              {
-                title: "Deadline tracking",
-                text: "AI monitors filing deadlines, limitation periods, and regulatory due dates extracted from uploaded documents. Alerts before anything lapses.",
-              },
+            custom: [
+              { title: "Trip log processing", text: "Upload driver logs. AI validates hours of service compliance, flags potential violations, and generates summary reports for dispatch." },
+              { title: "Fuel expense analysis", text: "AI tracks fuel costs per route and per driver. Identifies inefficient routes, unusual consumption patterns, and cost-saving opportunities." },
+              { title: "Load documentation", text: "Bill of lading extraction and cross-reference with delivery confirmations. AI flags missing signatures, discrepancies, and incomplete paperwork." },
             ],
           },
           {
             industry: "Restaurants & Food Service",
             icon: "&#127869;",
-            cases: [
-              {
-                title: "Menu costing",
-                text: "Upload supplier invoices and your menu. AI calculates food cost percentage per dish and flags items running below your margin target.",
-              },
-              {
-                title: "Health inspection prep",
-                text: "AI generates a pre-inspection checklist based on your jurisdiction's specific requirements. Walk through it before the inspector arrives.",
-              },
-              {
-                title: "Staff certification tracking",
-                text: "Food handler cards, WHMIS, first aid — AI monitors expiry dates across all staff and drafts renewal reminder emails.",
-              },
-              {
-                title: "Waste analysis",
-                text: "Log daily waste by category. AI identifies trends: 'Soup waste spikes Wednesday — consider reducing the Thursday prep batch by 30%.'",
-              },
+            included: [
+              { title: "Health inspection prep", text: "AI generates a pre-inspection checklist based on your jurisdiction\u2019s specific requirements. Walk through it before the inspector arrives." },
+              { title: "Staff certification tracking", text: "Food handler cards, WHMIS, first aid \u2014 AI monitors expiry dates across all staff and drafts renewal reminder emails." },
+            ],
+            custom: [
+              { title: "Menu costing", text: "Upload supplier invoices and your menu. AI calculates food cost percentage per dish and flags items running below your margin target." },
+              { title: "Waste analysis", text: "Log daily waste by category. AI identifies trends: \u2018Soup waste spikes Wednesday \u2014 consider reducing the Thursday prep batch by 30%.\u2019" },
+            ],
+          },
+          {
+            industry: "Agriculture",
+            icon: "&#127806;",
+            included: [
+              { title: "Equipment maintenance scheduling", text: "Upload equipment manuals. AI tracks service intervals per machine and flags upcoming maintenance before breakdowns happen." },
+              { title: "Compliance documentation", text: "Organic certification, pesticide application logs, water usage records \u2014 AI organizes submissions and flags gaps before audit deadlines." },
+            ],
+            custom: [
+              { title: "Crop log analysis", text: "Farmer logs observations \u2014 weather, pest sightings, yields, soil conditions. AI spots patterns across seasons that are invisible in raw data." },
+              { title: "Market price monitoring", text: "AI summarizes commodity price trends from public data. Flags optimal sell windows and hold recommendations based on historical patterns." },
+            ],
+          },
+          {
+            industry: "Legal & Accounting Firms",
+            icon: "&#9878;",
+            included: [
+              { title: "Time entry assistance", text: "Describe what you worked on in plain language. AI categorizes by client and matter code, calculates duration, and drafts the time entry." },
+              { title: "Client intake processing", text: "New client emails their situation. AI drafts a conflict check summary, intake memo, and initial matter classification." },
+            ],
+            custom: [
+              { title: "Document review prep", text: "Upload a contract. AI flags non-standard clauses, missing sections, and unusual terms \u2014 so the lawyer knows where to focus before reading 40 pages." },
+              { title: "Deadline tracking", text: "AI monitors filing deadlines, limitation periods, and regulatory due dates extracted from uploaded documents. Alerts before anything lapses." },
             ],
           },
           {
             industry: "Developers & Technical Teams",
             icon: "&#128187;",
-            cases: [
-              {
-                title: "Model A/B testing",
-                text: "Run the same prompt through Claude, GPT, DeepSeek, and Gemini. Compare output quality, latency, and cost. Pick the best model for each task type.",
-              },
-              {
-                title: "Multi-model pipelines",
-                text: "Cheap model extracts data, mid-tier validates and structures, expensive model makes the final decision. Each step uses the right tool for the job.",
-              },
-              {
-                title: "Cost simulation",
-                text: "Test a workflow against 300+ model pricing tiers before deploying to production. Know what a 1,000-user deployment costs before you commit.",
-              },
-              {
-                title: "Prompt versioning",
-                text: "Skills are markdown files, version controlled in git. Roll back a bad prompt like you'd roll back code. Full history of what changed and when.",
-              },
-              {
-                title: "Agent observability",
-                text: "Every LLM call logged with model, token count, latency, and cost. Prometheus metrics and Grafana dashboards included out of the box.",
-              },
+            included: [
+              { title: "Model A/B testing", text: "Run the same prompt through Claude, GPT, DeepSeek, and Gemini. Compare output quality, latency, and cost. Pick the best model for each task type." },
+              { title: "Multi-model pipelines", text: "Cheap model extracts data, mid-tier validates and structures, expensive model makes the final decision. Each step uses the right tool for the job." },
+              { title: "Cost simulation", text: "Test a workflow against 300+ model pricing tiers before deploying to production. Know what a 1,000-user deployment costs before you commit." },
+              { title: "Prompt versioning", text: "Skills are markdown files, version controlled in git. Roll back a bad prompt like you\u2019d roll back code. Full history of what changed and when." },
+              { title: "Agent observability", text: "Every LLM call logged with model, token count, latency, and cost. Prometheus metrics and Grafana dashboards included out of the box." },
             ],
+            custom: [],
           },
         ].map((section) => (
           <div key={section.industry} style={{ marginBottom: "3rem" }}>
@@ -590,14 +396,36 @@ export function LandingHero() {
               />{" "}
               {section.industry}
             </h3>
-            <div className="trust-grid">
-              {section.cases.map((c) => (
-                <div key={c.title} className="trust-card">
-                  <h3>{c.title}</h3>
-                  <p>{c.text}</p>
+            {section.included.length > 0 && (
+              <>
+                <p style={{ fontSize: "0.8rem", color: "var(--text-muted, #94a3b8)", marginBottom: "0.75rem", paddingLeft: "1rem", fontWeight: 500 }}>
+                  Included in setup
+                </p>
+                <div className="trust-grid" style={{ marginBottom: "1.5rem" }}>
+                  {section.included.map((c) => (
+                    <div key={c.title} className="trust-card">
+                      <h3>{c.title}</h3>
+                      <p>{c.text}</p>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              </>
+            )}
+            {section.custom.length > 0 && (
+              <>
+                <p style={{ fontSize: "0.8rem", color: "var(--accent, #3b82f6)", marginBottom: "0.75rem", paddingLeft: "1rem", fontWeight: 500 }}>
+                  Custom development &mdash; $150/hr
+                </p>
+                <div className="trust-grid">
+                  {section.custom.map((c) => (
+                    <div key={c.title} className="trust-card" style={{ borderColor: "var(--accent, #3b82f6)", borderWidth: "1px", borderStyle: "solid", opacity: 0.85 }}>
+                      <h3>{c.title}</h3>
+                      <p>{c.text}</p>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         ))}
       </section>
@@ -615,44 +443,47 @@ export function LandingHero() {
           {[
             {
               tier: "You Host",
-              price: "$30\u201350",
-              period: "/mo server",
-              description: "Your own cloud server + AI API key",
+              price: "$1,000",
+              period: " setup",
+              description: "Your own cloud server \u2014 you control everything",
               features: [
+                "$1,000 one-time setup fee",
+                "Cloud VPS: $30\u201350/mo (you pay provider directly)",
+                "AI API: usage-based (you pay OpenRouter directly)",
                 "Your data stays on your server",
-                "Cloud VPS (OVH, DigitalOcean, Vultr)",
-                "AI costs: $20\u201350/mo (pay-as-you-go)",
                 "Your own Discord server + AI bot",
-                "We configure everything for you",
+                "Full configuration: discovery, SOUL.md, skills, integrations",
+                "Optional monthly retainer for ongoing support",
               ],
             },
             {
               tier: "Mac Mini",
-              price: "$0",
-              period: "/mo server",
+              price: "$1,000",
+              period: " setup",
               highlight: true,
-              description: "Run it at your office on your own hardware",
+              description: "Run it at your office \u2014 near-zero recurring cost",
               features: [
-                "Docker on Mac Mini at your location",
-                "Local AI for basic tasks (near-zero cost)",
-                "Cloud AI only for complex reasoning",
-                "No recurring server costs",
+                "$1,000 one-time setup fee",
+                "No monthly server cost \u2014 runs on your hardware",
+                "AI API: usage-based (you pay OpenRouter directly)",
+                "Local AI for basic tasks (optional, near-zero cost)",
                 "Your own Discord server + AI bot",
-                "We set it up for you",
+                "Full configuration: discovery, SOUL.md, skills, integrations",
+                "Optional monthly retainer for ongoing support",
               ],
             },
             {
               tier: "We Host",
-              price: "$500",
+              price: "$250",
               period: "/mo",
               description: "We run everything on Canadian infrastructure",
               features: [
+                "Setup fee included",
                 "Dedicated Canadian server",
-                "AI costs included",
+                "AI costs included in monthly price",
                 "Monitoring and maintenance included",
                 "Your own Discord server + AI bot",
                 "Priority support",
-                "Quarterly optimization reviews",
               ],
             },
           ].map((plan) => (
