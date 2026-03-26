@@ -16,6 +16,7 @@ class ChatAttachment(SQLModel):
     workspace_path: str
     content_type: str
     size_bytes: int
+    sanitized_workspace_path: str | None = None
 
 
 class GatewaySessionMessageRequest(SQLModel):
@@ -32,6 +33,7 @@ class ChatUploadResponse(SQLModel):
     workspace_path: str
     content_type: str
     size_bytes: int
+    sanitized_workspace_path: str | None = None
 
 
 class CreateSessionRequest(SQLModel):

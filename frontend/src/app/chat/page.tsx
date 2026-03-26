@@ -76,6 +76,7 @@ interface ChatAttachment {
   workspace_path: string;
   content_type: string;
   size_bytes: number;
+  sanitized_workspace_path?: string | null;
   preview_url?: string; // local blob URL for image preview
 }
 
@@ -505,8 +506,8 @@ export default function ChatPage() {
     try {
       const body: Record<string, unknown> = { content };
       if (attachments) {
-        body.attachments = attachments.map(({ filename, workspace_path, content_type, size_bytes }) => ({
-          filename, workspace_path, content_type, size_bytes,
+        body.attachments = attachments.map(({ filename, workspace_path, content_type, size_bytes, sanitized_workspace_path }) => ({
+          filename, workspace_path, content_type, size_bytes, sanitized_workspace_path,
         }));
       }
       await customFetch(

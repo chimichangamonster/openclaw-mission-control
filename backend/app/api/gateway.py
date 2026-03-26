@@ -99,6 +99,53 @@ async def upload_chat_file(
     dest.write_bytes(data)
     workspace_path = f"{relative_dir}/{unique_name}"
 
+    # Sanitize text-extractable files (PDF, CSV, TXT, JSON, Markdown)
+    sanitized_workspace_path: str | None = None
+    try:
+        from app.services.chat_upload_sanitize import (
+            TEXT_EXTRACTABLE_TYPES,
+            extract_and_sanitize_upload,
+        )
+
+        if content_type in TEXT_EXTRACTABLE_TYPES:
+            # Load org's redaction level from settings
+            redaction_level = "moderate"
+            try:
+                from sqlmodel import select as sql_select
+
+                from app.db.session import async_session_maker
+                from app.models.organization_settings import OrganizationSettings
+
+                async with async_session_maker() as db:
+                    result = await db.execute(
+                        sql_select(OrganizationSettings).where(
+                            OrganizationSettings.organization_id == ctx.organization.id
+                        )
+                    )
+                    settings = result.scalars().first()
+                    if settings and settings.data_policy:
+                        redaction_level = settings.data_policy.get("redaction_level", "moderate")
+            except Exception:
+                pass  # Fall back to moderate
+
+            sanitized_text = await extract_and_sanitize_upload(
+                data, content_type, original_name, redaction_level,
+            )
+            if sanitized_text is not None:
+                sanitized_name = f"{uuid4().hex[:12]}.sanitized.txt"
+                sanitized_dest = upload_dir / sanitized_name
+                sanitized_dest.write_text(sanitized_text, encoding="utf-8")
+                sanitized_workspace_path = f"{relative_dir}/{sanitized_name}"
+                logger.info(
+                    "chat.upload.sanitized org_id=%s file=%s sanitized_path=%s",
+                    org_id, original_name, sanitized_workspace_path,
+                )
+    except Exception:
+        logger.warning(
+            "chat.upload.sanitize_failed org_id=%s file=%s",
+            org_id, original_name, exc_info=True,
+        )
+
     logger.info(
         "chat.upload org_id=%s file=%s size=%d path=%s",
         org_id, original_name, len(data), workspace_path,
@@ -109,6 +156,7 @@ async def upload_chat_file(
         workspace_path=workspace_path,
         content_type=content_type,
         size_bytes=len(data),
+        sanitized_workspace_path=sanitized_workspace_path,
     )
 
 

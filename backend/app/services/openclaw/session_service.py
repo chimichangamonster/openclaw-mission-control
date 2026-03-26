@@ -223,7 +223,8 @@ class GatewaySessionService(OpenClawDBService):
             return payload.content
         lines = ["[Attached files]"]
         for att in payload.attachments:
-            lines.append(f"- {att.filename} ({att.content_type}, {att.size_bytes:,} bytes): {att.workspace_path}")
+            agent_path = att.sanitized_workspace_path or att.workspace_path
+            lines.append(f"- {att.filename} ({att.content_type}, {att.size_bytes:,} bytes): {agent_path}")
         lines.append("[/Attached files]")
         lines.append("")
         lines.append(payload.content)
