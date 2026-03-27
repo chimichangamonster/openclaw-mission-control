@@ -77,25 +77,6 @@ async def fetch_messages(
         from_data = msg.get("from", {}).get("emailAddress", {})
         body = msg.get("body", {})
 
-        # Fetch attachment metadata for messages that have attachments
-        attachments: list[RawAttachment] = []
-        if msg.get("hasAttachments", False):
-            try:
-                att_list = await fetch_attachments(access_token, msg.get("id", ""))
-                attachments = [
-                    RawAttachment(
-                        filename=a["filename"],
-                        content_type=a.get("content_type"),
-                        size_bytes=a.get("size_bytes"),
-                        provider_attachment_id=a.get("provider_attachment_id"),
-                        content_id=a.get("content_id"),
-                        is_inline=a.get("is_inline", False),
-                    )
-                    for a in att_list
-                ]
-            except Exception:
-                logger.warning("Failed to fetch attachments for message %s", msg.get("id"))
-
         messages.append(
             RawEmailMessage(
                 provider_message_id=msg.get("id", ""),
@@ -112,7 +93,7 @@ async def fetch_messages(
                 folder=folder,
                 labels=None,
                 has_attachments=msg.get("hasAttachments", False),
-                attachments=attachments,
+                attachments=[],
             )
         )
     return messages, next_delta
@@ -125,11 +106,7 @@ async def fetch_attachments(
     """Fetch attachment metadata for a message from Graph API."""
     url = f"{GRAPH_URL}/me/messages/{message_id}/attachments"
     async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            url,
-            headers=_headers(access_token),
-            params={"$select": "id,name,contentType,size,isInline,contentId"},
-        )
+        resp = await client.get(url, headers=_headers(access_token))
         resp.raise_for_status()
         data = resp.json()
     return [

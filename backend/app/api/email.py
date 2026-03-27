@@ -253,7 +253,38 @@ async def get_email_message(
             )
         )
         att_result = await session.execute(att_stmt)
-        for att in att_result.scalars().all():
+        inline_atts = list(att_result.scalars().all())
+
+        # Lazy-fetch attachments from provider if none with content_id exist yet
+        if not inline_atts and msg.has_attachments and account.provider == "microsoft":
+            try:
+                from uuid import uuid4 as _uuid4
+
+                from app.services.email.providers.microsoft import fetch_attachments
+
+                access_token = await get_valid_access_token(session, account)
+                att_list = await fetch_attachments(access_token, msg.provider_message_id)
+                now = utcnow()
+                for a in att_list:
+                    att_obj = EmailAttachment(
+                        id=_uuid4(),
+                        email_message_id=msg.id,
+                        filename=a["filename"],
+                        content_type=a.get("content_type"),
+                        size_bytes=a.get("size_bytes"),
+                        provider_attachment_id=a.get("provider_attachment_id"),
+                        content_id=a.get("content_id"),
+                        is_inline=a.get("is_inline", False),
+                        created_at=now,
+                    )
+                    session.add(att_obj)
+                    if att_obj.content_id:
+                        inline_atts.append(att_obj)
+                await session.commit()
+            except Exception:
+                logger.warning("email.inline.lazy_fetch_failed", extra={"message_id": str(msg.id)})
+
+        for att in inline_atts:
             cid = att.content_id
             if cid:
                 # Encode attachment coordinates into a signed token (1h expiry)
@@ -442,7 +473,12 @@ async def list_email_attachments(
     ctx: OrganizationContext = ORG_MEMBER_DEP,
     session: AsyncSession = SESSION_DEP,
 ) -> list[EmailAttachment]:
-    """List attachment metadata for an email message."""
+    """List attachment metadata for an email message.
+
+    Lazily fetches from the provider if the DB has no records but the message
+    is flagged as having attachments (e.g. Microsoft Graph messages synced
+    before attachment fetching was added).
+    """
     account = await _get_account_or_404(account_id, ctx, session)
     msg = await _get_message_or_404(message_id, account, session)
     stmt = (
@@ -451,7 +487,37 @@ async def list_email_attachments(
         .order_by(EmailAttachment.created_at)
     )
     result = await session.execute(stmt)
-    return list(result.scalars().all())
+    attachments = list(result.scalars().all())
+
+    # Lazy-fetch from provider if DB is empty but message has attachments
+    if not attachments and msg.has_attachments and account.provider == "microsoft":
+        try:
+            from uuid import uuid4 as _uuid4
+
+            from app.services.email.providers.microsoft import fetch_attachments
+
+            access_token = await get_valid_access_token(session, account)
+            att_list = await fetch_attachments(access_token, msg.provider_message_id)
+            now = utcnow()
+            for a in att_list:
+                att = EmailAttachment(
+                    id=_uuid4(),
+                    email_message_id=msg.id,
+                    filename=a["filename"],
+                    content_type=a.get("content_type"),
+                    size_bytes=a.get("size_bytes"),
+                    provider_attachment_id=a.get("provider_attachment_id"),
+                    content_id=a.get("content_id"),
+                    is_inline=a.get("is_inline", False),
+                    created_at=now,
+                )
+                session.add(att)
+                attachments.append(att)
+            await session.commit()
+        except Exception:
+            logger.warning("email.attachments.lazy_fetch_failed", extra={"message_id": str(msg.id)})
+
+    return attachments
 
 
 @router.get(
@@ -471,7 +537,7 @@ async def download_email_attachment(
     if att is None or att.email_message_id != msg.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
 
-    access_token = await get_valid_access_token(account, session)
+    access_token = await get_valid_access_token(session, account)
 
     if account.provider == "zoho":
         from app.services.email.providers.zoho import download_attachment
@@ -546,7 +612,7 @@ async def get_inline_attachment(
     if msg is None or msg.email_account_id != account.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
 
-    access_token = await get_valid_access_token(account, session)
+    access_token = await get_valid_access_token(session, account)
 
     if account.provider == "zoho":
         from app.services.email.providers.zoho import download_attachment
