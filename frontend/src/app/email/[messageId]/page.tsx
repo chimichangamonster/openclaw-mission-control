@@ -8,10 +8,16 @@ import {
   Archive,
   ArrowLeft,
   Download,
+  Eye,
+  FileSpreadsheet,
+  FileText,
+  Image as ImageIcon,
   Mail,
   Paperclip,
+  Presentation,
   Reply,
   Tag,
+  X,
 } from "lucide-react";
 
 import { useAuth } from "@/auth/clerk";
@@ -22,6 +28,7 @@ import {
   type EmailMessage,
   fetchEmailMessage,
   fetchEmailAttachments,
+  fetchAttachmentBlob,
   downloadEmailAttachment,
   archiveEmail,
   replyToEmail,
@@ -42,6 +49,9 @@ export default function EmailMessagePage() {
   const [replyOpen, setReplyOpen] = useState(false);
   const [replyText, setReplyText] = useState("");
   const [sending, setSending] = useState(false);
+  const [previewAtt, setPreviewAtt] = useState<EmailAttachment | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   const loadMessage = useCallback(async () => {
     if (!accountId || !messageId) return;
@@ -70,6 +80,64 @@ export default function EmailMessagePage() {
   useEffect(() => {
     if (isSignedIn) loadMessage();
   }, [isSignedIn, loadMessage]);
+
+  const isPreviewable = (att: EmailAttachment) => {
+    const ct = att.content_type?.toLowerCase() ?? "";
+    const fn = att.filename.toLowerCase();
+    return (
+      ct.startsWith("image/") ||
+      ct === "application/pdf" ||
+      fn.endsWith(".pdf") ||
+      fn.endsWith(".jpg") || fn.endsWith(".jpeg") || fn.endsWith(".png") ||
+      fn.endsWith(".gif") || fn.endsWith(".webp")
+    );
+  };
+
+  const isImage = (att: EmailAttachment) => {
+    const ct = att.content_type?.toLowerCase() ?? "";
+    const fn = att.filename.toLowerCase();
+    return ct.startsWith("image/") || /\.(jpg|jpeg|png|gif|webp|svg)$/.test(fn);
+  };
+
+  const getFileIcon = (att: EmailAttachment) => {
+    const fn = att.filename.toLowerCase();
+    const ct = att.content_type?.toLowerCase() ?? "";
+    if (ct.startsWith("image/") || /\.(jpg|jpeg|png|gif|webp|svg)$/.test(fn))
+      return <ImageIcon className="h-5 w-5 text-emerald-500" />;
+    if (ct === "application/pdf" || fn.endsWith(".pdf"))
+      return <FileText className="h-5 w-5 text-red-500" />;
+    if (fn.endsWith(".xlsx") || fn.endsWith(".xls") || fn.endsWith(".csv") ||
+        ct.includes("spreadsheet") || ct.includes("excel"))
+      return <FileSpreadsheet className="h-5 w-5 text-green-600" />;
+    if (fn.endsWith(".pptx") || fn.endsWith(".ppt") || ct.includes("presentation"))
+      return <Presentation className="h-5 w-5 text-orange-500" />;
+    if (fn.endsWith(".docx") || fn.endsWith(".doc") || ct.includes("word"))
+      return <FileText className="h-5 w-5 text-blue-600" />;
+    return <Paperclip className="h-5 w-5 text-slate-400" />;
+  };
+
+  const openPreview = async (att: EmailAttachment) => {
+    if (!isPreviewable(att)) {
+      downloadEmailAttachment(accountId, messageId, att.id, att.filename || "attachment");
+      return;
+    }
+    setPreviewAtt(att);
+    setPreviewLoading(true);
+    try {
+      const url = await fetchAttachmentBlob(accountId, messageId, att.id);
+      setPreviewUrl(url);
+    } catch {
+      setPreviewUrl(null);
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  const closePreview = () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewAtt(null);
+    setPreviewUrl(null);
+  };
 
   const handleReply = async () => {
     if (!replyText.trim() || !message) return;
@@ -198,33 +266,107 @@ export default function EmailMessagePage() {
                 {attachments.length} attachment{attachments.length > 1 ? "s" : ""}
               </div>
               <div className="flex flex-wrap gap-2">
-                {attachments.map((att) => (
-                  <button
-                    key={att.id}
-                    type="button"
-                    onClick={() =>
-                      downloadEmailAttachment(
-                        accountId,
-                        messageId,
-                        att.id,
-                        att.filename || "attachment",
-                      )
-                    }
-                    className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 transition-colors hover:bg-slate-100"
-                  >
-                    <Download className="h-4 w-4 text-slate-400" />
-                    <span className="max-w-[200px] truncate">{att.filename || "Untitled"}</span>
-                    {att.size_bytes != null && (
-                      <span className="text-xs text-slate-400">
-                        {att.size_bytes < 1024
-                          ? `${att.size_bytes} B`
-                          : att.size_bytes < 1048576
-                            ? `${(att.size_bytes / 1024).toFixed(0)} KB`
-                            : `${(att.size_bytes / 1048576).toFixed(1)} MB`}
-                      </span>
-                    )}
-                  </button>
-                ))}
+                {attachments.map((att) => {
+                  const canPreview = isPreviewable(att);
+                  const sizeLabel = att.size_bytes != null
+                    ? att.size_bytes < 1024
+                      ? `${att.size_bytes} B`
+                      : att.size_bytes < 1048576
+                        ? `${(att.size_bytes / 1024).toFixed(0)} KB`
+                        : `${(att.size_bytes / 1048576).toFixed(1)} MB`
+                    : null;
+                  return (
+                    <div
+                      key={att.id}
+                      className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700"
+                    >
+                      {getFileIcon(att)}
+                      <span className="max-w-[200px] truncate">{att.filename || "Untitled"}</span>
+                      {sizeLabel && (
+                        <span className="text-xs text-slate-400">{sizeLabel}</span>
+                      )}
+                      <div className="ml-1 flex items-center gap-1">
+                        {canPreview && (
+                          <button
+                            type="button"
+                            onClick={() => openPreview(att)}
+                            className="rounded p-1 text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-600"
+                            title="Preview"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            downloadEmailAttachment(accountId, messageId, att.id, att.filename || "attachment")
+                          }
+                          className="rounded p-1 text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-600"
+                          title="Download"
+                        >
+                          <Download className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Attachment preview overlay */}
+          {previewAtt && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+              <div className="relative flex max-h-[90vh] w-full max-w-4xl flex-col rounded-xl bg-white shadow-2xl">
+                <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+                  <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                    {getFileIcon(previewAtt)}
+                    <span className="truncate">{previewAtt.filename}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        downloadEmailAttachment(accountId, messageId, previewAtt.id, previewAtt.filename || "attachment")
+                      }
+                      className="rounded p-1.5 text-slate-500 transition-colors hover:bg-slate-100"
+                      title="Download"
+                    >
+                      <Download className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={closePreview}
+                      className="rounded p-1.5 text-slate-500 transition-colors hover:bg-slate-100"
+                      title="Close"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+                <div className="flex-1 overflow-auto p-4">
+                  {previewLoading ? (
+                    <div className="flex h-64 items-center justify-center">
+                      <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent" />
+                    </div>
+                  ) : !previewUrl ? (
+                    <p className="py-8 text-center text-sm text-slate-500">
+                      Failed to load preview.
+                    </p>
+                  ) : isImage(previewAtt) ? (
+                    <img
+                      src={previewUrl}
+                      alt={previewAtt.filename}
+                      className="mx-auto max-h-[70vh] rounded object-contain"
+                    />
+                  ) : (
+                    <iframe
+                      src={previewUrl}
+                      title={previewAtt.filename}
+                      className="h-[70vh] w-full rounded border-0"
+                    />
+                  )}
+                </div>
               </div>
             </div>
           )}

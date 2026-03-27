@@ -187,21 +187,11 @@ export async function fetchEmailAttachments(
   return res.data;
 }
 
-export async function downloadEmailAttachment(
-  accountId: string,
-  messageId: string,
-  attachmentId: string,
-  filename: string,
-): Promise<void> {
-  // We need to fetch with auth headers, so we can't use a plain <a> tag.
-  // Use customFetch's auth resolution approach but handle the blob ourselves.
-  const { getApiBaseUrl } = await import("@/lib/api-base");
+async function _authHeaders(): Promise<Record<string, string>> {
   const { getLocalAuthToken, isLocalAuthMode } = await import("@/auth/localAuth");
   const { getWeChatAuthToken } = await import("@/auth/wechatAuth");
 
-  const baseUrl = getApiBaseUrl();
   const headers: Record<string, string> = {};
-
   if (isLocalAuthMode()) {
     const token = getLocalAuthToken();
     if (token) headers["Authorization"] = `Bearer ${token}`;
@@ -219,13 +209,34 @@ export async function downloadEmailAttachment(
       } catch { /* ignore */ }
     }
   }
+  return headers;
+}
 
-  const url = `${baseUrl}${V1}/email/accounts/${accountId}/messages/${messageId}/attachments/${attachmentId}/download`;
-  const resp = await fetch(url, { headers });
-  if (!resp.ok) throw new Error("Download failed");
+function _attachmentUrl(accountId: string, messageId: string, attachmentId: string): string {
+  return `${V1}/email/accounts/${accountId}/messages/${messageId}/attachments/${attachmentId}/download`;
+}
 
+export async function fetchAttachmentBlob(
+  accountId: string,
+  messageId: string,
+  attachmentId: string,
+): Promise<string> {
+  const { getApiBaseUrl } = await import("@/lib/api-base");
+  const baseUrl = getApiBaseUrl();
+  const headers = await _authHeaders();
+  const resp = await fetch(`${baseUrl}${_attachmentUrl(accountId, messageId, attachmentId)}`, { headers });
+  if (!resp.ok) throw new Error("Failed to fetch attachment");
   const blob = await resp.blob();
-  const blobUrl = URL.createObjectURL(blob);
+  return URL.createObjectURL(blob);
+}
+
+export async function downloadEmailAttachment(
+  accountId: string,
+  messageId: string,
+  attachmentId: string,
+  filename: string,
+): Promise<void> {
+  const blobUrl = await fetchAttachmentBlob(accountId, messageId, attachmentId);
   const a = document.createElement("a");
   a.href = blobUrl;
   a.download = filename;
