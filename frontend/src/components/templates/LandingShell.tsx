@@ -71,7 +71,7 @@ export function LandingShell({ children }: { children: ReactNode }) {
           <div className="footer-brand">
             <h3>VantageClaw</h3>
             <p>AI operations for Canadian small businesses. Built by Vantage Solutions, Edmonton AB.</p>
-            <div className="footer-tagline">henry@vantagesolutions.ca</div>
+            <div className="footer-tagline">info@vantagesolutions.ca</div>
           </div>
 
           <div className="footer-column">

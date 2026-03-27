@@ -425,7 +425,7 @@ export function LandingHero() {
           <h2>Ready to put AI to work?</h2>
           <p>
             Sign in to see the platform, or reach out to get your business
-            configured — henry@vantagesolutions.ca
+            configured — info@vantagesolutions.ca
           </p>
           <div className="cta-actions">
             <SignedOut>
