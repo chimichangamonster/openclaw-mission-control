@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import Response
 from sqlalchemy import func, select
 
 from app.api.deps import ORG_MEMBER_DEP, ORG_RATE_LIMIT_DEP, SESSION_DEP, require_feature
@@ -424,3 +425,51 @@ async def list_email_attachments(
     )
     result = await session.execute(stmt)
     return list(result.scalars().all())
+
+
+@router.get(
+    "/accounts/{account_id}/messages/{message_id}/attachments/{attachment_id}/download",
+)
+async def download_email_attachment(
+    account_id: UUID,
+    message_id: UUID,
+    attachment_id: UUID,
+    ctx: OrganizationContext = ORG_MEMBER_DEP,
+    session: AsyncSession = SESSION_DEP,
+) -> Response:
+    """Download an email attachment's content from the provider."""
+    account = await _get_account_or_404(account_id, ctx, session)
+    msg = await _get_message_or_404(message_id, account, session)
+    att = await session.get(EmailAttachment, attachment_id)
+    if att is None or att.email_message_id != msg.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+
+    access_token = await get_valid_access_token(account, session)
+
+    if account.provider == "zoho":
+        from app.services.email.providers.zoho import download_attachment
+
+        content, filename, content_type = await download_attachment(
+            access_token,
+            account.provider_account_id or "",
+            msg.provider_message_id,
+            att.provider_attachment_id or "",
+        )
+    elif account.provider == "microsoft":
+        from app.services.email.providers.microsoft import download_attachment
+
+        content, filename, content_type = await download_attachment(
+            access_token,
+            msg.provider_message_id,
+            att.provider_attachment_id or "",
+        )
+    else:
+        raise HTTPException(status_code=400, detail="Unsupported provider")
+
+    return Response(
+        content=content,
+        media_type=content_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{att.filename or filename}"',
+        },
+    )

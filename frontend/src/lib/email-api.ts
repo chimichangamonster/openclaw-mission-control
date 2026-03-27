@@ -165,6 +165,76 @@ export async function replyToEmail(
   );
 }
 
+// --- Attachment APIs ---
+
+export interface EmailAttachment {
+  id: string;
+  email_message_id: string;
+  filename: string;
+  content_type: string | null;
+  size_bytes: number | null;
+  created_at: string;
+}
+
+export async function fetchEmailAttachments(
+  accountId: string,
+  messageId: string,
+): Promise<EmailAttachment[]> {
+  const res = await customFetch<{ data: EmailAttachment[] }>(
+    `${V1}/email/accounts/${accountId}/messages/${messageId}/attachments`,
+    { method: "GET" },
+  );
+  return res.data;
+}
+
+export async function downloadEmailAttachment(
+  accountId: string,
+  messageId: string,
+  attachmentId: string,
+  filename: string,
+): Promise<void> {
+  // We need to fetch with auth headers, so we can't use a plain <a> tag.
+  // Use customFetch's auth resolution approach but handle the blob ourselves.
+  const { getApiBaseUrl } = await import("@/lib/api-base");
+  const { getLocalAuthToken, isLocalAuthMode } = await import("@/auth/localAuth");
+  const { getWeChatAuthToken } = await import("@/auth/wechatAuth");
+
+  const baseUrl = getApiBaseUrl();
+  const headers: Record<string, string> = {};
+
+  if (isLocalAuthMode()) {
+    const token = getLocalAuthToken();
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+  }
+  if (!headers["Authorization"]) {
+    const wechatToken = getWeChatAuthToken();
+    if (wechatToken) headers["Authorization"] = `Bearer ${wechatToken}`;
+  }
+  if (!headers["Authorization"]) {
+    const clerk = (window as unknown as { Clerk?: { session?: { getToken: () => Promise<string> } } }).Clerk;
+    if (clerk?.session) {
+      try {
+        const token = await clerk.session.getToken();
+        headers["Authorization"] = `Bearer ${token}`;
+      } catch { /* ignore */ }
+    }
+  }
+
+  const url = `${baseUrl}${V1}/email/accounts/${accountId}/messages/${messageId}/attachments/${attachmentId}/download`;
+  const resp = await fetch(url, { headers });
+  if (!resp.ok) throw new Error("Download failed");
+
+  const blob = await resp.blob();
+  const blobUrl = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = blobUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(blobUrl);
+}
+
 export async function archiveEmail(
   accountId: string,
   messageId: string,

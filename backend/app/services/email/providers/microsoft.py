@@ -77,6 +77,23 @@ async def fetch_messages(
         from_data = msg.get("from", {}).get("emailAddress", {})
         body = msg.get("body", {})
 
+        # Fetch attachment metadata for messages that have attachments
+        attachments: list[RawAttachment] = []
+        if msg.get("hasAttachments", False):
+            try:
+                att_list = await fetch_attachments(access_token, msg.get("id", ""))
+                attachments = [
+                    RawAttachment(
+                        filename=a["filename"],
+                        content_type=a.get("content_type"),
+                        size_bytes=a.get("size_bytes"),
+                        provider_attachment_id=a.get("provider_attachment_id"),
+                    )
+                    for a in att_list
+                ]
+            except Exception:
+                logger.warning("Failed to fetch attachments for message %s", msg.get("id"))
+
         messages.append(
             RawEmailMessage(
                 provider_message_id=msg.get("id", ""),
@@ -93,10 +110,52 @@ async def fetch_messages(
                 folder=folder,
                 labels=None,
                 has_attachments=msg.get("hasAttachments", False),
-                attachments=[],
+                attachments=attachments,
             )
         )
     return messages, next_delta
+
+
+async def fetch_attachments(
+    access_token: str,
+    message_id: str,
+) -> list[dict]:
+    """Fetch attachment metadata for a message from Graph API."""
+    url = f"{GRAPH_URL}/me/messages/{message_id}/attachments"
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            url,
+            headers=_headers(access_token),
+            params={"$select": "id,name,contentType,size"},
+        )
+        resp.raise_for_status()
+        data = resp.json()
+    return [
+        {
+            "provider_attachment_id": att.get("id", ""),
+            "filename": att.get("name", ""),
+            "content_type": att.get("contentType"),
+            "size_bytes": att.get("size"),
+        }
+        for att in data.get("value", [])
+        if att.get("@odata.type", "") != "#microsoft.graph.itemAttachment"
+    ]
+
+
+async def download_attachment(
+    access_token: str,
+    message_id: str,
+    attachment_id: str,
+) -> tuple[bytes, str, str]:
+    """Download attachment content. Returns (content_bytes, filename, content_type)."""
+    url = f"{GRAPH_URL}/me/messages/{message_id}/attachments/{attachment_id}"
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(url, headers=_headers(access_token))
+        resp.raise_for_status()
+        data = resp.json()
+    import base64
+    content = base64.b64decode(data.get("contentBytes", ""))
+    return content, data.get("name", "attachment"), data.get("contentType", "application/octet-stream")
 
 
 async def send_message(

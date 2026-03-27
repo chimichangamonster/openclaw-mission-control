@@ -83,6 +83,9 @@ export function OrgSwitcher() {
           if (orgId) {
             announceOrgSwitch(orgId);
           }
+          // Clear all cached queries so the new org gets fresh data
+          // (feature flags, settings, boards, etc.)
+          queryClient.clear();
           // Redirect to dashboard — the previous page may not be enabled
           // for the new org's feature flags.
           window.location.href = "/";

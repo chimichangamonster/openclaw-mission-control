@@ -7,7 +7,9 @@ import { useParams, useSearchParams, useRouter } from "next/navigation";
 import {
   Archive,
   ArrowLeft,
+  Download,
   Mail,
+  Paperclip,
   Reply,
   Tag,
 } from "lucide-react";
@@ -16,8 +18,11 @@ import { useAuth } from "@/auth/clerk";
 import { DashboardPageLayout } from "@/components/templates/DashboardPageLayout";
 import { Button } from "@/components/ui/button";
 import {
+  type EmailAttachment,
   type EmailMessage,
   fetchEmailMessage,
+  fetchEmailAttachments,
+  downloadEmailAttachment,
   archiveEmail,
   replyToEmail,
   updateEmailMessage,
@@ -32,6 +37,7 @@ export default function EmailMessagePage() {
   const accountId = searchParams.get("account") ?? "";
 
   const [message, setMessage] = useState<EmailMessage | null>(null);
+  const [attachments, setAttachments] = useState<EmailAttachment[]>([]);
   const [loading, setLoading] = useState(true);
   const [replyOpen, setReplyOpen] = useState(false);
   const [replyText, setReplyText] = useState("");
@@ -45,6 +51,14 @@ export default function EmailMessagePage() {
       setMessage(msg);
       if (!msg.is_read) {
         await updateEmailMessage(accountId, messageId, { is_read: true });
+      }
+      if (msg.has_attachments) {
+        try {
+          const atts = await fetchEmailAttachments(accountId, messageId);
+          setAttachments(atts);
+        } catch {
+          setAttachments([]);
+        }
       }
     } catch {
       setMessage(null);
@@ -175,6 +189,45 @@ export default function EmailMessagePage() {
               )}
             </div>
           </div>
+
+          {/* Attachments */}
+          {attachments.length > 0 && (
+            <div className="rounded-xl border border-slate-200 bg-white p-4">
+              <div className="mb-3 flex items-center gap-2 text-sm font-medium text-slate-700">
+                <Paperclip className="h-4 w-4" />
+                {attachments.length} attachment{attachments.length > 1 ? "s" : ""}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {attachments.map((att) => (
+                  <button
+                    key={att.id}
+                    type="button"
+                    onClick={() =>
+                      downloadEmailAttachment(
+                        accountId,
+                        messageId,
+                        att.id,
+                        att.filename || "attachment",
+                      )
+                    }
+                    className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 transition-colors hover:bg-slate-100"
+                  >
+                    <Download className="h-4 w-4 text-slate-400" />
+                    <span className="max-w-[200px] truncate">{att.filename || "Untitled"}</span>
+                    {att.size_bytes != null && (
+                      <span className="text-xs text-slate-400">
+                        {att.size_bytes < 1024
+                          ? `${att.size_bytes} B`
+                          : att.size_bytes < 1048576
+                            ? `${(att.size_bytes / 1024).toFixed(0)} KB`
+                            : `${(att.size_bytes / 1048576).toFixed(1)} MB`}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Actions */}
           <div className="flex flex-wrap gap-2">

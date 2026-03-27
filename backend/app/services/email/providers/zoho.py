@@ -103,6 +103,26 @@ async def fetch_messages(
     return messages
 
 
+async def download_attachment(
+    access_token: str,
+    account_id: str,
+    message_id: str,
+    attachment_id: str,
+) -> tuple[bytes, str, str]:
+    """Download attachment content. Returns (content_bytes, filename, content_type)."""
+    url = f"{BASE_URL}/{account_id}/messages/{message_id}/attachments/{attachment_id}"
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(url, headers=_headers(access_token))
+        resp.raise_for_status()
+        content_type = resp.headers.get("content-type", "application/octet-stream")
+        # Zoho returns the filename in content-disposition header
+        filename = "attachment"
+        cd = resp.headers.get("content-disposition", "")
+        if "filename=" in cd:
+            filename = cd.split("filename=")[-1].strip('" ')
+        return resp.content, filename, content_type
+
+
 async def send_message(
     access_token: str,
     account_id: str,
