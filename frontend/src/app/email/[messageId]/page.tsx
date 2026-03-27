@@ -65,7 +65,8 @@ export default function EmailMessagePage() {
       if (msg.has_attachments) {
         try {
           const atts = await fetchEmailAttachments(accountId, messageId);
-          setAttachments(atts);
+          // Filter out inline attachments — they're rendered in the email body via CID replacement
+          setAttachments(atts.filter((a) => !a.is_inline));
         } catch {
           setAttachments([]);
         }

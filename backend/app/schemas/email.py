@@ -124,4 +124,5 @@ class EmailAttachmentRead(SQLModel):
     filename: str
     content_type: str | None = None
     size_bytes: int | None = None
+    is_inline: bool = False
     created_at: datetime

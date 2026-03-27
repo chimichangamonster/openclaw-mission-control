@@ -43,6 +43,10 @@ router = APIRouter(
     dependencies=[Depends(require_feature("email")), ORG_RATE_LIMIT_DEP],
 )
 
+# Separate unauthenticated router for HMAC-signed inline attachment URLs
+# (browser <img> tags can't send auth headers, so inline images use signed tokens)
+inline_router = APIRouter(prefix="/email", tags=["email"])
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -235,6 +239,29 @@ async def get_email_message(
     text, html, _, _ = redact_email_content(msg.body_text, msg.body_html, level=RedactionLevel.MODERATE)
     msg.body_text = text
     msg.body_html = html
+
+    # Replace cid: references in HTML with signed download URLs
+    # so inline images render without auth headers (browser <img> tags can't send them)
+    if msg.body_html and "cid:" in msg.body_html:
+        from app.core.file_tokens import create_file_token
+
+        att_stmt = (
+            select(EmailAttachment)
+            .where(
+                EmailAttachment.email_message_id == msg.id,
+                EmailAttachment.content_id.isnot(None),  # type: ignore[union-attr]
+            )
+        )
+        att_result = await session.execute(att_stmt)
+        for att in att_result.scalars().all():
+            cid = att.content_id
+            if cid:
+                # Encode attachment coordinates into a signed token (1h expiry)
+                token_path = f"email-att:{account_id}:{message_id}:{att.id}"
+                token = create_file_token(token_path, expires_hours=1)
+                download_url = f"/api/v1/email/inline-attachment?token={token}"
+                msg.body_html = msg.body_html.replace(f"cid:{cid}", download_url)
+
     return msg
 
 
@@ -471,5 +498,81 @@ async def download_email_attachment(
         media_type=content_type,
         headers={
             "Content-Disposition": f'attachment; filename="{att.filename or filename}"',
+        },
+    )
+
+
+# ---------------------------------------------------------------------------
+# Unauthenticated inline attachment endpoint (HMAC-signed token)
+# ---------------------------------------------------------------------------
+
+
+@inline_router.get("/inline-attachment")
+async def get_inline_attachment(
+    token: str = Query(...),
+    session: AsyncSession = SESSION_DEP,
+) -> Response:
+    """Serve an inline email attachment using a signed token (no auth required).
+
+    Tokens are generated server-side when replacing cid: references in HTML.
+    """
+    from app.core.file_tokens import verify_file_token
+
+    path = verify_file_token(token)
+    if not path or not path.startswith("email-att:"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid or expired token")
+
+    parts = path.split(":")
+    if len(parts) != 4:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid token")
+
+    _, account_id_str, message_id_str, attachment_id_str = parts
+    try:
+        from uuid import UUID as _UUID
+        account_id = _UUID(account_id_str)
+        attachment_id = _UUID(attachment_id_str)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid token")
+
+    account = await session.get(EmailAccount, account_id)
+    if account is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+
+    att = await session.get(EmailAttachment, attachment_id)
+    if att is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+
+    msg = await session.get(EmailMessage, att.email_message_id)
+    if msg is None or msg.email_account_id != account.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+
+    access_token = await get_valid_access_token(account, session)
+
+    if account.provider == "zoho":
+        from app.services.email.providers.zoho import download_attachment
+
+        content, filename, content_type = await download_attachment(
+            access_token,
+            account.provider_account_id or "",
+            msg.provider_message_id,
+            att.provider_attachment_id or "",
+        )
+    elif account.provider == "microsoft":
+        from app.services.email.providers.microsoft import download_attachment
+
+        content, filename, content_type = await download_attachment(
+            access_token,
+            msg.provider_message_id,
+            att.provider_attachment_id or "",
+        )
+    else:
+        raise HTTPException(status_code=400, detail="Unsupported provider")
+
+    return Response(
+        content=content,
+        media_type=content_type,
+        headers={
+            "Cache-Control": "private, max-age=3600",
+            "Content-Disposition": "inline",
         },
     )

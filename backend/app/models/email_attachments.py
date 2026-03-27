@@ -24,4 +24,6 @@ class EmailAttachment(QueryModel, table=True):
     content_type: str | None = None
     size_bytes: int | None = None
     provider_attachment_id: str | None = None
+    content_id: str | None = Field(default=None)
+    is_inline: bool = Field(default=False)
     created_at: datetime = Field(default_factory=utcnow)

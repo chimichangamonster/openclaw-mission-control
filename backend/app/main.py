@@ -26,7 +26,7 @@ from app.api.board_onboarding import router as board_onboarding_router
 from app.api.board_webhooks import router as board_webhooks_router
 from app.api.boards import router as boards_router
 from app.api.crypto_trading import router as crypto_trading_router
-from app.api.email import router as email_router
+from app.api.email import inline_router as email_inline_router, router as email_router
 from app.api.email_oauth import router as email_oauth_router
 from app.api.gateway import router as gateway_router
 from app.api.cost_tracker import router as cost_tracker_router
@@ -877,6 +877,7 @@ api_v1.include_router(board_groups_router)
 api_v1.include_router(board_group_memory_router)
 api_v1.include_router(boards_router)
 api_v1.include_router(email_router)
+api_v1.include_router(email_inline_router)
 api_v1.include_router(email_oauth_router)
 api_v1.include_router(agent_email_router)
 api_v1.include_router(agent_contacts_router)

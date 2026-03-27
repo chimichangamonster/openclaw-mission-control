@@ -173,6 +173,7 @@ export interface EmailAttachment {
   filename: string;
   content_type: string | null;
   size_bytes: number | null;
+  is_inline: boolean;
   created_at: string;
 }
 

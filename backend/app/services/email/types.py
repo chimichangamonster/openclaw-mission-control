@@ -48,3 +48,5 @@ class RawAttachment:
     content_type: str | None
     size_bytes: int | None
     provider_attachment_id: str | None
+    content_id: str | None = None
+    is_inline: bool = False

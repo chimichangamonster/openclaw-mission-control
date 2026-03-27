@@ -88,6 +88,8 @@ async def fetch_messages(
                         content_type=a.get("content_type"),
                         size_bytes=a.get("size_bytes"),
                         provider_attachment_id=a.get("provider_attachment_id"),
+                        content_id=a.get("content_id"),
+                        is_inline=a.get("is_inline", False),
                     )
                     for a in att_list
                 ]
@@ -126,7 +128,7 @@ async def fetch_attachments(
         resp = await client.get(
             url,
             headers=_headers(access_token),
-            params={"$select": "id,name,contentType,size"},
+            params={"$select": "id,name,contentType,size,isInline,contentId"},
         )
         resp.raise_for_status()
         data = resp.json()
@@ -136,6 +138,8 @@ async def fetch_attachments(
             "filename": att.get("name", ""),
             "content_type": att.get("contentType"),
             "size_bytes": att.get("size"),
+            "content_id": att.get("contentId"),
+            "is_inline": att.get("isInline", False),
         }
         for att in data.get("value", [])
         if att.get("@odata.type", "") != "#microsoft.graph.itemAttachment"

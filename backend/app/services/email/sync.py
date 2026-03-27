@@ -68,6 +68,8 @@ async def _save_message(
                 content_type=att.content_type,
                 size_bytes=att.size_bytes,
                 provider_attachment_id=att.provider_attachment_id,
+                content_id=att.content_id,
+                is_inline=att.is_inline,
                 created_at=now,
             )
         )
