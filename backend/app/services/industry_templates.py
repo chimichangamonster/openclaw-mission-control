@@ -232,6 +232,81 @@ TEMPLATES: dict[str, IndustryTemplate] = {
             OnboardingStep("generate_invoice", "Generate an invoice", "Bill a client for logged hours.", 5),
         ],
     ),
+
+    "clean_technology": IndustryTemplate(
+        id="clean_technology",
+        name="Clean Technology & Equipment Sales",
+        description="Capital equipment sales pipeline, waste treatment operations, regulatory compliance tracking, ROI modeling, and global market prospecting.",
+        icon="🔬",
+        feature_flags={
+            "bookkeeping": True,
+            "document_generation": True,
+            "email": True,
+            "cron_jobs": True,
+            "approvals": True,
+        },
+        skills=[
+            "bookkeeping", "invoicing", "expense-capture", "doc-gen",
+            "competitor-intel", "lead-qualifier", "client-pipeline",
+            "discovery-prep", "proposal-builder", "project-tracker",
+            "social-media", "news-intelligence", "scheduling",
+            "notifications", "document-intake", "roi-calculator",
+            "regulatory-tracker", "waste-market-intel",
+        ],
+        default_config={
+            "product_catalog": [
+                ConfigItem("magnetgas", "MagnetGas Treatment System", {"price": "TBD", "unit": "system"}),
+                ConfigItem("eboiler", "Eboiler Steam/Hot Water", {"price": "TBD", "unit": "system"}),
+                ConfigItem("autoclave_shredder", "Autoclave-Shredder MWI Series", {"price": "TBD", "unit": "system"}),
+                ConfigItem("steam_microwave", "Steam-Microwave Sterilizer", {"price": "TBD", "unit": "system"}),
+                ConfigItem("medical_autoclave", "Medical Waste Autoclave MWC Series", {"price": "TBD", "unit": "system"}),
+                ConfigItem("container_washer", "Container Washer QX1000", {"price": "TBD", "unit": "system"}),
+            ],
+            "sales_stages": [
+                ConfigItem("lead", "Lead", {"typical_days": 14}),
+                ConfigItem("qualification", "Qualification", {"typical_days": 21}),
+                ConfigItem("site_assessment", "Site Assessment", {"typical_days": 30}),
+                ConfigItem("proposal", "Proposal", {"typical_days": 14}),
+                ConfigItem("negotiation", "Negotiation", {"typical_days": 30}),
+                ConfigItem("purchase_order", "Purchase Order", {"typical_days": 14}),
+                ConfigItem("installation", "Installation", {"typical_days": 90}),
+                ConfigItem("commissioning", "Commissioning", {"typical_days": 30}),
+            ],
+            "cost_codes": [
+                ConfigItem("equipment", "Equipment Purchase", {"code": "CT-100", "unit": "each"}),
+                ConfigItem("installation", "Installation & Integration", {"code": "CT-200", "unit": "lump_sum"}),
+                ConfigItem("shipping", "Shipping & Logistics", {"code": "CT-300", "unit": "shipment"}),
+                ConfigItem("regulatory", "Regulatory & Certification", {"code": "CT-400", "unit": "each"}),
+                ConfigItem("training", "Training & Commissioning", {"code": "CT-500", "unit": "day"}),
+                ConfigItem("maintenance", "Maintenance & Spare Parts", {"code": "CT-600", "unit": "annual"}),
+                ConfigItem("consulting", "Consulting & Engineering", {"code": "CT-700", "unit": "hour"}),
+            ],
+            "brand_voice": [
+                ConfigItem("tone", "Tone", {"value": "Professional, technical, environmentally authoritative"}),
+                ConfigItem("voice", "Voice", {"value": "We engineer solutions that eliminate the problem at its source"}),
+                ConfigItem("audience", "Audience", {"value": "Hospital administrators, government procurement, industrial facility managers, waste management directors"}),
+                ConfigItem("avoid", "Avoid", {"value": "Greenwashing, unsubstantiated claims, competitor bashing, oversimplifying regulatory requirements"}),
+                ConfigItem("keywords", "Keywords", {"value": "near-zero emissions, on-site treatment, proven technology, regulatory compliance, ROI, MagnetGas"}),
+                ConfigItem("location", "Location", {"value": "Edmonton, AB — with offices in Montreal, Paris, Chongqing"}),
+            ],
+            "regulatory_bodies": [
+                ConfigItem("aepa", "Alberta Environment and Protected Areas", {"jurisdiction": "Alberta", "governs": "EPEA facility approvals for waste treatment"}),
+                ConfigItem("absa", "Alberta Boilers Safety Association", {"jurisdiction": "Alberta", "governs": "CRN for pressure vessels and boilers"}),
+                ConfigItem("csa", "Canadian Standards Association", {"jurisdiction": "Canada", "governs": "electrical and gas appliance certification"}),
+                ConfigItem("epa", "Environmental Protection Agency", {"jurisdiction": "United States", "governs": "medical waste treatment facility permits"}),
+                ConfigItem("health_canada", "Health Canada", {"jurisdiction": "Canada", "governs": "biomedical waste classification and handling"}),
+                ConfigItem("who", "World Health Organization", {"jurisdiction": "International", "governs": "medical waste management guidelines"}),
+            ],
+        },
+        onboarding_steps=[
+            OnboardingStep("review_products", "Review product catalog", "Default Magnetik product catalog loaded. Add pricing and customize specs.", 1),
+            OnboardingStep("configure_sales_stages", "Configure sales pipeline stages", "Review the 8-stage pipeline from Lead to Commissioning.", 2),
+            OnboardingStep("add_first_client", "Add your first prospect", "Create a prospect record in the pipeline.", 3),
+            OnboardingStep("upload_regulatory_docs", "Upload regulatory documentation", "Add certification docs, emission test reports, and compliance evidence.", 4),
+            OnboardingStep("connect_email", "Connect email account", "Link your info@magnetiksolutions.com mailbox.", 5),
+            OnboardingStep("test_proposal", "Generate a test proposal", "Create a proposal with ROI modeling for a sample prospect.", 6),
+        ],
+    ),
 }
 
 
@@ -249,6 +324,9 @@ CATEGORY_LABELS: dict[str, str] = {
     "billing_terms": "Billing Terms",
     "competitors": "Competitors",
     "project_stages": "Project Stages",
+    "product_catalog": "Product Catalog",
+    "sales_stages": "Sales Pipeline Stages",
+    "regulatory_bodies": "Regulatory Bodies",
 }
 
 
@@ -306,6 +384,13 @@ _INDUSTRY_KEYWORDS: dict[str, list[str]] = {
         "accounting", "accountant", "legal", "law firm", "engineering",
         "architecture", "architect", "it services", "managed services",
         "marketing agency", "design agency", "creative agency",
+    ],
+    "clean_technology": [
+        "clean tech", "clean technology", "cleantech", "waste treatment",
+        "medical waste", "biomedical waste", "gasification", "sterilization",
+        "autoclave", "emissions reduction", "environmental technology",
+        "waste-to-energy", "thermal treatment", "magnetgas", "eboiler",
+        "incineration alternative", "on-site treatment",
     ],
 }
 
