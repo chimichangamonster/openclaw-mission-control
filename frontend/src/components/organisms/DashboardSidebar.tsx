@@ -313,6 +313,28 @@ export function DashboardSidebar() {
             </div>
           </div>
 
+          {isFeatureEnabled("pentest") ? (
+          <div>
+            <p className="px-3 text-[11px] font-semibold uppercase tracking-wider text-[color:var(--text-quiet)]">
+              Security
+            </p>
+            <div className="mt-1 space-y-1">
+              <Link
+                href="/pentest"
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-[color:var(--text)] transition",
+                  pathname.startsWith("/pentest")
+                    ? "bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)] font-medium"
+                    : "hover:bg-[color:var(--surface-muted)]",
+                )}
+              >
+                <Shield className="h-4 w-4" />
+                Pentest Lab
+              </Link>
+            </div>
+          </div>
+          ) : null}
+
           <div>
             <p className="px-3 text-[11px] font-semibold uppercase tracking-wider text-[color:var(--text-quiet)]">
               Boards

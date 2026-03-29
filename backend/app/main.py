@@ -35,6 +35,7 @@ from app.api.cron_jobs import router as cron_jobs_router
 from app.api.paper_bets import router as paper_bets_router
 from app.api.paper_trading import router as paper_trading_router
 from app.api.polymarket import router as polymarket_router
+from app.api.pentest import router as pentest_router
 from app.api.document_gen import router as document_gen_router
 from app.api.microsoft_graph import router as microsoft_graph_router
 from app.api.google_calendar import router as google_calendar_router
@@ -884,6 +885,7 @@ api_v1.include_router(agent_contacts_router)
 api_v1.include_router(contacts_router)
 api_v1.include_router(polymarket_router)
 api_v1.include_router(agent_polymarket_router)
+api_v1.include_router(pentest_router)
 api_v1.include_router(document_gen_router)
 api_v1.include_router(microsoft_graph_router)
 api_v1.include_router(google_calendar_router)

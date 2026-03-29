@@ -28,6 +28,7 @@ DEFAULT_FEATURE_FLAGS = {
     "google_calendar": False,
     "bookkeeping": True,
     "wechat": False,
+    "pentest": False,
 }
 
 
