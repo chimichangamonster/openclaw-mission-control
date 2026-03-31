@@ -14,7 +14,7 @@ from app.db.session import async_session_maker
 from app.models.gateways import Gateway
 from app.models.tasks import Task
 from app.services.error_tracker import track_error
-from app.services.openclaw.gateway_rpc import GatewayConfig, openclaw_call
+from app.services.openclaw.gateway_rpc import GatewayConfig, send_message
 
 logger = get_logger(__name__)
 
@@ -47,12 +47,9 @@ async def _get_first_gateway_config() -> GatewayConfig | None:
 async def _send_alert(gw_config: GatewayConfig, message: str) -> None:
     """Send alert to #notifications via gateway."""
     try:
-        await openclaw_call(
-            "chat.send",
-            params={
-                "agentId": "notification-agent",
-                "message": message,
-            },
+        await send_message(
+            message,
+            session_key="agent:notification-agent:alerts",
             config=gw_config,
         )
     except Exception:  # noqa: BLE001

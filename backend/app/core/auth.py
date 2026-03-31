@@ -356,6 +356,26 @@ async def _get_or_sync_user(
         defaults=defaults,
     )
 
+    # Enforce signup allowlist: reject new users whose email is not permitted.
+    if created:
+        allowlist_raw = settings.allowed_signup_emails.strip()
+        if allowlist_raw:
+            allowed = {e.strip().lower() for e in allowlist_raw.split(",") if e.strip()}
+            resolved_email = (claim_email or "").lower()
+            if resolved_email not in allowed:
+                logger.warning(
+                    "auth.signup.blocked email=%s clerk_user_id=%s",
+                    resolved_email,
+                    clerk_user_id_log,
+                )
+                # Roll back the auto-created user row.
+                await session.delete(user)
+                await session.commit()
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Signups are restricted. Contact the platform administrator.",
+                )
+
     profile_email: str | None = None
     profile_name: str | None = None
     # Avoid a network roundtrip to Clerk on every request once core profile

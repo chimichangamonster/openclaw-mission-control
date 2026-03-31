@@ -22,6 +22,7 @@ from app.services.openclaw.gateway_rpc import (
     compact_session,
     openclaw_call,
     reset_session,
+    send_message,
 )
 
 logger = get_logger(__name__)
@@ -298,12 +299,9 @@ async def _upsert_daily_spend(org_id: UUID, agent_agg: dict[str, dict]) -> None:
 async def _send_discord_alert(gw_config: GatewayConfig, message: str) -> None:
     """Send an alert message to the #notifications channel via gateway."""
     try:
-        await openclaw_call(
-            "chat.send",
-            params={
-                "agentId": "notification-agent",
-                "message": message,
-            },
+        await send_message(
+            message,
+            session_key="agent:notification-agent:alerts",
             config=gw_config,
         )
     except Exception:

@@ -167,6 +167,192 @@ class TestSaveToWorkspace:
         assert path1 != path2
 
 
+# ---------------------------------------------------------------------------
+# RedactionVault tests
+# ---------------------------------------------------------------------------
+
+
+class TestRedactionVault:
+    """Reversible redaction for security assessment reports."""
+
+    def test_redacts_ipv4_addresses(self):
+        from app.core.redact import RedactionVault
+
+        vault = RedactionVault()
+        result = vault.redact("Found open port on 192.168.1.50")
+        assert "192.168.1.50" not in result
+        assert "[IP_ADDRESS_" in result
+        assert vault.entry_count >= 1
+
+    def test_rehydrates_placeholders(self):
+        from app.core.redact import RedactionVault
+
+        vault = RedactionVault()
+        redacted = vault.redact("Host 10.0.0.1 has FTP on port 21")
+        assert "10.0.0.1" not in redacted
+
+        # Simulate LLM generating text with placeholders
+        llm_output = f"The server at {redacted.split('Host ')[1].split(' has')[0]} is vulnerable."
+        rehydrated = vault.rehydrate(llm_output)
+        assert "10.0.0.1" in rehydrated
+
+    def test_deduplicates_same_value(self):
+        from app.core.redact import RedactionVault
+
+        vault = RedactionVault()
+        result = vault.redact("Server 10.0.0.5 responds. Confirmed 10.0.0.5 is alive.")
+        # Same IP should get the same tag
+        tags = [e["tag"] for e in vault.entries if e["original"] == "10.0.0.5"]
+        assert len(tags) == 1  # one entry, reused
+
+    def test_redacts_mac_addresses(self):
+        from app.core.redact import RedactionVault
+
+        vault = RedactionVault()
+        result = vault.redact("Device MAC: AA:BB:CC:DD:EE:FF")
+        assert "AA:BB:CC:DD:EE:FF" not in result
+        categories = {e["label"] for e in vault.entries}
+        assert "MAC address" in categories
+
+    def test_redacts_hostnames(self):
+        from app.core.redact import RedactionVault
+
+        vault = RedactionVault()
+        result = vault.redact("DNS points to mail.example.corp.com")
+        assert "mail.example.corp.com" not in result
+
+    def test_redacts_internal_hosts(self):
+        from app.core.redact import RedactionVault
+
+        vault = RedactionVault()
+        result = vault.redact("Found dc01.corp.local on the network")
+        assert "dc01.corp.local" not in result
+
+    def test_redacts_file_paths(self):
+        from app.core.redact import RedactionVault
+
+        vault = RedactionVault()
+        result = vault.redact("Config at /etc/nginx/sites-enabled/default")
+        assert "/etc/nginx/sites-enabled/default" not in result
+
+    def test_redacts_windows_paths(self):
+        from app.core.redact import RedactionVault
+
+        vault = RedactionVault()
+        result = vault.redact("Found file at C:\\Users\\admin\\Desktop\\passwords.txt")
+        assert "C:\\Users\\admin\\Desktop\\passwords.txt" not in result
+
+    def test_redacts_domain_users(self):
+        from app.core.redact import RedactionVault
+
+        vault = RedactionVault()
+        result = vault.redact("Login as CONTOSO\\jsmith succeeded")
+        assert "CONTOSO\\jsmith" not in result
+
+    def test_vault_serialization_roundtrip(self):
+        from app.core.redact import RedactionVault
+
+        vault = RedactionVault()
+        redacted = vault.redact("Host 172.16.0.100 is running SSH")
+
+        # Serialize and reconstruct
+        data = vault.to_dict()
+        vault2 = RedactionVault.from_dict(data)
+
+        rehydrated = vault2.rehydrate(redacted)
+        assert "172.16.0.100" in rehydrated
+
+    def test_entries_for_review(self):
+        from app.core.redact import RedactionVault
+
+        vault = RedactionVault()
+        vault.redact("Server 10.0.0.1 with MAC AA:BB:CC:DD:EE:FF")
+
+        entries = vault.entries
+        assert len(entries) >= 2
+        for entry in entries:
+            assert "tag" in entry
+            assert "original" in entry
+            assert "label" in entry
+
+    def test_recursive_redact(self):
+        from app.api.document_gen import _redact_recursive
+        from app.core.redact import RedactionVault
+
+        vault = RedactionVault()
+        data = {
+            "findings": [
+                {
+                    "title": "Open SSH on 10.0.0.5",
+                    "affected_nodes": [
+                        {"address": "10.0.0.5", "hostname": "web01.corp.local"}
+                    ],
+                }
+            ],
+            "count": 1,
+        }
+        result = _redact_recursive(data, vault)
+        # IPs and hostnames should be redacted in nested structures
+        assert "10.0.0.5" not in str(result)
+        assert "web01.corp.local" not in str(result)
+        # Non-string values preserved
+        assert result["count"] == 1
+
+    def test_recursive_rehydrate(self):
+        from app.api.document_gen import _redact_recursive, _rehydrate_recursive
+        from app.core.redact import RedactionVault
+
+        vault = RedactionVault()
+        original = {
+            "observation": "Port 22 open on 192.168.10.1",
+            "nodes": [{"ip": "192.168.10.1"}],
+        }
+        redacted = _redact_recursive(original, vault)
+        assert "192.168.10.1" not in str(redacted)
+
+        rehydrated = _rehydrate_recursive(redacted, vault)
+        assert "192.168.10.1" in str(rehydrated)
+
+    def test_security_assessment_template_renders(self):
+        from app.services.document_gen import _render_html_template
+
+        html = _render_html_template("security-assessment", {
+            "client_name": "Test Corp",
+            "assessment_date": "March 15, 2026",
+            "report_date": "March 20, 2026",
+            "date": "March 20, 2026",
+            "engagement_type_label": "External Network Penetration Test",
+            "scope_summary": "external-facing infrastructure",
+            "overall_severity": "Medium",
+            "total_findings": 2,
+            "counts": {"critical": 0, "high": 0, "medium": 2, "low": 0, "info": 0},
+            "findings": [
+                {
+                    "id": "VS-2026-001",
+                    "title": "Insecure FTP Service",
+                    "severity": "medium",
+                    "category": "Insecure Protocols",
+                    "cvss_score": "5.3",
+                    "cvss_vector": "AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:N/A:N",
+                    "observation": "FTP service running without encryption.",
+                    "security_impact": "Credentials exposed in cleartext.",
+                    "affected_count": 1,
+                    "affected_nodes": [{"address": "10.0.0.1", "port": "21/tcp"}],
+                    "recommendation": "<p>Disable FTP or switch to SFTP.</p>",
+                    "remediation_timeline": "Within 30 days",
+                    "mitre_ids": ["T1046"],
+                    "reproduction_steps": ["Connect via ftp 10.0.0.1"],
+                    "evidence": [{"type": "text", "content": "220 ProFTPD Server ready"}],
+                    "references": [{"url": "https://example.com", "title": "FTP RFC"}],
+                },
+            ],
+        })
+        assert "Test Corp" in html
+        assert "VS-2026-001" in html
+        assert "Insecure FTP Service" in html
+        assert "CONFIDENTIAL" in html
+
+
 class TestComplexFallback:
     """Test that complex mode falls back to HTML without Adobe."""
 

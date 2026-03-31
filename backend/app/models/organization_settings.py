@@ -57,6 +57,7 @@ class OrganizationSettings(QueryModel, table=True):
     # Model configuration
     default_model_tier_max: int = Field(default=3)
     configured_models_json: str = Field(default="[]")
+    model_pins_json: str = Field(default="{}")
 
     # Feature flags
     feature_flags_json: str = Field(
@@ -93,6 +94,10 @@ class OrganizationSettings(QueryModel, table=True):
     @property
     def configured_models(self) -> list[str]:
         return json.loads(self.configured_models_json)
+
+    @property
+    def model_pins(self) -> dict[str, str]:
+        return json.loads(self.model_pins_json)
 
     @property
     def agent_defaults(self) -> dict:

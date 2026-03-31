@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Security Assessment Report — {{ client_name }}</title>
+<style>
+  @page {
+    size: letter;
+    margin: 0.85in 0.75in;
+    @top-right { content: "CONFIDENTIAL"; font-size: 7pt; color: #bbb; letter-spacing: 1px; }
+    @bottom-left { content: "{{ client_name | default('') }} — Security Assessment"; font-size: 7pt; color: #bbb; }
+    @bottom-right { content: "Page " counter(page) " of " counter(pages); font-size: 7pt; color: #bbb; }
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Helvetica Neue', Arial, sans-serif; color: #2d2d2d; line-height: 1.55; font-size: 10pt; }
+
+  /* ── Cover ─────────────────────────────────────────────── */
+  .cover { page-break-after: always; display: flex; flex-direction: column; justify-content: center; min-height: 90vh; padding: 2in 0; }
+  .cover .logo { max-width: 200px; max-height: 80px; margin-bottom: 1.5em; }
+  .cover h1 { font-size: 30pt; color: #1a1a2e; margin-bottom: 0.15em; letter-spacing: -0.5px; }
+  .cover .doc-type { font-size: 13pt; color: #e63946; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 1.5em; }
+  .cover .meta { font-size: 9.5pt; color: #777; }
+  .cover .meta span { display: block; margin-bottom: 3px; }
+  .cover .classification { margin-top: 2em; display: inline-block; background: #e63946; color: white; padding: 6px 18px; font-size: 8pt; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; }
+
+  /* ── Typography ────────────────────────────────────────── */
+  h2 { font-size: 15pt; color: #1a1a2e; margin: 1.4em 0 0.5em; padding-bottom: 4px; border-bottom: 2.5px solid #e63946; }
+  h3 { font-size: 11.5pt; color: #1a1a2e; margin: 1em 0 0.4em; }
+  h4 { font-size: 10pt; color: #555; margin: 0.8em 0 0.3em; font-weight: 600; }
+  p { margin-bottom: 0.6em; }
+  ul, ol { margin: 0.4em 0 0.8em 1.4em; }
+  li { margin-bottom: 0.25em; }
+
+  /* ── Tables ────────────────────────────────────────────── */
+  table { width: 100%; border-collapse: collapse; margin: 0.8em 0; font-size: 9.5pt; }
+  th { background: #1a1a2e; color: white; padding: 7px 10px; text-align: left; font-weight: 600; font-size: 8.5pt; text-transform: uppercase; letter-spacing: 0.3px; }
+  td { padding: 6px 10px; border-bottom: 1px solid #e8e8e8; vertical-align: top; }
+  tr:nth-child(even) td { background: #fafafa; }
+
+  /* ── Severity badges ───────────────────────────────────── */
+  .sev { display: inline-block; padding: 2px 10px; border-radius: 3px; font-size: 8pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: white; }
+  .sev-critical { background: #8b0000; }
+  .sev-high { background: #e63946; }
+  .sev-medium { background: #f59e0b; color: #1a1a2e; }
+  .sev-low { background: #3b82f6; }
+  .sev-info { background: #94a3b8; }
+
+  /* ── KPI dashboard ─────────────────────────────────────── */
+  .kpi-row { display: flex; gap: 12px; margin: 1em 0 1.5em; }
+  .kpi { flex: 1; background: #f8f8f8; border-radius: 6px; padding: 14px 10px; text-align: center; border-top: 3px solid #1a1a2e; }
+  .kpi .value { font-size: 24pt; font-weight: 800; color: #1a1a2e; line-height: 1.1; }
+  .kpi .label { font-size: 7.5pt; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
+  .kpi.critical .value { color: #8b0000; }
+  .kpi.critical { border-top-color: #8b0000; }
+  .kpi.high .value { color: #e63946; }
+  .kpi.high { border-top-color: #e63946; }
+  .kpi.medium .value { color: #f59e0b; }
+  .kpi.medium { border-top-color: #f59e0b; }
+  .kpi.clean .value { color: #16a34a; }
+  .kpi.clean { border-top-color: #16a34a; }
+
+  /* ── Boxes ─────────────────────────────────────────────── */
+  .callout { background: #f0f7ff; border-left: 3px solid #2196f3; padding: 10px 14px; margin: 0.8em 0; font-size: 9.5pt; }
+  .warning-box { background: #fff8e1; border-left: 3px solid #f59e0b; padding: 10px 14px; margin: 0.8em 0; font-size: 9.5pt; }
+  .success-box { background: #f0fdf4; border-left: 3px solid #16a34a; padding: 10px 14px; margin: 0.8em 0; font-size: 9.5pt; }
+  .danger-box { background: #fef2f2; border-left: 3px solid #e63946; padding: 10px 14px; margin: 0.8em 0; font-size: 9.5pt; }
+
+  /* ── Finding cards ─────────────────────────────────────── */
+  .finding { border: 1px solid #e0e0e0; border-radius: 6px; margin: 1.2em 0; page-break-inside: avoid; overflow: hidden; }
+  .finding-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; }
+  .finding-header.critical { background: #8b0000; color: white; }
+  .finding-header.high { background: #e63946; color: white; }
+  .finding-header.medium { background: #fef3c7; color: #1a1a2e; border-bottom: 1px solid #f59e0b; }
+  .finding-header.low { background: #eff6ff; color: #1a1a2e; border-bottom: 1px solid #3b82f6; }
+  .finding-header.info { background: #f1f5f9; color: #1a1a2e; border-bottom: 1px solid #94a3b8; }
+  .finding-title { font-size: 11pt; font-weight: 700; }
+  .finding-id { font-size: 8pt; font-weight: 600; opacity: 0.8; }
+  .finding-body { padding: 14px; }
+  .finding-body h4 { color: #1a1a2e; font-size: 9.5pt; text-transform: uppercase; letter-spacing: 0.5px; margin: 1em 0 0.3em; border-bottom: 1px solid #eee; padding-bottom: 3px; }
+  .finding-body h4:first-child { margin-top: 0; }
+  .finding-meta { display: flex; gap: 20px; margin-bottom: 1em; font-size: 9pt; color: #666; flex-wrap: wrap; }
+  .finding-meta .meta-item { display: flex; align-items: center; gap: 4px; }
+  .finding-meta .meta-label { font-weight: 600; color: #444; }
+
+  /* ── Evidence blocks ───────────────────────────────────── */
+  .evidence { background: #1a1a2e; color: #e0e0e0; padding: 12px 14px; border-radius: 4px; margin: 0.5em 0; font-family: 'Consolas', 'Monaco', 'Courier New', monospace; font-size: 8.5pt; line-height: 1.5; white-space: pre-wrap; word-break: break-all; overflow-x: auto; }
+
+  /* ── Risk matrix ───────────────────────────────────────── */
+  .risk-matrix { margin: 1em 0; }
+  .risk-matrix table { font-size: 8.5pt; }
+  .risk-matrix td { text-align: center; width: 80px; height: 36px; font-weight: 600; }
+  .risk-matrix .axis-label { background: none; border: none; font-weight: 700; color: #1a1a2e; text-align: right; padding-right: 8px; }
+  .risk-matrix .cell-critical { background: #8b0000; color: white; }
+  .risk-matrix .cell-high { background: #e63946; color: white; }
+  .risk-matrix .cell-medium { background: #fef3c7; color: #92400e; }
+  .risk-matrix .cell-low { background: #eff6ff; color: #1e40af; }
+  .risk-matrix .cell-minimal { background: #f0fdf4; color: #166534; }
+
+  /* ── MITRE ATT&CK ──────────────────────────────────────── */
+  .mitre-tag { display: inline-block; background: #1a1a2e; color: #e0e0e0; padding: 1px 7px; border-radius: 3px; font-size: 7.5pt; font-family: monospace; margin-right: 4px; }
+  .mitre-tactic { display: inline-block; background: #f1f5f9; color: #475569; padding: 1px 7px; border-radius: 3px; font-size: 7.5pt; margin-right: 4px; }
+
+  /* ── Remediation timeline ──────────────────────────────── */
+  .timeline { margin: 1em 0; }
+  .timeline-item { display: flex; margin-bottom: 0; }
+  .timeline-marker { width: 80px; flex-shrink: 0; text-align: center; padding: 8px 0; }
+  .timeline-marker .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
+  .timeline-marker .line { display: block; width: 2px; height: 100%; background: #ddd; margin: 0 auto; }
+  .timeline-content { flex: 1; padding: 6px 0 16px 12px; border-left: 2px solid #e0e0e0; }
+  .timeline-label { font-size: 8pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+  .timeline-label.immediate { color: #e63946; }
+  .timeline-label.short { color: #f59e0b; }
+  .timeline-label.standard { color: #3b82f6; }
+  .timeline-label.ongoing { color: #16a34a; }
+
+  /* ── Methodology ───────────────────────────────────────── */
+  .phase-list { counter-reset: phase; list-style: none; margin-left: 0; }
+  .phase-list li { counter-increment: phase; margin-bottom: 0.6em; padding-left: 2.5em; position: relative; }
+  .phase-list li::before { content: counter(phase); position: absolute; left: 0; top: 0; width: 1.8em; height: 1.8em; background: #1a1a2e; color: white; border-radius: 50%; text-align: center; line-height: 1.8em; font-size: 8.5pt; font-weight: 700; }
+
+  .page-break { page-break-before: always; }
+  .no-break { page-break-inside: avoid; }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════
+     COVER PAGE
+     ══════════════════════════════════════════════════════════ -->
+<div class="cover">
+  {% if logo_url %}<img src="{{ logo_url }}" alt="Vantage Solutions" class="logo">{% endif %}
+  <h1>{{ client_name }}</h1>
+  <div class="doc-type">Security Assessment Report</div>
+  <div class="meta">
+    <span><strong>Prepared by:</strong> Vantage Solutions</span>
+    <span><strong>Assessment Date:</strong> {{ assessment_date }}</span>
+    <span><strong>Report Date:</strong> {{ report_date | default(date) }}</span>
+    <span><strong>Engagement Type:</strong> {{ engagement_type_label }}</span>
+    {% if reference_roe %}<span><strong>RoE Reference:</strong> {{ reference_roe }}</span>{% endif %}
+    {% if report_version %}<span><strong>Version:</strong> {{ report_version }}</span>{% endif %}
+  </div>
+  <div class="classification">CONFIDENTIAL</div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     CONFIDENTIALITY NOTICE
+     ══════════════════════════════════════════════════════════ -->
+<div class="danger-box">
+  <strong>Confidentiality Notice</strong><br>
+  This document contains sensitive security findings and is intended solely for {{ client_name }}. Distribution, reproduction, or disclosure to unauthorized parties is prohibited. Treat this document with the same care as the vulnerabilities it describes.
+</div>
+
+<h2>Table of Contents</h2>
+<ol>
+  <li>Executive Summary</li>
+  <li>Findings Overview</li>
+  <li>Risk Matrix</li>
+  <li>Detailed Findings</li>
+  <li>Remediation Roadmap</li>
+  <li>Testing Methodology</li>
+  <li>MITRE ATT&CK Mapping</li>
+  <li>Scope & Rules of Engagement</li>
+  <li>Activity Log</li>
+  <li>Appendices</li>
+</ol>
+
+<div class="page-break"></div>
+
+<!-- ══════════════════════════════════════════════════════════
+     1. EXECUTIVE SUMMARY
+     ══════════════════════════════════════════════════════════ -->
+<h2>1. Executive Summary</h2>
+
+<p>{{ client_name }} engaged Vantage Solutions to perform a {{ engagement_type_label | lower }} of their {{ scope_summary }}. Testing was conducted {{ assessment_date }} under signed Rules of Engagement{% if reference_roe %} ({{ reference_roe }}){% endif %}.</p>
+
+{% if executive_summary %}
+{{ executive_summary | safe }}
+{% endif %}
+
+<h3>Overall Risk Rating</h3>
+
+<div class="kpi-row">
+  <div class="kpi {{ 'critical' if counts.critical > 0 else 'clean' }}">
+    <div class="value">{{ overall_severity }}</div>
+    <div class="label">Overall Risk</div>
+  </div>
+  <div class="kpi critical">
+    <div class="value">{{ counts.critical | default(0) }}</div>
+    <div class="label">Critical</div>
+  </div>
+  <div class="kpi high">
+    <div class="value">{{ counts.high | default(0) }}</div>
+    <div class="label">High</div>
+  </div>
+  <div class="kpi medium">
+    <div class="value">{{ counts.medium | default(0) }}</div>
+    <div class="label">Medium</div>
+  </div>
+  <div class="kpi">
+    <div class="value">{{ counts.low | default(0) }}</div>
+    <div class="label">Low</div>
+  </div>
+  <div class="kpi">
+    <div class="value">{{ counts.info | default(0) }}</div>
+    <div class="label">Info</div>
+  </div>
+</div>
+
+<div class="kpi-row">
+  <div class="kpi">
+    <div class="value">{{ total_findings }}</div>
+    <div class="label">Total Findings</div>
+  </div>
+  <div class="kpi">
+    <div class="value">{{ hosts_tested | default('—') }}</div>
+    <div class="label">Hosts Tested</div>
+  </div>
+  <div class="kpi">
+    <div class="value">{{ ports_discovered | default('—') }}</div>
+    <div class="label">Open Ports</div>
+  </div>
+  <div class="kpi">
+    <div class="value">{{ services_enumerated | default('—') }}</div>
+    <div class="label">Services Found</div>
+  </div>
+</div>
+
+{% if category_summary %}
+<h3>Finding Categories</h3>
+<table>
+  <tr><th>Category</th><th>Count</th><th>Highest Severity</th><th>Summary</th></tr>
+  {% for cat in category_summary %}
+  <tr>
+    <td><strong>{{ cat.name }}</strong></td>
+    <td>{{ cat.count }}</td>
+    <td><span class="sev sev-{{ cat.highest_severity | lower }}">{{ cat.highest_severity }}</span></td>
+    <td>{{ cat.summary }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endif %}
+
+<div class="page-break"></div>
+
+<!-- ══════════════════════════════════════════════════════════
+     2. FINDINGS OVERVIEW
+     ══════════════════════════════════════════════════════════ -->
+<h2>2. Findings Overview</h2>
+
+<table>
+  <tr>
+    <th style="width:6%">ID</th>
+    <th>Finding</th>
+    <th style="width:10%">Severity</th>
+    <th style="width:10%">CVSS</th>
+    <th style="width:12%">Category</th>
+    <th style="width:14%">Remediation</th>
+  </tr>
+  {% for f in findings %}
+  <tr>
+    <td><strong>{{ f.id }}</strong></td>
+    <td>{{ f.title }}</td>
+    <td><span class="sev sev-{{ f.severity | lower }}">{{ f.severity }}</span></td>
+    <td>{{ f.cvss_score | default('—') }}{% if f.cvss_vector %}<br><span style="font-size:7pt;color:#888">{{ f.cvss_vector }}</span>{% endif %}</td>
+    <td>{{ f.category }}</td>
+    <td>{{ f.remediation_timeline }}</td>
+  </tr>
+  {% endfor %}
+</table>
+
+<!-- ══════════════════════════════════════════════════════════
+     3. RISK MATRIX
+     ══════════════════════════════════════════════════════════ -->
+<h2>3. Risk Matrix</h2>
+
+<p>Findings are plotted on a likelihood-vs-impact matrix to help prioritize remediation based on real-world exploitability, not just theoretical severity.</p>
+
+<div class="risk-matrix">
+<table>
+  <tr>
+    <td class="axis-label"></td>
+    <th>Negligible</th>
+    <th>Minor</th>
+    <th>Moderate</th>
+    <th>Significant</th>
+    <th>Severe</th>
+  </tr>
+  <tr>
+    <td class="axis-label">Almost Certain</td>
+    <td class="cell-medium">Medium</td>
+    <td class="cell-high">High</td>
+    <td class="cell-critical">Critical</td>
+    <td class="cell-critical">Critical</td>
+    <td class="cell-critical">Critical</td>
+  </tr>
+  <tr>
+    <td class="axis-label">Likely</td>
+    <td class="cell-low">Low</td>
+    <td class="cell-medium">Medium</td>
+    <td class="cell-high">High</td>
+    <td class="cell-critical">Critical</td>
+    <td class="cell-critical">Critical</td>
+  </tr>
+  <tr>
+    <td class="axis-label">Possible</td>
+    <td class="cell-low">Low</td>
+    <td class="cell-medium">Medium</td>
+    <td class="cell-medium">Medium</td>
+    <td class="cell-high">High</td>
+    <td class="cell-critical">Critical</td>
+  </tr>
+  <tr>
+    <td class="axis-label">Unlikely</td>
+    <td class="cell-minimal">Minimal</td>
+    <td class="cell-low">Low</td>
+    <td class="cell-medium">Medium</td>
+    <td class="cell-medium">Medium</td>
+    <td class="cell-high">High</td>
+  </tr>
+  <tr>
+    <td class="axis-label">Rare</td>
+    <td class="cell-minimal">Minimal</td>
+    <td class="cell-minimal">Minimal</td>
+    <td class="cell-low">Low</td>
+    <td class="cell-medium">Medium</td>
+    <td class="cell-medium">Medium</td>
+  </tr>
+</table>
+<p style="font-size:8pt;color:#888;margin-top:4px;"><strong>Vertical axis:</strong> Likelihood of exploitation &nbsp;|&nbsp; <strong>Horizontal axis:</strong> Business impact if exploited</p>
+</div>
+
+{% if risk_placements %}
+<h3>Finding Placement</h3>
+<table>
+  <tr><th>ID</th><th>Finding</th><th>Likelihood</th><th>Impact</th><th>Risk Rating</th></tr>
+  {% for r in risk_placements %}
+  <tr>
+    <td>{{ r.id }}</td>
+    <td>{{ r.title }}</td>
+    <td>{{ r.likelihood }}</td>
+    <td>{{ r.impact }}</td>
+    <td><span class="sev sev-{{ r.risk | lower }}">{{ r.risk }}</span></td>
+  </tr>
+  {% endfor %}
+</table>
+{% endif %}
+
+<div class="page-break"></div>
+
+<!-- ══════════════════════════════════════════════════════════
+     4. DETAILED FINDINGS
+     ══════════════════════════════════════════════════════════ -->
+<h2>4. Detailed Findings</h2>
+
+{% for f in findings %}
+<div class="finding">
+  <div class="finding-header {{ f.severity | lower }}">
+    <span class="finding-title">{{ f.title }}</span>
+    <span class="finding-id">{{ f.id }} &nbsp;|&nbsp; <span class="sev sev-{{ f.severity | lower }}">{{ f.severity }}</span></span>
+  </div>
+  <div class="finding-body">
+
+    <div class="finding-meta">
+      <div class="meta-item"><span class="meta-label">Category:</span> {{ f.category }}</div>
+      {% if f.cvss_score %}<div class="meta-item"><span class="meta-label">CVSS 3.1:</span> {{ f.cvss_score }} ({{ f.cvss_vector }})</div>{% endif %}
+      <div class="meta-item"><span class="meta-label">Affected:</span> {{ f.affected_count }} node{{ 's' if f.affected_count != 1 else '' }}</div>
+      <div class="meta-item"><span class="meta-label">Remediation:</span> {{ f.remediation_timeline }}</div>
+      {% if f.mitre_ids %}
+      <div class="meta-item"><span class="meta-label">MITRE:</span> {% for m in f.mitre_ids %}<span class="mitre-tag">{{ m }}</span>{% endfor %}</div>
+      {% endif %}
+    </div>
+
+    <h4>Observation</h4>
+    <p>{{ f.observation }}</p>
+
+    <h4>Security Impact</h4>
+    <p>{{ f.security_impact }}</p>
+
+    {% if f.affected_nodes %}
+    <h4>Affected Nodes</h4>
+    <table>
+      <tr><th>IP Address / URL</th><th>Hostname</th><th>Port / Service</th><th>OS</th></tr>
+      {% for node in f.affected_nodes %}
+      <tr>
+        <td><code>{{ node.address }}</code></td>
+        <td>{{ node.hostname | default('—') }}</td>
+        <td>{{ node.port | default('—') }}</td>
+        <td>{{ node.os | default('Unknown') }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% endif %}
+
+    <h4>Recommendation</h4>
+    {{ f.recommendation | safe }}
+
+    {% if f.reproduction_steps %}
+    <h4>Reproduction Steps</h4>
+    <ol>
+      {% for step in f.reproduction_steps %}
+      <li>{{ step }}</li>
+      {% endfor %}
+    </ol>
+    {% endif %}
+
+    {% if f.evidence %}
+    <h4>Evidence</h4>
+    {% for ev in f.evidence %}
+      {% if ev.type == 'text' %}
+      <div class="evidence">{{ ev.content }}</div>
+      {% elif ev.type == 'image' %}
+      <img src="{{ ev.src }}" alt="{{ ev.caption | default('Evidence screenshot') }}" style="max-width:100%;border:1px solid #ddd;border-radius:4px;margin:0.5em 0;">
+      {% if ev.caption %}<p style="font-size:8pt;color:#888;margin-top:2px;">{{ ev.caption }}</p>{% endif %}
+      {% elif ev.type == 'table' %}
+      {{ ev.content | safe }}
+      {% endif %}
+    {% endfor %}
+    {% endif %}
+
+    {% if f.references %}
+    <h4>References</h4>
+    <ul>
+      {% for ref in f.references %}
+      <li><a href="{{ ref.url }}" style="color:#2196f3;text-decoration:none;">{{ ref.title | default(ref.url) }}</a></li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+
+  </div>
+</div>
+{% endfor %}
+
+<div class="page-break"></div>
+
+<!-- ══════════════════════════════════════════════════════════
+     5. REMEDIATION ROADMAP
+     ══════════════════════════════════════════════════════════ -->
+<h2>5. Remediation Roadmap</h2>
+
+<p>Findings are grouped into remediation phases based on severity, exploitability, and implementation complexity. Address each phase in order.</p>
+
+{% if remediation_phases %}
+<div class="timeline">
+  {% for phase in remediation_phases %}
+  <div class="timeline-item">
+    <div class="timeline-content">
+      <div class="timeline-label {{ phase.urgency }}">{{ phase.label }}</div>
+      <p style="font-size:9pt;color:#888;margin-bottom:6px;">{{ phase.timeframe }}</p>
+      <table>
+        <tr><th>ID</th><th>Finding</th><th>Action</th></tr>
+        {% for item in phase.items %}
+        <tr>
+          <td><strong>{{ item.id }}</strong></td>
+          <td>{{ item.title }}</td>
+          <td>{{ item.action }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if strategic_recommendations %}
+<h3>Strategic Recommendations</h3>
+<p>Beyond individual finding remediation, the following organizational improvements would strengthen {{ client_name }}'s overall security posture:</p>
+<ol>
+  {% for rec in strategic_recommendations %}
+  <li><strong>{{ rec.title }}:</strong> {{ rec.description }}</li>
+  {% endfor %}
+</ol>
+{% endif %}
+
+<div class="page-break"></div>
+
+<!-- ══════════════════════════════════════════════════════════
+     6. TESTING METHODOLOGY
+     ══════════════════════════════════════════════════════════ -->
+<h2>6. Testing Methodology</h2>
+
+<p>This assessment followed a structured methodology aligned with industry standards (PTES, OWASP, NIST SP 800-115).</p>
+
+<ol class="phase-list">
+  <li><strong>Reconnaissance & OSINT</strong> — Domain enumeration, subdomain discovery, DNS record analysis, email harvesting, doppelganger domain scanning, public data exposure checks.</li>
+  <li><strong>Host Discovery</strong> — Network scanning (ping sweeps, TCP/UDP port scans) to identify live hosts, open ports, and running services within the defined scope.</li>
+  <li><strong>Enumeration</strong> — Service fingerprinting, version detection, protocol analysis, SSL/TLS configuration review, directory enumeration, and banner grabbing.</li>
+  <li><strong>Vulnerability Analysis</strong> — Identification and validation of vulnerabilities through automated scanning and manual testing. CVSS 3.1 scoring applied to each confirmed finding.</li>
+  <li><strong>Exploitation</strong> — Controlled exploitation of confirmed vulnerabilities to demonstrate real-world impact. Only safe exploits executed per Rules of Engagement.</li>
+  <li><strong>Post-Exploitation</strong> — {% if post_exploitation_allowed %}Privilege escalation, lateral movement, and data access assessment where initial exploitation succeeded.{% else %}Post-exploitation was limited or excluded per the Rules of Engagement for this engagement.{% endif %}</li>
+  <li><strong>Reporting</strong> — Findings documented with evidence, CVSS scoring, MITRE ATT&CK mapping, and prioritized remediation guidance.</li>
+</ol>
+
+{% if tools_used %}
+<h3>Tools & Techniques</h3>
+<table>
+  <tr><th>Tool</th><th>Purpose</th><th>Phase</th></tr>
+  {% for tool in tools_used %}
+  <tr>
+    <td><code>{{ tool.name }}</code></td>
+    <td>{{ tool.purpose }}</td>
+    <td>{{ tool.phase }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endif %}
+
+{% if testing_limitations %}
+<h3>Testing Limitations</h3>
+<div class="warning-box">
+  {{ testing_limitations | safe }}
+</div>
+{% endif %}
+
+<div class="page-break"></div>
+
+<!-- ══════════════════════════════════════════════════════════
+     7. MITRE ATT&CK MAPPING
+     ══════════════════════════════════════════════════════════ -->
+<h2>7. MITRE ATT&CK Mapping</h2>
+
+<p>Techniques observed or tested during this assessment, mapped to the <a href="https://attack.mitre.org/" style="color:#2196f3;">MITRE ATT&CK Enterprise Framework</a>.</p>
+
+{% if mitre_mappings %}
+<table>
+  <tr><th>TTP ID</th><th>Technique</th><th>Tactic</th><th>Finding(s)</th><th>Result</th></tr>
+  {% for m in mitre_mappings %}
+  <tr>
+    <td><span class="mitre-tag">{{ m.ttp_id }}</span></td>
+    <td>{{ m.technique }}</td>
+    <td><span class="mitre-tactic">{{ m.tactic }}</span></td>
+    <td>{{ m.finding_ids | join(', ') }}</td>
+    <td>{{ m.result }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endif %}
+
+<!-- ══════════════════════════════════════════════════════════
+     8. SCOPE & RULES OF ENGAGEMENT
+     ══════════════════════════════════════════════════════════ -->
+<h2>8. Scope & Rules of Engagement</h2>
+
+<h3>Assessment Scope</h3>
+<table>
+  <tr><th>Component</th><th>Description</th></tr>
+  <tr><td>Engagement Type</td><td>{{ engagement_type_label }}</td></tr>
+  <tr><td>Testing Window</td><td>{{ assessment_date }}</td></tr>
+  <tr><td>Testing Hours</td><td>{{ testing_hours | default('As defined in RoE') }}</td></tr>
+</table>
+
+{% if in_scope_targets %}
+<h4>In-Scope Targets</h4>
+<table>
+  <tr><th>Target</th><th>Type</th><th>Notes</th></tr>
+  {% for t in in_scope_targets %}
+  <tr>
+    <td><code>{{ t.target }}</code></td>
+    <td>{{ t.type }}</td>
+    <td>{{ t.notes | default('—') }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endif %}
+
+{% if out_of_scope %}
+<h4>Out-of-Scope</h4>
+<div class="danger-box">{{ out_of_scope | safe }}</div>
+{% endif %}
+
+{% if rules_of_engagement %}
+<h3>Rules of Engagement Summary</h3>
+<table>
+  <tr><th>Activity</th><th>Permitted</th><th>Notes</th></tr>
+  {% for roe in rules_of_engagement %}
+  <tr>
+    <td>{{ roe.activity }}</td>
+    <td>{{ roe.permitted }}</td>
+    <td>{{ roe.notes | default('—') }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endif %}
+
+{% if tester_info %}
+<h3>Assessment Team</h3>
+<table>
+  <tr><th>Role</th><th>Name</th><th>Contact</th></tr>
+  {% for t in tester_info %}
+  <tr>
+    <td>{{ t.role }}</td>
+    <td>{{ t.name }}</td>
+    <td>{{ t.contact }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endif %}
+
+<div class="page-break"></div>
+
+<!-- ══════════════════════════════════════════════════════════
+     9. ACTIVITY LOG
+     ══════════════════════════════════════════════════════════ -->
+<h2>9. Activity Log</h2>
+
+<p>Chronological record of testing activities. Use this log to correlate with your SIEM, IDS/IPS, and firewall logs to evaluate detection capabilities.</p>
+
+{% if activity_log %}
+<table>
+  <tr><th style="width:14%">Time</th><th style="width:14%">Phase</th><th>Activity</th><th style="width:12%">Result</th></tr>
+  {% for entry in activity_log %}
+  <tr>
+    <td style="font-size:8pt;">{{ entry.time }}</td>
+    <td>{{ entry.phase }}</td>
+    <td>{{ entry.activity }}</td>
+    <td>{{ entry.result | default('—') }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<div class="callout">A detailed activity log is available as a separate document upon request.</div>
+{% endif %}
+
+<div class="callout">
+  <strong>Detection Validation:</strong> Vantage Solutions recommends reviewing your security monitoring tools (SIEM, IDS/IPS, EDR, firewall logs) against this activity log to identify detection gaps.
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     10. APPENDICES
+     ══════════════════════════════════════════════════════════ -->
+{% if appendices %}
+<div class="page-break"></div>
+<h2>10. Appendices</h2>
+
+{% for appendix in appendices %}
+<h3>Appendix {{ loop.index }}: {{ appendix.title }}</h3>
+{{ appendix.content | safe }}
+{% if not loop.last %}<div class="page-break"></div>{% endif %}
+{% endfor %}
+{% endif %}
+
+<!-- ══════════════════════════════════════════════════════════
+     SEVERITY DEFINITIONS (APPENDIX)
+     ══════════════════════════════════════════════════════════ -->
+<div class="page-break"></div>
+<h2>Appendix: Severity Definitions</h2>
+
+<table>
+  <tr>
+    <th style="width:12%">Severity</th>
+    <th style="width:12%">CVSS Range</th>
+    <th>Description</th>
+    <th style="width:16%">Remediation SLA</th>
+  </tr>
+  <tr>
+    <td><span class="sev sev-critical">Critical</span></td>
+    <td>9.0 – 10.0</td>
+    <td>Immediate threat to confidentiality, integrity, or availability. Trivial to exploit with severe business impact. Typically leads to full system compromise, mass data exposure, or complete service disruption.</td>
+    <td><strong>Immediate</strong><br>Within 48 hours</td>
+  </tr>
+  <tr>
+    <td><span class="sev sev-high">High</span></td>
+    <td>7.0 – 8.9</td>
+    <td>Significant threat requiring low-to-moderate effort to exploit. Leads to compromise of individual systems, limited sensitive data exposure, or partial service disruption.</td>
+    <td><strong>Urgent</strong><br>Within 7 days</td>
+  </tr>
+  <tr>
+    <td><span class="sev sev-medium">Medium</span></td>
+    <td>4.0 – 6.9</td>
+    <td>Moderate threat requiring specific conditions or chained with other findings. May lead to non-privileged access, limited data exposure, or denial-of-service conditions.</td>
+    <td><strong>Short-term</strong><br>Within 30 days</td>
+  </tr>
+  <tr>
+    <td><span class="sev sev-low">Low</span></td>
+    <td>0.1 – 3.9</td>
+    <td>Minor threat with limited direct impact. Typically information disclosure that could support more significant attacks when combined with other vectors.</td>
+    <td><strong>Standard</strong><br>Within 90 days</td>
+  </tr>
+  <tr>
+    <td><span class="sev sev-info">Info</span></td>
+    <td>0.0</td>
+    <td>No direct technical threat. Observations, hardening suggestions, or information that could be useful to an attacker for reconnaissance but does not enable attack on its own.</td>
+    <td><strong>Ongoing</strong><br>Next review cycle</td>
+  </tr>
+</table>
+
+<!-- ══════════════════════════════════════════════════════════
+     RETEST & CLOSING
+     ══════════════════════════════════════════════════════════ -->
+<div class="page-break"></div>
+<h2>Retest & Verification</h2>
+
+<p>Security assessments are point-in-time evaluations. Vantage Solutions recommends:</p>
+
+<ul>
+  <li><strong>Remediation retest</strong> — after addressing findings, a focused retest validates that fixes are effective and no regressions were introduced. Retest scope is limited to previously identified findings.</li>
+  <li><strong>Recurring assessments</strong> — {{ cadence_recommendation | default('quarterly or semi-annual assessments') }} to track security posture over time and catch new exposures.</li>
+  <li><strong>Continuous monitoring</strong> — automated vulnerability scanning between manual assessments provides ongoing visibility.</li>
+</ul>
+
+{% if retest_offer %}
+<div class="success-box">
+  <strong>Retest Available</strong><br>
+  {{ retest_offer }}
+</div>
+{% endif %}
+
+<div style="margin-top:3em;padding-top:1.5em;border-top:2px solid #e0e0e0;font-size:9pt;color:#888;">
+  <p><strong>Vantage Solutions</strong> — info@vantagesolutions.ca</p>
+  <p>This document was generated on {{ report_date | default(date) }}. Point-in-time assessment — findings reflect the state of the environment at the time of testing.</p>
+  <p style="margin-top:0.5em;">
+    <strong>Lead Assessor:</strong> {{ lead_assessor | default('Henry Chin') }} &nbsp;|&nbsp;
+    <strong>Report Version:</strong> {{ report_version | default('1.0') }}
+  </p>
+</div>
+
+</body>
+</html>

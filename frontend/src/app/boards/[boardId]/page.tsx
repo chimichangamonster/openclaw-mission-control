@@ -119,7 +119,7 @@ import {
   resolveMemberDisplayName,
 } from "@/lib/display-name";
 import { AGENT_EMOJI_GLYPHS } from "@/lib/agent-emoji";
-import { cn } from "@/lib/utils";
+import { cn, extractTextContent } from "@/lib/utils";
 import { usePageActive } from "@/hooks/usePageActive";
 import {
   boardCustomFieldValues,
@@ -637,7 +637,7 @@ const ChatMessageCard = memo(function ChatMessageCard({
         </span>
       </div>
       <div className="mt-2 select-text cursor-text text-sm leading-relaxed text-slate-900 break-words">
-        <Markdown content={message.content} variant="basic" />
+        <Markdown content={extractTextContent(message.content)} variant="basic" />
       </div>
     </div>
   );

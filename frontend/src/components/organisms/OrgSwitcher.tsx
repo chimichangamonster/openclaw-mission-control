@@ -88,7 +88,7 @@ export function OrgSwitcher() {
           queryClient.clear();
           // Redirect to dashboard — the previous page may not be enabled
           // for the new org's feature flags.
-          window.location.href = "/";
+          window.location.href = "/dashboard";
         },
         onError: (err) => {
           setOrgError(err.message || "Unable to switch organization.");

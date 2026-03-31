@@ -59,7 +59,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
     const handleStorage = (event: StorageEvent) => {
       if (event.key !== "openclaw_org_switch" || !event.newValue) return;
       // Redirect to dashboard — the current page may not be enabled for the new org.
-      window.location.href = "/";
+      window.location.href = "/dashboard";
     };
 
     window.addEventListener("storage", handleStorage);
@@ -68,7 +68,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
     if ("BroadcastChannel" in window) {
       channel = new BroadcastChannel("org-switch");
       channel.onmessage = () => {
-        window.location.href = "/";
+        window.location.href = "/dashboard";
       };
     }
 

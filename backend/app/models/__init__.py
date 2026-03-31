@@ -31,6 +31,7 @@ from app.models.email_accounts import EmailAccount
 from app.models.exchange_accounts import ExchangeAccount
 from app.models.email_attachments import EmailAttachment
 from app.models.email_messages import EmailMessage
+from app.models.generated_documents import GeneratedDocument
 from app.models.gateways import Gateway
 from app.models.polymarket_positions import PolymarketPosition
 from app.models.polymarket_risk_config import PolymarketRiskConfig
@@ -44,6 +45,7 @@ from app.models.organization_invites import OrganizationInvite
 from app.models.organization_members import OrganizationMember
 from app.models.organizations import Organization
 from app.models.paper_bets import PaperBet
+from app.models.pentest_scans import PentestScanRecord
 from app.models.paper_trading import PaperPortfolio, PaperPosition, PaperTrade
 from app.models.skills import GatewayInstalledSkill, MarketplaceSkill, SkillPack
 from app.models.tag_assignments import TagAssignment
@@ -79,6 +81,7 @@ __all__ = [
     "ExchangeAccount",
     "EmailAttachment",
     "EmailMessage",
+    "GeneratedDocument",
     "Gateway",
     "PolymarketPosition",
     "PolymarketRiskConfig",
@@ -104,6 +107,7 @@ __all__ = [
     "TagAssignment",
     "User",
     "PaperBet",
+    "PentestScanRecord",
     "PaperPortfolio",
     "PaperPosition",
     "PaperTrade",

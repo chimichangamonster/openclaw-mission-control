@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 from uuid import UUID
 
 from fastapi import HTTPException, status
+from sqlmodel import select
 
 from app.core.logging import TRACE_LEVEL
 from app.models.boards import Board
@@ -21,6 +23,7 @@ from app.schemas.gateway_api import (
     GatewaySessionsResponse,
     GatewaysStatusResponse,
 )
+from app.models.org_config import OrgConfigData
 from app.services.openclaw.db_service import OpenClawDBService
 from app.services.openclaw.error_messages import normalize_gateway_error_message
 from app.services.openclaw.gateway_compat import check_gateway_version_compatibility
@@ -193,6 +196,84 @@ class GatewaySessionService(OpenClawDBService):
             )
         return board, config, main_session
 
+    _SESSION_LABELS_CATEGORY = "session_labels"
+
+    async def _get_session_labels(self, organization_id: UUID) -> dict[str, str]:
+        """Load persisted session labels from OrgConfigData."""
+        result = await self.session.exec(
+            select(OrgConfigData).where(
+                OrgConfigData.organization_id == organization_id,
+                OrgConfigData.category == self._SESSION_LABELS_CATEGORY,
+                OrgConfigData.key == "labels",
+            )
+        )
+        row = result.first()
+        if row:
+            try:
+                return json.loads(row.value_json)
+            except (json.JSONDecodeError, TypeError):
+                return {}
+        return {}
+
+    async def _save_session_label(
+        self, organization_id: UUID, session_key: str, label: str
+    ) -> None:
+        """Persist a session label to OrgConfigData."""
+        labels = await self._get_session_labels(organization_id)
+        labels[session_key] = label
+        result = await self.session.exec(
+            select(OrgConfigData).where(
+                OrgConfigData.organization_id == organization_id,
+                OrgConfigData.category == self._SESSION_LABELS_CATEGORY,
+                OrgConfigData.key == "labels",
+            )
+        )
+        row = result.first()
+        if row:
+            row.value_json = json.dumps(labels)
+        else:
+            self.session.add(OrgConfigData(
+                organization_id=organization_id,
+                category=self._SESSION_LABELS_CATEGORY,
+                key="labels",
+                label="Session Labels",
+                value_json=json.dumps(labels),
+            ))
+        await self.session.commit()
+
+    async def _remove_session_label(
+        self, organization_id: UUID, session_key: str
+    ) -> None:
+        """Remove a persisted session label."""
+        labels = await self._get_session_labels(organization_id)
+        if session_key in labels:
+            del labels[session_key]
+            result = await self.session.exec(
+                select(OrgConfigData).where(
+                    OrgConfigData.organization_id == organization_id,
+                    OrgConfigData.category == self._SESSION_LABELS_CATEGORY,
+                    OrgConfigData.key == "labels",
+                )
+            )
+            row = result.first()
+            if row:
+                row.value_json = json.dumps(labels)
+                await self.session.commit()
+
+    def _apply_session_labels(
+        self,
+        sessions_list: list[dict[str, object]],
+        labels: dict[str, str],
+    ) -> list[dict[str, object]]:
+        """Overlay persisted labels onto gateway session entries."""
+        if not labels:
+            return sessions_list
+        for item in sessions_list:
+            key = item.get("key")
+            if isinstance(key, str) and key in labels:
+                item["displayName"] = labels[key]
+        return sessions_list
+
     async def list_sessions(self, config: GatewayClientConfig) -> list[dict[str, object]]:
         sessions = await openclaw_call("sessions.list", config=config)
         if isinstance(sessions, dict):
@@ -321,6 +402,11 @@ class GatewaySessionService(OpenClawDBService):
         else:
             sessions_list = self.as_object_list(sessions)
 
+        # Overlay persisted session labels (gateway doesn't persist renames)
+        labels = await self._get_session_labels(organization_id)
+        typed_list = [item for item in sessions_list if isinstance(item, dict)]
+        self._apply_session_labels(typed_list, labels)
+
         main_session_entry: object | None = None
         if main_session:
             try:
@@ -333,7 +419,7 @@ class GatewaySessionService(OpenClawDBService):
                     main_session_entry = ensured.get("entry") or ensured
             except OpenClawGatewayError:
                 main_session_entry = None
-        return GatewaySessionsResponse(sessions=sessions_list, main_session=main_session_entry)
+        return GatewaySessionsResponse(sessions=typed_list, main_session=main_session_entry)
 
     async def get_session(
         self,
@@ -437,6 +523,10 @@ class GatewaySessionService(OpenClawDBService):
                 status_code=status.HTTP_502_BAD_GATEWAY,
                 detail=str(exc),
             ) from exc
+        # Persist label in MC database (gateway doesn't persist renames)
+        await self._save_session_label(organization_id, session_id, label)
+        if isinstance(session_entry, dict):
+            session_entry["displayName"] = label
         return GatewaySessionResponse(session=session_entry)
 
     async def get_session_history(
@@ -591,3 +681,5 @@ class GatewaySessionService(OpenClawDBService):
                 status_code=status.HTTP_502_BAD_GATEWAY,
                 detail=str(exc),
             ) from exc
+        # Clean up persisted label
+        await self._remove_session_label(organization_id, session_id)

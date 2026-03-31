@@ -2,8 +2,8 @@
 
 export const dynamic = "force-dynamic";
 
-import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { useAuth, useUser } from "@/auth/clerk";
 import { useQueryClient } from "@tanstack/react-query";
@@ -31,6 +31,7 @@ type ClerkGlobal = {
 
 export default function SettingsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { isSignedIn } = useAuth();
   const { user } = useUser();
@@ -43,6 +44,18 @@ export default function SettingsPage() {
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+
+  // Show OAuth callback feedback
+  const [oauthBanner, setOauthBanner] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  useEffect(() => {
+    if (searchParams.get("email_connected") === "true") {
+      setOauthBanner({ type: "success", message: "Email account connected successfully." });
+      router.replace("/settings", { scroll: false });
+    } else if (searchParams.get("email_error")) {
+      setOauthBanner({ type: "error", message: `Email connection failed: ${searchParams.get("email_error")}` });
+      router.replace("/settings", { scroll: false });
+    }
+  }, [searchParams, router]);
 
   const meQuery = useGetMeApiV1UsersMeGet<
     getMeApiV1UsersMeGetResponse,
@@ -152,6 +165,23 @@ export default function SettingsPage() {
         description="Update your profile and account preferences."
       >
         <div className="space-y-6">
+          {oauthBanner && (
+            <div
+              className={`rounded-lg border px-4 py-3 text-sm ${
+                oauthBanner.type === "success"
+                  ? "border-green-200 bg-green-50 text-green-800"
+                  : "border-red-200 bg-red-50 text-red-800"
+              }`}
+            >
+              {oauthBanner.message}
+              <button
+                className="ml-2 font-medium underline"
+                onClick={() => setOauthBanner(null)}
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
           <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-base font-semibold text-slate-900">Profile</h2>
             <p className="mt-1 text-sm text-slate-500">

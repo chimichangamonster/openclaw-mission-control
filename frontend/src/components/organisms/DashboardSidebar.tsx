@@ -323,13 +323,25 @@ export function DashboardSidebar() {
                 href="/pentest"
                 className={cn(
                   "flex items-center gap-3 rounded-lg px-3 py-2.5 text-[color:var(--text)] transition",
-                  pathname.startsWith("/pentest")
+                  pathname === "/pentest"
                     ? "bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)] font-medium"
                     : "hover:bg-[color:var(--surface-muted)]",
                 )}
               >
                 <Shield className="h-4 w-4" />
-                Pentest Lab
+                Command Center
+              </Link>
+              <Link
+                href="/pentest/sdr"
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-[color:var(--text)] transition",
+                  pathname.startsWith("/pentest/sdr")
+                    ? "bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)] font-medium"
+                    : "hover:bg-[color:var(--surface-muted)]",
+                )}
+              >
+                <Radio className="h-4 w-4" />
+                SDR Workspace
               </Link>
             </div>
           </div>

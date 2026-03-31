@@ -178,7 +178,7 @@ function tierFromModel(model: string): { label: string; color: string } {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function LivePage() {
-  const { isSignedIn } = useAuth();
+  const { isSignedIn, getToken } = useAuth();
 
   // Core state
   const [sessions, setSessions] = useState<AgentSession[]>([]);
@@ -206,46 +206,53 @@ export default function LivePage() {
   const sseRef = useRef<EventSource | null>(null);
   useEffect(() => {
     if (!isSignedIn) return;
-    const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") || "" : "";
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || "";
-    const url = `${baseUrl}/api/v1/activity/live/stream?token=${encodeURIComponent(token)}`;
-    const es = new EventSource(url);
-    sseRef.current = es;
+    let cancelled = false;
+    let es: EventSource | null = null;
 
-    es.addEventListener("activity", (e) => {
-      try {
-        const data: LiveSSEEvent = JSON.parse(e.data);
-        const eventType = data.event_type || "";
-        let type: ActivityEvent["type"] = "active";
-        if (eventType.includes("thinking")) type = "thinking";
-        else if (eventType.includes("tool_call")) type = "tool_call";
-        else if (eventType.includes("responded") || eventType.includes("completed")) type = "responded";
-        else if (eventType.includes("cron")) type = "cron";
-        else if (eventType.includes("approval")) type = "approval";
-        else if (eventType.includes("gateway") || eventType.includes("disconnect") || eventType.includes("connect")) type = "gateway";
-        else if (eventType.includes("message_received")) type = "active";
-        else if (eventType.includes("presence")) type = "idle";
+    void getToken().then((token) => {
+      if (cancelled || !token) return;
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "";
+      const url = `${baseUrl}/api/v1/activity/live/stream?token=${encodeURIComponent(token)}`;
+      es = new EventSource(url);
+      sseRef.current = es;
 
-        const newEvent: ActivityEvent = {
-          id: data.id || String(eventIdRef.current++),
-          timestamp: data.timestamp ? new Date(data.timestamp).getTime() : Date.now(),
-          agent: data.agent_name || "unknown",
-          channel: data.channel || "",
-          model: data.model || "",
-          type,
-          message: data.message || eventType,
-          tokenDelta: 0,
-        };
-        setEvents((prev) => [newEvent, ...prev].slice(0, 100));
-      } catch { /* ignore parse errors */ }
+      es.addEventListener("activity", (e) => {
+        try {
+          const data: LiveSSEEvent = JSON.parse(e.data);
+          const eventType = data.event_type || "";
+          let type: ActivityEvent["type"] = "active";
+          if (eventType.includes("thinking")) type = "thinking";
+          else if (eventType.includes("tool_call")) type = "tool_call";
+          else if (eventType.includes("responded") || eventType.includes("completed")) type = "responded";
+          else if (eventType.includes("cron")) type = "cron";
+          else if (eventType.includes("approval")) type = "approval";
+          else if (eventType.includes("gateway") || eventType.includes("disconnect") || eventType.includes("connect")) type = "gateway";
+          else if (eventType.includes("message_received")) type = "active";
+          else if (eventType.includes("presence")) type = "idle";
+
+          const newEvent: ActivityEvent = {
+            id: data.id || String(eventIdRef.current++),
+            timestamp: data.timestamp ? new Date(data.timestamp).getTime() : Date.now(),
+            agent: data.agent_name || "unknown",
+            channel: data.channel || "",
+            model: data.model || "",
+            type,
+            message: data.message || eventType,
+            tokenDelta: 0,
+          };
+          setEvents((prev) => [newEvent, ...prev].slice(0, 100));
+        } catch { /* ignore parse errors */ }
+      });
+
+      es.onerror = () => { /* EventSource auto-reconnects */ };
     });
 
-    es.onerror = () => { /* EventSource auto-reconnects */ };
-
     return () => {
-      es.close();
+      cancelled = true;
+      es?.close();
       sseRef.current = null;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSignedIn]);
 
   // ─── Poll gateway sessions ───────────────────────────────────────────────

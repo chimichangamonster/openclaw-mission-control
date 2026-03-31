@@ -26,6 +26,7 @@ from app.schemas.activity_events import ActivityEventRead, ActivityTaskCommentFe
 from app.schemas.pagination import DefaultLimitOffsetPage
 from app.services.organizations import (
     OrganizationContext,
+    ensure_member_for_user,
     get_active_membership,
     list_accessible_board_ids,
 )
@@ -399,13 +400,39 @@ async def stream_task_comment_feed(
 async def stream_live_activity(
     request: Request,
     token: str | None = Query(default=None),
-    _ctx: OrganizationContext = ORG_MEMBER_DEP,
+    session: AsyncSession = SESSION_DEP,
 ) -> EventSourceResponse:
     """Stream real-time gateway events via SSE.
 
     Events are pushed from the in-memory broadcast hub populated by
     the persistent gateway event listener.
+
+    EventSource cannot set custom headers, so auth is passed via the
+    ``token`` query parameter.
     """
+    # Resolve auth from query-param token (EventSource can't set headers)
+    from app.core.auth import get_auth_context
+
+    if token:
+        # Inject token as Authorization header for the standard auth chain.
+        # Must invalidate Starlette's cached Headers object so the new header
+        # is visible to downstream code (request.headers caches on first access).
+        scope_headers = [
+            (k, v) for k, v in request.scope["headers"]
+            if k != b"authorization"
+        ]
+        scope_headers.append((b"authorization", f"Bearer {token}".encode()))
+        request.scope["headers"] = scope_headers
+        if hasattr(request, "_headers"):
+            del request._headers  # noqa: SLF001 – invalidate cache
+    auth = await get_auth_context(request, credentials=None, session=session)
+    if auth.user is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
+    member = await get_active_membership(session, auth.user)
+    if member is None:
+        member = await ensure_member_for_user(session, auth.user)
+    if member is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
     from app.services.openclaw.event_broadcast import broadcast as hub
 
     queue = hub.subscribe()

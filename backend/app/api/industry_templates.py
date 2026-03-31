@@ -6,6 +6,7 @@ import json
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlmodel import select
 
 from app.api.deps import ORG_MEMBER_DEP, require_org_role
@@ -74,17 +75,28 @@ async def get_template_detail(template_id: str, org_ctx: OrganizationContext = O
     }
 
 
+class ApplyTemplatePayload(BaseModel):
+    exclude_categories: list[str] = []
+
+
 @router.post("/{template_id}/apply")
-async def apply_template(template_id: str, org_ctx: OrganizationContext = _ADMIN_DEP):
+async def apply_template(
+    template_id: str,
+    payload: ApplyTemplatePayload | None = None,
+    org_ctx: OrganizationContext = _ADMIN_DEP,
+):
     """Apply an industry template to the current organization.
 
     Seeds default config data, merges feature flags, creates onboarding checklist.
     Skips config items that already exist (safe to re-apply).
+    Pass ``exclude_categories`` to skip specific config categories the org doesn't need.
     """
     template = get_template(template_id)
     if not template:
         raise HTTPException(status_code=404, detail=f"Template '{template_id}' not found")
 
+    body = payload or ApplyTemplatePayload()
+    excluded = set(body.exclude_categories)
     org_id = org_ctx.organization.id
 
     async with async_session_maker() as session:
@@ -106,9 +118,11 @@ async def apply_template(template_id: str, org_ctx: OrganizationContext = _ADMIN
         settings.industry_template_id = template_id
         settings.updated_at = utcnow()
 
-        # 2. Seed config data (skip existing)
+        # 2. Seed config data (skip existing and excluded categories)
         config_created = 0
         for category, items in template.default_config.items():
+            if category in excluded:
+                continue
             for item in items:
                 existing = await session.execute(
                     select(OrgConfigData).where(
@@ -167,7 +181,7 @@ async def apply_template(template_id: str, org_ctx: OrganizationContext = _ADMIN
         org_id, "template.applied",
         user_id=org_ctx.member.user_id,
         resource_type="industry_template",
-        details={"template_id": template_id, "config_items_created": config_created},
+        details={"template_id": template_id, "config_items_created": config_created, "excluded_categories": list(excluded) if excluded else []},
     )
 
     return {
@@ -193,7 +207,7 @@ async def get_onboarding_status(org_ctx: OrganizationContext = ORG_MEMBER_DEP):
         steps = result.scalars().all()
 
         if not steps:
-            return {"template_id": None, "steps": [], "progress": 0}
+            return {"template_id": None, "steps": [], "progress_pct": 0}
 
         total = len(steps)
         completed = sum(1 for s in steps if s.completed)
@@ -202,7 +216,7 @@ async def get_onboarding_status(org_ctx: OrganizationContext = ORG_MEMBER_DEP):
             "template_id": steps[0].template_id,
             "steps": [
                 {
-                    "key": s.step_key,
+                    "step_key": s.step_key,
                     "label": s.label,
                     "description": s.description,
                     "completed": s.completed,
@@ -210,7 +224,7 @@ async def get_onboarding_status(org_ctx: OrganizationContext = ORG_MEMBER_DEP):
                 }
                 for s in steps
             ],
-            "progress": round(completed / total * 100) if total else 0,
+            "progress_pct": round(completed / total * 100) if total else 0,
         }
 
 

@@ -46,20 +46,10 @@ def _normalize_skill_pack_source_url(source_url: str) -> str:
     return normalized
 
 
-DEFAULT_INSTALLER_SKILL_PACKS = (
-    (
-        "sickn33/antigravity-awesome-skills",
-        "antigravity-awesome-skills",
-        "The Ultimate Collection of 800+ Agentic Skills for Claude Code/Antigravity/Cursor. "
-        "Battle-tested, high-performance skills for AI agents including official skills from "
-        "Anthropic and Vercel.",
-    ),
-    (
-        "BrianRWagner/ai-marketing-skills",
-        "ai-marketing-skills",
-        "Marketing frameworks that AI actually executes. Use for Claude Code, OpenClaw, etc.",
-    ),
-)
+# No default skill packs — VantageClaw uses curated in-house skills only.
+# Upstream defaults (antigravity-awesome-skills, ai-marketing-skills) removed
+# to prevent 1000+ third-party skills from auto-seeding on new orgs.
+DEFAULT_INSTALLER_SKILL_PACKS: tuple[tuple[str, str, str], ...] = ()
 VALID_ROLES = {"viewer", "member", "operator", "admin", "owner"}
 ADMIN_ROLES = {"owner", "admin"}
 OPERATOR_ROLES = {"owner", "admin", "operator"}

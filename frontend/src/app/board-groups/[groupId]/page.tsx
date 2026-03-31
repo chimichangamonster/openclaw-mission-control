@@ -46,7 +46,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { createExponentialBackoff } from "@/lib/backoff";
 import { apiDatetimeToMs } from "@/lib/datetime";
 import { formatTimestamp } from "@/lib/formatters";
-import { cn } from "@/lib/utils";
+import { cn, extractTextContent } from "@/lib/utils";
 import { usePageActive } from "@/hooks/usePageActive";
 
 const statusLabel = (value?: string | null) => {
@@ -115,7 +115,7 @@ function GroupChatMessageCard({ message }: { message: BoardGroupMemoryRead }) {
         </span>
       </div>
       <div className="mt-2 select-text cursor-text text-sm leading-relaxed text-slate-900 break-words">
-        <Markdown content={message.content} variant="basic" />
+        <Markdown content={extractTextContent(message.content)} variant="basic" />
       </div>
       {message.tags?.length ? (
         <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-slate-600">

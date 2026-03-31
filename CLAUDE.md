@@ -38,6 +38,25 @@ VantageClaw fork of abhi1693/openclaw-mission-control. Separate git repo (not a 
 - `POST /watchlist/portfolios/{id}/items/bulk` — bulk add from report scan
 - `GET /watchlist/portfolios/{id}/items/summary` — counts + active alerts
 
+## Cron Job CRUD Endpoints
+- `GET /cron-jobs` — list cron jobs (RPC with file-read fallback)
+- `POST /cron-jobs` — create job via gateway RPC (operator+ role)
+- `PATCH /cron-jobs/{id}` — update job (operator+ role)
+- `DELETE /cron-jobs/{id}` — remove job (operator+ role)
+- `POST /cron-jobs/{id}/run` — trigger manual run (operator+ role)
+- `GET /cron-jobs/{id}/runs` — run history (member role)
+- Schemas: `app/schemas/cron_jobs.py` — `CronJobCreate`, `CronJobUpdate`, `CronRunRecord`
+- Frontend: `/cron-jobs` page — create dialog, enable/disable toggle, edit, delete, run now, run history
+
+## Model Registry & Pinning Endpoints
+- `GET /models/registry` — list all known models with versions, status, pricing
+- `POST /models/registry/refresh` — refresh from OpenRouter (admin role)
+- `GET /models/registry/{family}/versions` — version history for a model family
+- `GET /models/pins` — get per-org model pins + deprecation warnings
+- `PUT /models/pins` — set pins (admin role, audit-logged)
+- Service: `app/services/model_registry.py` — in-memory cache + JSON persistence
+- Frontend: Model Registry & Pinning section in org-settings page
+
 ## Chat & Gateway Session Endpoints
 - `GET /gateways/sessions` — list gateway sessions (requires board_id)
 - `GET /gateways/sessions/{id}/history` — fetch chat history for a session

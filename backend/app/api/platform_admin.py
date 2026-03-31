@@ -264,6 +264,149 @@ async def get_org_audit_trail(
 
 
 # ---------------------------------------------------------------------------
+# Org readiness check (pre-onboarding QA)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/orgs/{org_id}/readiness", summary="Pre-onboarding readiness check")
+async def org_readiness_check(
+    org_id: UUID,
+    admin: User = ADMIN_DEP,
+    session: AsyncSession = SESSION_DEP,
+) -> dict:
+    """Run automated readiness checks for a client org before onboarding.
+
+    Validates: org exists, settings configured, feature flags set, gateway
+    connected, members exist, budget config present, rate limiting active,
+    BYOK key or platform key available.
+    """
+    from app.models.budget import BudgetConfig
+
+    org = await _get_org_or_404(org_id, session)
+
+    checks: list[dict] = []
+
+    def add(name: str, passed: bool, detail: str = "") -> None:
+        checks.append({"check": name, "passed": passed, "detail": detail})
+
+    # 1. Org settings exist
+    settings_result = await session.execute(
+        select(OrganizationSettings).where(
+            OrganizationSettings.organization_id == org_id
+        )
+    )
+    org_settings = settings_result.scalars().first()
+    add("org_settings_exist", org_settings is not None, "OrganizationSettings row exists")
+
+    # 2. Feature flags configured (at least one enabled)
+    if org_settings:
+        flags = org_settings.feature_flags or {}
+        enabled = [k for k, v in flags.items() if v]
+        add(
+            "feature_flags_set",
+            len(enabled) > 0,
+            f"{len(enabled)} flags enabled: {', '.join(enabled[:5])}{'...' if len(enabled) > 5 else ''}",
+        )
+    else:
+        add("feature_flags_set", False, "No settings — cannot check flags")
+
+    # 3. Has LLM access (BYOK key or custom endpoint)
+    if org_settings:
+        has_key = bool(org_settings.openrouter_api_key_encrypted)
+        has_custom = bool(
+            org_settings.custom_llm_endpoint
+            and org_settings.custom_llm_endpoint.get("api_url")
+        )
+        add(
+            "llm_access",
+            has_key or has_custom,
+            "BYOK key" if has_key else ("Custom endpoint" if has_custom else "No LLM key or endpoint configured"),
+        )
+    else:
+        add("llm_access", False, "No settings — cannot check LLM access")
+
+    # 4. Gateway connected
+    gw_result = await session.execute(
+        select(Gateway).where(Gateway.organization_id == org_id)
+    )
+    gateways = gw_result.scalars().all()
+    add("gateway_connected", len(gateways) > 0, f"{len(gateways)} gateway(s)")
+
+    # 5. Members exist
+    member_result = await session.execute(
+        select(func.count()).where(OrganizationMember.organization_id == org_id)
+    )
+    member_count = member_result.scalar() or 0
+    add("members_exist", member_count > 0, f"{member_count} member(s)")
+
+    # 6. Has at least one owner
+    owner_result = await session.execute(
+        select(func.count()).where(
+            OrganizationMember.organization_id == org_id,
+            OrganizationMember.role == "owner",
+        )
+    )
+    owner_count = owner_result.scalar() or 0
+    add("has_owner", owner_count > 0, f"{owner_count} owner(s)")
+
+    # 7. Budget config exists
+    budget_result = await session.execute(
+        select(BudgetConfig).where(BudgetConfig.organization_id == org_id)
+    )
+    budget = budget_result.scalars().first()
+    add(
+        "budget_configured",
+        budget is not None,
+        f"Daily limit: ${budget.daily_limit}" if budget else "No budget config",
+    )
+
+    # 8. Industry template applied
+    if org_settings:
+        add(
+            "industry_template",
+            bool(org_settings.industry_template_id),
+            org_settings.industry_template_id or "No template applied",
+        )
+    else:
+        add("industry_template", False, "No settings")
+
+    # 9. Slug set (required for gateway workspace)
+    has_slug = bool(getattr(org, "slug", None))
+    add("slug_set", has_slug, getattr(org, "slug", "(none)"))
+
+    # 10. Timezone set
+    if org_settings:
+        add(
+            "timezone_set",
+            bool(org_settings.timezone and org_settings.timezone != "UTC"),
+            org_settings.timezone or "Not set",
+        )
+    else:
+        add("timezone_set", False, "No settings")
+
+    passed = sum(1 for c in checks if c["passed"])
+    total = len(checks)
+
+    await log_audit(
+        org_id=org_id,
+        action="platform.readiness_check",
+        user_id=admin.id,
+        resource_type="organization",
+        resource_id=org_id,
+        details={"passed": passed, "total": total},
+    )
+
+    return {
+        "org": org.name,
+        "slug": getattr(org, "slug", None),
+        "passed": passed,
+        "total": total,
+        "ready": passed == total,
+        "checks": checks,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 

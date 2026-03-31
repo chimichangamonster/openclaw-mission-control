@@ -27,7 +27,7 @@ import { customFetch } from "@/api/mutator";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Markdown } from "@/components/atoms/Markdown";
-import { cn } from "@/lib/utils";
+import { cn, extractTextContent } from "@/lib/utils";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -120,22 +120,7 @@ function findClawSession(sessions: GatewaySession[]): GatewaySession | null {
   return sessions[0] ?? null;
 }
 
-function extractTextContent(content: unknown): string {
-  if (typeof content === "string") return content;
-  if (Array.isArray(content)) {
-    return content
-      .filter(
-        (p): p is { type: string; text: string } =>
-          typeof p === "object" &&
-          p !== null &&
-          p.type === "text" &&
-          typeof p.text === "string",
-      )
-      .map((p) => p.text)
-      .join("\n");
-  }
-  return String(content ?? "");
-}
+// extractTextContent is imported from @/lib/utils
 
 function parseHistory(history: unknown[]): ChatMessage[] {
   return history
@@ -163,7 +148,7 @@ function parseHistory(history: unknown[]): ChatMessage[] {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function ChatPage() {
-  const { isSignedIn } = useAuth();
+  const { isSignedIn, getToken } = useAuth();
 
   // Board resolution — pick first board with a gateway
   const [boardId, setBoardId] = useState<string | null>(null);
@@ -345,66 +330,71 @@ export default function ChatPage() {
 
   useEffect(() => {
     if (!isSignedIn) return;
-    const token =
-      typeof window !== "undefined"
-        ? localStorage.getItem("auth_token") || ""
-        : "";
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || "";
-    const url = `${baseUrl}/api/v1/activity/live/stream?token=${encodeURIComponent(token)}`;
-    const es = new EventSource(url);
-    sseRef.current = es;
+    let cancelled = false;
+    let es: EventSource | null = null;
 
-    es.onopen = () => setSseConnected(true);
-    es.onerror = () => setSseConnected(false);
+    // Fetch auth token async (Clerk is async, local/wechat are sync)
+    void getToken().then((token) => {
+      if (cancelled || !token) return;
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "";
+      const url = `${baseUrl}/api/v1/activity/live/stream?token=${encodeURIComponent(token)}`;
+      es = new EventSource(url);
+      sseRef.current = es;
 
-    es.addEventListener("activity", (e) => {
-      try {
-        const data: LiveSSEEvent = JSON.parse(e.data);
-        const eventType = data.event_type || "";
+      es.onopen = () => setSseConnected(true);
+      es.onerror = () => setSseConnected(false);
 
-        // Only care about events from The Claw / main agent
-        const agent = data.agent_name || "";
-        const isRelevant =
-          agent.includes("the-claw") ||
-          agent.includes("main") ||
-          agent.includes("mc-gateway");
-        if (!isRelevant) return;
+      es.addEventListener("activity", (e) => {
+        try {
+          const data: LiveSSEEvent = JSON.parse(e.data);
+          const eventType = data.event_type || "";
 
-        // Agent is thinking/working
-        if (
-          eventType.includes("thinking") ||
-          eventType.includes("working") ||
-          eventType.includes("tool_call")
-        ) {
-          setAgentTyping(true);
-          if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-          typingTimeoutRef.current = setTimeout(
-            () => setAgentTyping(false),
-            15000,
-          );
-        }
+          // Only care about events from The Claw / main agent
+          const agent = data.agent_name || "";
+          const isRelevant =
+            agent.includes("the-claw") ||
+            agent.includes("main") ||
+            agent.includes("mc-gateway");
+          if (!isRelevant) return;
 
-        // Agent responded — refetch history
-        if (
-          eventType.includes("responded") ||
-          eventType.includes("completed")
-        ) {
-          setAgentTyping(false);
-          if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-          const currentKey = sessionKeyRef.current;
-          if (currentKey) {
-            setTimeout(() => void fetchHistory(currentKey), 500);
+          // Agent is thinking/working
+          if (
+            eventType.includes("thinking") ||
+            eventType.includes("working") ||
+            eventType.includes("tool_call")
+          ) {
+            setAgentTyping(true);
+            if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+            typingTimeoutRef.current = setTimeout(
+              () => setAgentTyping(false),
+              15000,
+            );
           }
+
+          // Agent responded — refetch history
+          if (
+            eventType.includes("responded") ||
+            eventType.includes("completed")
+          ) {
+            setAgentTyping(false);
+            if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+            const currentKey = sessionKeyRef.current;
+            if (currentKey) {
+              setTimeout(() => void fetchHistory(currentKey), 500);
+            }
+          }
+        } catch {
+          /* ignore parse errors */
         }
-      } catch {
-        /* ignore parse errors */
-      }
+      });
     });
 
     return () => {
-      es.close();
+      cancelled = true;
+      es?.close();
       sseRef.current = null;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSignedIn, fetchHistory]);
 
   // ─── File upload helpers ──────────────────────────────────────────────────

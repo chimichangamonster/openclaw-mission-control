@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rules of Engagement — {{ client_name }}</title>
+<style>
+  @page {
+    size: letter;
+    margin: 1in 0.75in;
+    @top-center { content: "CONFIDENTIAL — Rules of Engagement"; font-size: 8pt; color: #999; }
+    @bottom-center { content: "Page " counter(page) " of " counter(pages); font-size: 8pt; color: #999; }
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Helvetica Neue', Arial, sans-serif; color: #333; line-height: 1.6; }
+  .cover { page-break-after: always; display: flex; flex-direction: column; justify-content: center; min-height: 90vh; padding: 2in 0; }
+  .cover h1 { font-size: 32pt; color: #1a1a2e; margin-bottom: 0.3em; border-bottom: 4px solid #e63946; padding-bottom: 0.3em; }
+  .cover .subtitle { font-size: 14pt; color: #555; margin-bottom: 1em; }
+  .cover .meta { font-size: 10pt; color: #888; }
+  .cover .meta span { display: block; margin-bottom: 4px; }
+  .cover .logo { max-width: 200px; max-height: 80px; margin-bottom: 1.5em; }
+  h2 { font-size: 16pt; color: #1a1a2e; margin: 1.5em 0 0.5em; border-left: 4px solid #e63946; padding-left: 12px; }
+  h3 { font-size: 12pt; color: #444; margin: 1em 0 0.4em; }
+  p { margin-bottom: 0.8em; font-size: 10.5pt; }
+  ul, ol { margin: 0.5em 0 1em 1.5em; font-size: 10.5pt; }
+  li { margin-bottom: 0.3em; }
+  table { width: 100%; border-collapse: collapse; margin: 1em 0; font-size: 10pt; }
+  th { background: #1a1a2e; color: white; padding: 8px 12px; text-align: left; font-weight: 600; }
+  td { padding: 6px 12px; border-bottom: 1px solid #e0e0e0; }
+  tr:nth-child(even) td { background: #f8f8f8; }
+  .warning-box { background: #fff3cd; border-left: 4px solid #ff9800; padding: 12px 16px; margin: 1em 0; border-radius: 0 4px 4px 0; font-size: 10pt; }
+  .scope-box { background: #f0fff4; border-left: 4px solid #4caf50; padding: 12px 16px; margin: 1em 0; border-radius: 0 4px 4px 0; font-size: 10pt; }
+  .restrict-box { background: #fde8e8; border-left: 4px solid #e63946; padding: 12px 16px; margin: 1em 0; border-radius: 0 4px 4px 0; font-size: 10pt; }
+  .page-break { page-break-before: always; }
+  .sig-block { margin-top: 2em; }
+  .sig-line { border-top: 1px solid #333; width: 300px; margin-top: 60px; padding-top: 5px; font-size: 10pt; }
+  .sig-row { display: flex; gap: 60px; margin-top: 2em; }
+  .sig-col { flex: 1; }
+  .checkbox { display: inline-block; width: 14px; height: 14px; border: 1.5px solid #333; margin-right: 6px; vertical-align: middle; }
+  .checked { background: #1a1a2e; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  {% if logo_url %}<img src="{{ logo_url }}" alt="Vantage Solutions" class="logo">{% endif %}
+  <h1>Rules of Engagement</h1>
+  <div class="subtitle">Security Assessment Authorization</div>
+  <div class="meta">
+    <span><strong>Prepared by:</strong> Vantage Solutions</span>
+    <span><strong>Prepared for:</strong> {{ client_name }}</span>
+    <span><strong>Document Date:</strong> {{ date }}</span>
+    <span><strong>Engagement Window:</strong> {{ start_date }} to {{ end_date }}</span>
+    {% if reference_sow %}<span><strong>Reference SOW:</strong> {{ reference_sow }}</span>{% endif %}
+  </div>
+</div>
+
+<h2>1. Purpose</h2>
+<p>This Rules of Engagement (RoE) document authorizes Vantage Solutions to perform a security assessment against the systems, networks, and/or facilities listed in Section 3 (Scope). Testing will be conducted within the boundaries defined herein. This authorization must be signed by an individual with the authority to grant permission for the described activities.</p>
+
+<div class="warning-box">
+  <strong>No testing may begin until this document is signed by both parties.</strong> Any scope changes require a written amendment signed by the authorized client contact.
+</div>
+
+<h2>2. Engagement Overview</h2>
+<table>
+  <tr><th style="width:35%">Field</th><th>Details</th></tr>
+  <tr><td>Client Organization</td><td>{{ client_name }}</td></tr>
+  <tr><td>Authorized Signer</td><td>{{ client_signer }}</td></tr>
+  <tr><td>Client Contact Email</td><td>{{ client_email }}</td></tr>
+  <tr><td>Engagement Type</td><td>{{ engagement_type }}</td></tr>
+  <tr><td>Testing Window</td><td>{{ start_date }} to {{ end_date }}</td></tr>
+  <tr><td>Testing Hours</td><td>{{ testing_hours }}</td></tr>
+  <tr><td>Findings Delivery</td><td>{{ findings_delivery | default('Encrypted email') }}</td></tr>
+</table>
+
+<h2>3. Scope</h2>
+
+<h3>3.1 In-Scope Targets</h3>
+<div class="scope-box">
+  {{ in_scope }}
+</div>
+
+<h3>3.2 Out-of-Scope Targets</h3>
+<div class="restrict-box">
+  {{ out_of_scope | default('None specified — all targets not explicitly listed in Section 3.1 are out of scope.') }}
+</div>
+
+<h3>3.3 Authorized Testing Methods</h3>
+<table>
+  <tr><th>Method</th><th>Authorized</th><th>Notes</th></tr>
+  <tr>
+    <td>Network Scanning (nmap, Responder)</td>
+    <td>{% if 'network' in engagement_type or 'combined' in engagement_type %}Yes{% else %}No{% endif %}</td>
+    <td>In-scope IP ranges only</td>
+  </tr>
+  <tr>
+    <td>WiFi Assessment (active scanning, deauth, capture)</td>
+    <td>{% if wireless_transmission == 'full' and ('wireless' in engagement_type or 'combined' in engagement_type) %}Yes{% elif wireless_transmission == 'passive_only' and ('wireless' in engagement_type or 'combined' in engagement_type) %}Passive only{% else %}No{% endif %}</td>
+    <td>{% if wireless_transmission == 'passive_only' %}NOWIFI restriction — monitor mode only, no active transmission{% endif %}</td>
+  </tr>
+  <tr>
+    <td>BLE Scanning & Exploitation</td>
+    <td>{% if wireless_transmission == 'full' and ('wireless' in engagement_type or 'combined' in engagement_type) %}Yes{% elif wireless_transmission == 'passive_only' %}Passive only{% else %}No{% endif %}</td>
+    <td>{% if wireless_transmission == 'passive_only' %}Receive-only — no active BLE connections{% endif %}</td>
+  </tr>
+  <tr>
+    <td>RFID/NFC Card Assessment</td>
+    <td>{% if 'physical' in engagement_type or 'combined' in engagement_type %}Yes{% else %}No{% endif %}</td>
+    <td>{% if wireless_transmission == 'passive_only' %}Proxmark3 passive sniff mode only{% else %}Read, clone, and replay testing{% endif %}</td>
+  </tr>
+  <tr>
+    <td>Sub-GHz RF (garage doors, remotes)</td>
+    <td>{% if wireless_transmission == 'full' and ('physical' in engagement_type or 'combined' in engagement_type) %}Yes{% else %}No{% endif %}</td>
+    <td>Client-owned devices only</td>
+  </tr>
+  <tr>
+    <td>Physical Access Testing (tailgating, badge cloning)</td>
+    <td>{% if 'physical' in engagement_type or 'combined' in engagement_type %}Yes{% else %}No{% endif %}</td>
+    <td>Authorized buildings/floors only per Section 3.1</td>
+  </tr>
+  <tr>
+    <td>Social Engineering</td>
+    <td>{% if 'social_engineering' in engagement_type or 'combined' in engagement_type %}Yes{% else %}No{% endif %}</td>
+    <td>Phishing, pretexting, USB drops as agreed</td>
+  </tr>
+  <tr>
+    <td>Web Application Testing</td>
+    <td>{% if 'webapp' in engagement_type or 'combined' in engagement_type %}Yes{% else %}No{% endif %}</td>
+    <td>Staging/test environments preferred</td>
+  </tr>
+  <tr>
+    <td>Credential Testing (default passwords, brute-force)</td>
+    <td>{% if 'network' in engagement_type or 'combined' in engagement_type %}Yes{% else %}No{% endif %}</td>
+    <td>Rate-limited, in-scope systems only</td>
+  </tr>
+</table>
+
+{% if wireless_transmission == 'passive_only' %}
+<div class="restrict-box">
+  <strong>NOWIFI RESTRICTION IN EFFECT</strong><br>
+  Active wireless transmission is prohibited during this engagement. Reason: {{ rf_restrictions_reason | default('Client facility policy') }}.<br>
+  All wireless testing is limited to passive/receive-only modes. No deauthentication, no active scanning, no RF transmission.
+</div>
+{% endif %}
+
+<div class="page-break"></div>
+
+{% if 'physical' in engagement_type or 'combined' in engagement_type %}
+<h2>4. Physical Access Scope</h2>
+<p>Physical security testing is authorized at the following locations:</p>
+<div class="scope-box">
+  {{ physical_scope }}
+</div>
+<p>The tester will carry a copy of this signed RoE document at all times during physical testing. If confronted by security or law enforcement, the tester will immediately identify themselves and present this authorization.</p>
+{% endif %}
+
+<h2>{% if 'physical' in engagement_type or 'combined' in engagement_type %}5{% else %}4{% endif %}. Emergency Contacts & Stop Procedure</h2>
+
+<table>
+  <tr><th>Role</th><th>Contact</th></tr>
+  <tr><td>Notification Contact (non-emergency)</td><td>{{ notification_contact }}</td></tr>
+  <tr><td>Emergency Stop Contact</td><td>{{ emergency_stop_contact }}</td></tr>
+  <tr><td>Vantage Solutions Lead Tester</td><td>Henry Chin — info@vantagesolutions.ca</td></tr>
+</table>
+
+<p>Either party may halt testing at any time by contacting the other party's listed contact. Upon receiving a stop request, all testing activities will cease immediately. Testing will not resume until both parties agree in writing.</p>
+
+<h2>{% if 'physical' in engagement_type or 'combined' in engagement_type %}6{% else %}5{% endif %}. Data Handling & Confidentiality</h2>
+
+<ul>
+  <li>All findings, captured data (hashes, credentials, card data, network captures), and work products are treated as <strong>confidential</strong>.</li>
+  <li>Captured data is stored encrypted (AES-256) on Vantage Solutions' secured infrastructure during the engagement.</li>
+  <li>All captured data will be securely destroyed <strong>{{ data_retention_days | default('30') }} days</strong> after the final report is delivered.</li>
+  <li>Findings will be delivered via <strong>{{ findings_delivery | default('encrypted email') }}</strong>.</li>
+  <li>No findings or client data will be shared with third parties without written consent.</li>
+  <li>If live credentials are discovered during testing, they will be reported to the notification contact within 24 hours.</li>
+</ul>
+
+<h2>{% if 'physical' in engagement_type or 'combined' in engagement_type %}7{% else %}6{% endif %}. Limitations & Liability</h2>
+
+<ul>
+  <li>Vantage Solutions will exercise reasonable care to avoid disruption to business operations.</li>
+  <li>Security testing inherently carries risk of unintended disruption. The client acknowledges this risk.</li>
+  <li>Vantage Solutions' liability is limited to the value of the engagement fee as defined in the referenced SOW.</li>
+  <li>Vantage Solutions is not responsible for pre-existing vulnerabilities discovered during the assessment.</li>
+  <li>Testing does not guarantee the discovery of all vulnerabilities — it is a point-in-time assessment.</li>
+</ul>
+
+<div class="warning-box">
+  <strong>DRAFT — REQUIRES LEGAL REVIEW</strong><br>
+  This template should be reviewed by a qualified lawyer before use in client engagements. Liability terms and authorization language may need adjustment for your jurisdiction and specific engagement type.
+</div>
+
+<h2>{% if 'physical' in engagement_type or 'combined' in engagement_type %}8{% else %}7{% endif %}. Authorization & Signatures</h2>
+
+<p>By signing below, the authorized client representative confirms that they have the authority to authorize the testing activities described in this document, and that Vantage Solutions is permitted to conduct these activities within the defined scope and timeframe.</p>
+
+<div class="sig-row">
+  <div class="sig-col">
+    <div class="sig-line">
+      <strong>Client Authorized Signer</strong><br>
+      Name: {{ client_signer }}<br>
+      Title: ______________________________<br>
+      Date: ______________________________
+    </div>
+  </div>
+  <div class="sig-col">
+    <div class="sig-line">
+      <strong>Vantage Solutions</strong><br>
+      Name: Henry Chin<br>
+      Title: Principal Consultant<br>
+      Date: ______________________________
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

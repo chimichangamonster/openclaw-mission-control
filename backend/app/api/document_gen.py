@@ -1,20 +1,27 @@
-"""Document generation API — simple (reportlab) and complex (Adobe PDF Services)."""
+"""Document generation API — simple (reportlab) and complex (Adobe PDF Services).
+
+Includes a two-phase redaction workflow for security assessment reports:
+  1. POST /documents/redact-for-review — redact sensitive data, return for human review
+  2. POST /documents/generate/complex-with-rehydration — generate after approval, rehydrate placeholders
+"""
 
 from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
-from uuid import uuid4
+from uuid import UUID, uuid4
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
-from sqlmodel import select
+from sqlmodel import col, select
 
 from app.core.config import settings
 from app.core.encryption import decrypt_token
 from app.core.file_tokens import create_file_token
 from app.core.logging import get_logger
+from app.core.redact import RedactionVault
 from app.db.session import async_session_maker
+from app.models.generated_documents import GeneratedDocument
 from app.models.organization_settings import OrganizationSettings
 
 logger = get_logger(__name__)
@@ -147,6 +154,62 @@ async def _try_onedrive_upload(
         return {"onedrive_url": None, "onedrive_edit_url": None}
 
 
+async def _persist_document(
+    *,
+    filename: str,
+    relative_path: str,
+    file_size: int,
+    mime_type: str,
+    doc_type: str,
+    mode: str,
+    engine: str,
+    title: str,
+    onedrive_url: str | None = None,
+    onedrive_edit_url: str | None = None,
+) -> None:
+    """Save a GeneratedDocument record to the database."""
+    try:
+        async with async_session_maker() as session:
+            doc = GeneratedDocument(
+                filename=filename,
+                relative_path=relative_path,
+                file_size=file_size,
+                mime_type=mime_type,
+                doc_type=doc_type,
+                mode=mode,
+                engine=engine,
+                title=title,
+                onedrive_url=onedrive_url,
+                onedrive_edit_url=onedrive_edit_url,
+            )
+            session.add(doc)
+            await session.commit()
+    except Exception as exc:
+        logger.warning("document_gen.persist_failed error=%s", exc)
+
+
+def _infer_doc_type(template: str | None, title: str) -> str:
+    """Infer document type from template name or title keywords."""
+    if template:
+        mapping = {
+            "proposal": "proposal",
+            "report": "report",
+            "security-assessment": "security-assessment",
+            "rules-of-engagement": "rules-of-engagement",
+        }
+        for key, dtype in mapping.items():
+            if key in template:
+                return dtype
+    lower = title.lower()
+    if "invoice" in lower:
+        return "invoice"
+    if "proposal" in lower or "sow" in lower:
+        return "proposal"
+    if "report" in lower:
+        return "report"
+    return "other"
+
+
 @router.post(
     "/generate/simple",
     summary="Generate a simple PDF document",
@@ -177,10 +240,25 @@ async def generate_simple(
     # Try OneDrive upload
     od = await _try_onedrive_upload(pdf_bytes, Path(relative_path).name, "application/pdf")
 
+    actual_filename = Path(relative_path).name
     logger.info("document_gen.simple filename=%s size=%d", body.filename, len(pdf_bytes))
+
+    await _persist_document(
+        filename=actual_filename,
+        relative_path=relative_path,
+        file_size=len(pdf_bytes),
+        mime_type="application/pdf",
+        doc_type=_infer_doc_type(None, body.title),
+        mode="simple",
+        engine="reportlab",
+        title=body.title,
+        onedrive_url=od.get("onedrive_url"),
+        onedrive_edit_url=od.get("onedrive_edit_url"),
+    )
+
     return DocumentResponse(
         url=download_url,
-        filename=Path(relative_path).name,
+        filename=actual_filename,
         mode="simple",
         engine="reportlab",
         onedrive_url=od["onedrive_url"],
@@ -250,15 +328,348 @@ async def generate_complex(
     mime = "application/pdf" if extension == ".pdf" else "text/html"
     od = await _try_onedrive_upload(pdf_bytes, Path(relative_path).name, mime)
 
+    actual_filename = Path(relative_path).name
+    mime = "application/pdf" if extension == ".pdf" else "text/html"
     logger.info(
         "document_gen.complex filename=%s engine=%s size=%d",
         body.filename, engine, len(pdf_bytes),
     )
+
+    title = body.template_data.get("title", "") or body.template or body.filename
+    await _persist_document(
+        filename=actual_filename,
+        relative_path=relative_path,
+        file_size=len(pdf_bytes),
+        mime_type=mime,
+        doc_type=_infer_doc_type(body.template, str(title)),
+        mode="complex",
+        engine=engine,
+        title=str(title),
+        onedrive_url=od.get("onedrive_url"),
+        onedrive_edit_url=od.get("onedrive_edit_url"),
+    )
+
     return DocumentResponse(
         url=download_url,
-        filename=Path(relative_path).name,
+        filename=actual_filename,
         mode="complex",
         engine=engine,
         onedrive_url=od["onedrive_url"],
         onedrive_edit_url=od["onedrive_edit_url"],
     )
+
+
+# ---------------------------------------------------------------------------
+# Redact-Review-Rehydrate workflow for security assessment reports
+# ---------------------------------------------------------------------------
+
+
+class RedactForReviewRequest(BaseModel):
+    """Raw pentest data to be redacted before human review."""
+    template_data: dict[str, Any] = Field(
+        ..., description="Template variables containing raw pentest findings data"
+    )
+
+
+class RedactedEntry(BaseModel):
+    tag: str
+    original: str
+    label: str
+
+
+class RedactForReviewResponse(BaseModel):
+    """Redacted data for human review before sending to LLM."""
+    redacted_template_data: dict[str, Any]
+    vault: dict
+    redacted_entries: list[RedactedEntry]
+    entry_count: int
+
+
+class GenerateWithRehydrationRequest(BaseModel):
+    """Generate report from LLM output, rehydrating redacted placeholders."""
+    template: str = Field(default="security-assessment", description="Template name")
+    template_data: dict[str, Any] = Field(
+        ..., description="Template data (may contain LLM-generated text with placeholders)"
+    )
+    vault: dict = Field(
+        ..., description="Vault from redact-for-review response"
+    )
+    filename: str = Field(default="security-assessment.pdf")
+    page_width: float = Field(default=8.5)
+    page_height: float = Field(default=11.0)
+
+
+def _redact_recursive(obj: Any, vault: RedactionVault) -> Any:
+    """Recursively redact string values in nested dicts/lists."""
+    if isinstance(obj, str):
+        return vault.redact(obj)
+    if isinstance(obj, dict):
+        return {k: _redact_recursive(v, vault) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_redact_recursive(item, vault) for item in obj]
+    return obj
+
+
+def _rehydrate_recursive(obj: Any, vault: RedactionVault) -> Any:
+    """Recursively rehydrate placeholder tags in nested dicts/lists."""
+    if isinstance(obj, str):
+        return vault.rehydrate(obj)
+    if isinstance(obj, dict):
+        return {k: _rehydrate_recursive(v, vault) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_rehydrate_recursive(item, vault) for item in obj]
+    return obj
+
+
+@router.post(
+    "/redact-for-review",
+    summary="Redact pentest data for human review before LLM processing",
+    response_model=RedactForReviewResponse,
+)
+async def redact_for_review(
+    body: RedactForReviewRequest,
+    token: str = Query(..., description="Auth token"),
+):
+    """Phase 1: Redact sensitive data (IPs, hostnames, credentials, paths) from
+    raw pentest findings. Returns the redacted data and a vault for the user to
+    review. Nothing is sent to any LLM at this stage.
+
+    The user must review the redacted_entries list to confirm no sensitive data
+    remains before proceeding to report generation.
+    """
+    if token != settings.local_auth_token:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    vault = RedactionVault()
+    redacted_data = _redact_recursive(body.template_data, vault)
+
+    logger.info(
+        "document_gen.redact_for_review entries=%d",
+        vault.entry_count,
+    )
+
+    return RedactForReviewResponse(
+        redacted_template_data=redacted_data,
+        vault=vault.to_dict(),
+        redacted_entries=[
+            RedactedEntry(**e) for e in vault.entries
+        ],
+        entry_count=vault.entry_count,
+    )
+
+
+@router.post(
+    "/generate/complex-with-rehydration",
+    summary="Generate report with rehydration of redacted placeholders",
+    response_model=DocumentResponse,
+)
+async def generate_complex_with_rehydration(
+    body: GenerateWithRehydrationRequest,
+    token: str = Query(..., description="Auth token"),
+):
+    """Phase 2: After the user has reviewed and approved the redacted data,
+    generate the final report. Template data (which may contain LLM-generated
+    text with placeholder tags) is rehydrated with original values from the
+    vault before rendering to PDF.
+
+    Flow: redacted data → user approves → LLM generates text with placeholders
+    → this endpoint rehydrates → renders final PDF with real data.
+    """
+    if token != settings.local_auth_token:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    # Reconstruct vault and rehydrate
+    vault = RedactionVault.from_dict(body.vault)
+    rehydrated_data = _rehydrate_recursive(body.template_data, vault)
+
+    logger.info(
+        "document_gen.rehydrate entries=%d",
+        vault.entry_count,
+    )
+
+    # Render template with rehydrated data
+    from app.services.document_gen import _render_html_template
+
+    try:
+        html_content = _render_html_template(body.template, rehydrated_data)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=400, detail=f"Template rendering failed: {exc}"
+        )
+
+    # Generate PDF (same logic as generate_complex)
+    adobe_creds = await _get_adobe_credentials(org_id=None)
+
+    if adobe_creds:
+        from app.services.document_gen import generate_complex_pdf_adobe
+
+        try:
+            pdf_bytes = await generate_complex_pdf_adobe(
+                html_content,
+                client_id=adobe_creds[0],
+                client_secret=adobe_creds[1],
+                page_width=body.page_width,
+                page_height=body.page_height,
+            )
+            engine = "adobe_pdf_services"
+            extension = ".pdf"
+        except Exception as exc:
+            logger.warning("document_gen.adobe_failed error=%s", exc)
+            pdf_bytes = html_content.encode("utf-8")
+            engine = "html_fallback"
+            extension = ".html"
+    else:
+        pdf_bytes = html_content.encode("utf-8")
+        engine = "html_fallback"
+        extension = ".html"
+
+    relative_path = _save_to_workspace(pdf_bytes, body.filename, extension)
+    file_token = create_file_token(relative_path, expires_hours=48)
+    download_url = f"{settings.base_url}/api/v1/files/download?token={file_token}"
+
+    od = await _try_onedrive_upload(
+        pdf_bytes, Path(relative_path).name,
+        "application/pdf" if extension == ".pdf" else "text/html",
+    )
+
+    actual_filename = Path(relative_path).name
+    mime = "application/pdf" if extension == ".pdf" else "text/html"
+    logger.info(
+        "document_gen.complex_rehydrated filename=%s engine=%s entries_rehydrated=%d",
+        body.filename, engine, vault.entry_count,
+    )
+
+    title = rehydrated_data.get("title", "") or body.template or body.filename
+    await _persist_document(
+        filename=actual_filename,
+        relative_path=relative_path,
+        file_size=len(pdf_bytes),
+        mime_type=mime,
+        doc_type=_infer_doc_type(body.template, str(title)),
+        mode="complex_rehydrated",
+        engine=engine,
+        title=str(title),
+        onedrive_url=od.get("onedrive_url"),
+        onedrive_edit_url=od.get("onedrive_edit_url"),
+    )
+
+    return DocumentResponse(
+        url=download_url,
+        filename=actual_filename,
+        mode="complex_rehydrated",
+        engine=engine,
+        onedrive_url=od["onedrive_url"],
+        onedrive_edit_url=od["onedrive_edit_url"],
+    )
+
+
+# ---------------------------------------------------------------------------
+# Generated documents listing & management
+# ---------------------------------------------------------------------------
+
+from app.api.deps import require_org_member
+from app.db.session import get_session
+from app.services.organizations import OrganizationContext
+
+_ORG_DEP = Depends(require_org_member)
+_SESSION_DEP = Depends(get_session)
+
+
+class GeneratedDocumentRead(BaseModel):
+    id: str
+    filename: str
+    title: str
+    doc_type: str
+    mode: str
+    engine: str
+    file_size: int
+    mime_type: str
+    download_url: str
+    onedrive_url: str | None = None
+    onedrive_edit_url: str | None = None
+    created_at: str
+
+
+@router.get(
+    "/generated",
+    summary="List generated documents",
+    response_model=list[GeneratedDocumentRead],
+)
+async def list_generated_documents(
+    doc_type: str | None = Query(default=None, description="Filter by doc_type"),
+    ctx: OrganizationContext = _ORG_DEP,
+    session=_SESSION_DEP,
+):
+    """List all tracked generated documents for the current organization."""
+    from sqlmodel.ext.asyncio.session import AsyncSession
+    session: AsyncSession  # type: ignore[no-redef]
+
+    stmt = select(GeneratedDocument).where(
+        (GeneratedDocument.organization_id == ctx.organization.id)
+        | (col(GeneratedDocument.organization_id).is_(None))
+    ).order_by(col(GeneratedDocument.created_at).desc())
+
+    if doc_type:
+        stmt = stmt.where(GeneratedDocument.doc_type == doc_type)
+
+    result = await session.execute(stmt)
+    docs = result.scalars().all()
+
+    items = []
+    for doc in docs:
+        # Generate a fresh download token for each document
+        try:
+            file_token = create_file_token(doc.relative_path, expires_hours=48)
+            download_url = f"{settings.base_url}/api/v1/files/download?token={file_token}"
+        except Exception:
+            download_url = ""
+
+        items.append(GeneratedDocumentRead(
+            id=str(doc.id),
+            filename=doc.filename,
+            title=doc.title,
+            doc_type=doc.doc_type,
+            mode=doc.mode,
+            engine=doc.engine,
+            file_size=doc.file_size,
+            mime_type=doc.mime_type,
+            download_url=download_url,
+            onedrive_url=doc.onedrive_url,
+            onedrive_edit_url=doc.onedrive_edit_url,
+            created_at=doc.created_at.isoformat(),
+        ))
+    return items
+
+
+@router.delete(
+    "/generated/{doc_id}",
+    summary="Delete a generated document record",
+    status_code=204,
+)
+async def delete_generated_document(
+    doc_id: UUID,
+    ctx: OrganizationContext = _ORG_DEP,
+    session=_SESSION_DEP,
+):
+    """Delete a generated document record (and optionally the file on disk)."""
+    from sqlmodel.ext.asyncio.session import AsyncSession
+    session: AsyncSession  # type: ignore[no-redef]
+
+    stmt = select(GeneratedDocument).where(GeneratedDocument.id == doc_id)
+    result = await session.execute(stmt)
+    doc = result.scalar_one_or_none()
+    if doc is None:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    # Try to delete file from disk
+    workspace = settings.gateway_workspace_path
+    if workspace:
+        file_path = Path(workspace) / doc.relative_path
+        if file_path.exists():
+            try:
+                file_path.unlink()
+            except Exception as exc:
+                logger.warning("document_gen.delete_file_failed path=%s error=%s", file_path, exc)
+
+    await session.delete(doc)
+    await session.commit()

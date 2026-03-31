@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>VantageClaw — Client Onboarding Preparation Checklist</title>
+<style>
+  @media print {
+    body { margin: 0; padding: 20px; }
+    .no-print { display: none; }
+    @page { margin: 1.5cm; }
+  }
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    max-width: 800px;
+    margin: 40px auto;
+    padding: 0 20px;
+    color: #333;
+    line-height: 1.6;
+    font-size: 14px;
+  }
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 3px solid #1a1a2e;
+    padding-bottom: 16px;
+    margin-bottom: 24px;
+  }
+  .header h1 {
+    font-size: 22px;
+    color: #1a1a2e;
+    margin: 0;
+  }
+  .header .brand {
+    font-size: 12px;
+    color: #666;
+    text-align: right;
+  }
+  .header .brand strong {
+    display: block;
+    font-size: 14px;
+    color: #1a1a2e;
+  }
+  .intro {
+    background: #f0f7ff;
+    border-left: 4px solid #2196f3;
+    padding: 12px 16px;
+    margin-bottom: 24px;
+    border-radius: 0 6px 6px 0;
+  }
+  .intro p { margin: 4px 0; }
+  h2 {
+    color: #1a1a2e;
+    font-size: 16px;
+    margin-top: 28px;
+    margin-bottom: 8px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #e0e0e0;
+  }
+  h2 .num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    background: #1a1a2e;
+    color: #fff;
+    border-radius: 50%;
+    font-size: 12px;
+    margin-right: 8px;
+  }
+  .items { margin: 0; padding: 0; list-style: none; }
+  .items li {
+    padding: 6px 0 6px 28px;
+    position: relative;
+  }
+  .items li::before {
+    content: '';
+    position: absolute;
+    left: 4px;
+    top: 10px;
+    width: 14px;
+    height: 14px;
+    border: 2px solid #ccc;
+    border-radius: 3px;
+  }
+  .note {
+    font-size: 12px;
+    color: #666;
+    font-style: italic;
+    margin-top: 4px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+    font-size: 13px;
+  }
+  th {
+    background: #f5f5f5;
+    padding: 8px 12px;
+    text-align: left;
+    border-bottom: 2px solid #ddd;
+    font-weight: 600;
+  }
+  td {
+    padding: 8px 12px;
+    border-bottom: 1px solid #eee;
+  }
+  .what-happens {
+    background: #f8f9fa;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 16px;
+    margin-top: 28px;
+  }
+  .what-happens h2 { border-bottom: none; margin-top: 0; }
+  .what-happens ol { padding-left: 20px; }
+  .what-happens li { margin-bottom: 6px; }
+  .footer {
+    margin-top: 32px;
+    padding-top: 16px;
+    border-top: 1px solid #e0e0e0;
+    font-size: 12px;
+    color: #999;
+    text-align: center;
+  }
+  .important {
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    padding: 10px 14px;
+    border-radius: 6px;
+    margin: 12px 0;
+    font-size: 13px;
+  }
+  .important strong { color: #856404; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Client Onboarding<br>Preparation Checklist</h1>
+  <div class="brand">
+    <strong>VantageClaw</strong>
+    AI Business Platform<br>
+    vantageclaw.ai
+  </div>
+</div>
+
+<div class="intro">
+  <p><strong>Please review and prepare the following items before your onboarding session.</strong></p>
+  <p>Having this information ready lets us configure your organization accurately and get you operational faster. Most items take 5-10 minutes to gather. Don't worry if you don't have everything — we'll work through gaps together.</p>
+</div>
+
+<h2><span class="num">1</span> Cost Code Structure</h2>
+<ul class="items">
+  <li>Full list of cost codes with descriptions (base scope + extras/change orders)</li>
+  <li>Which codes are labor, which are equipment, which are materials</li>
+  <li>Example: "3100 = Backfill, 3200 = Excavation, 3300 = Concrete..."</li>
+</ul>
+
+<h2><span class="num">2</span> Sample Documents (1 week's worth)</h2>
+<ul class="items">
+  <li>Field Progress Reports (daily)</li>
+  <li>LEM Sheets (extra work tracking)</li>
+  <li>Crew Timesheets (weekly payroll hours)</li>
+  <li>Equipment Safety Checklists (daily pre-use inspections)</li>
+  <li>A mechanic invoice or service record</li>
+  <li>A material/vendor invoice</li>
+</ul>
+<p class="note">These samples configure the document extraction templates for your specific form layouts.</p>
+
+<h2><span class="num">3</span> Crew Roster</h2>
+<ul class="items">
+  <li>Names of all field staff (as they write them on reports — nicknames count)</li>
+  <li>Role for each: operator, labourer, foreman, superintendent</li>
+  <li>Which crews are on which projects</li>
+</ul>
+
+<h2><span class="num">4</span> Equipment Fleet List</h2>
+<ul class="items">
+  <li>Unit number (your internal ID), make, model, year</li>
+  <li>Current hour meter reading (approximate is fine)</li>
+  <li>Last known service date and hours for each unit</li>
+  <li>Any active rental equipment</li>
+</ul>
+
+<h2><span class="num">5</span> Maintenance Interval Specs</h2>
+<ul class="items">
+  <li>Manufacturer maintenance schedules per equipment model</li>
+  <li>Or your mechanic's recommended intervals if they differ</li>
+  <li>Last completed service records per unit (if available)</li>
+</ul>
+
+<h2><span class="num">6</span> Active Projects</h2>
+<ul class="items">
+  <li>Project name, number, location</li>
+  <li>Which crew and equipment are assigned to each</li>
+  <li>Budget per project (PM or owner only — used for cost tracking setup)</li>
+</ul>
+
+<h2><span class="num">7</span> Rate Tables <span class="note">(PM or owner only)</span></h2>
+<ul class="items">
+  <li>Labor rates by role (billing rate or payroll rate — whichever you track against)</li>
+  <li>Equipment rates per unit (internal charge-out rates)</li>
+</ul>
+<p class="note">These are visible only to users with Project Manager access — field staff never see dollar amounts.</p>
+
+<h2><span class="num">8</span> Roles & Access</h2>
+<p>Who needs access and at what level? Provide name and email for each person.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Role</th>
+      <th>What They See</th>
+      <th>What They Do</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Project Controls</strong></td>
+      <td>Hours, quantities, equipment usage — NO costs</td>
+      <td>Upload docs, validate data, flag discrepancies</td>
+    </tr>
+    <tr>
+      <td><strong>Project Manager</strong></td>
+      <td>Everything + costs, budgets, profit/loss</td>
+      <td>Full visibility, approvals, cost decisions</td>
+    </tr>
+    <tr>
+      <td><strong>Controller / Accounting</strong></td>
+      <td>Invoices, material costs — NOT full project P&amp;L</td>
+      <td>Submit vendor/material invoices</td>
+    </tr>
+    <tr>
+      <td><strong>Foreman</strong> (optional)</td>
+      <td>Their crew and project only</td>
+      <td>Upload daily reports, confirm flagged items</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2><span class="num">9</span> Vendor List <span class="note">(optional but helpful)</span></h2>
+<ul class="items">
+  <li>Key vendors and suppliers (mechanics, material suppliers, rental companies)</li>
+  <li>Contact info and typical services</li>
+</ul>
+<p class="note">Helps the system automatically match and categorize future invoices.</p>
+
+<h2><span class="num">10</span> Existing Cost Control Spreadsheet</h2>
+<ul class="items">
+  <li>A blank template of how you currently track project costs</li>
+</ul>
+<p class="note">The system output will match your existing format so there's no learning curve.</p>
+
+<h2><span class="num">11</span> AI Access Setup</h2>
+
+<div class="important">
+  <strong>Important:</strong> The platform uses AI models to process documents, run agents, and generate reports. You'll need an API key — this is separate from any personal AI subscription you may have.
+</div>
+
+<ul class="items">
+  <li>Create an OpenRouter account at <strong>openrouter.ai</strong> and add a $5-20 deposit</li>
+  <li>Typical monthly cost: $5-50 depending on usage</li>
+</ul>
+
+<table>
+  <thead>
+    <tr>
+      <th>Your Situation</th>
+      <th>What You Need</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>No existing AI subscription</td>
+      <td>OpenRouter API key (recommended)</td>
+    </tr>
+    <tr>
+      <td>Already have Claude Max / ChatGPT Pro</td>
+      <td>Still need a separate API key — personal plans don't cover platform use</td>
+    </tr>
+    <tr>
+      <td>Compliance requirements</td>
+      <td>Direct provider API key with BAA, or self-hosted model</td>
+    </tr>
+    <tr>
+      <td>Data must never leave your servers</td>
+      <td>Custom LLM endpoint (we'll configure during onboarding)</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="what-happens">
+  <h2>What Happens at the Onboarding Session</h2>
+  <ol>
+    <li>We walk through your sample documents together and configure the extraction templates</li>
+    <li>Set up your cost code structure, crew roster, and equipment fleet</li>
+    <li>Configure maintenance intervals and load service history</li>
+    <li>Set up user accounts with appropriate access levels</li>
+    <li>Run a test: upload one field report and verify the extracted data matches reality</li>
+    <li>Train your team on the upload workflow</li>
+  </ol>
+  <p><strong>Typical onboarding: 1-2 sessions, 2-4 hours total.</strong></p>
+</div>
+
+<div class="footer">
+  VantageClaw AI Platform &mdash; vantageclaw.ai &mdash; support@vantageclaw.ai
+</div>
+
+</body>
+</html>

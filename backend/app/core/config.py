@@ -50,6 +50,10 @@ class Settings(BaseSettings):
     clerk_verify_iat: bool = True
     clerk_leeway: float = 10.0
 
+    # Signup allowlist: comma-separated emails permitted to create accounts.
+    # Empty string = open registration (NOT recommended for production).
+    allowed_signup_emails: str = ""
+
     # WeChat/WeCom OAuth (China deployments)
     wechat_corp_id: str = ""
     wechat_app_secret: str = ""

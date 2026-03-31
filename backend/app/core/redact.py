@@ -189,6 +189,144 @@ def redact_sensitive(
     return RedactionResult(text=text, redaction_count=count, categories=categories)
 
 
+# ---------------------------------------------------------------------------
+# Reversible redaction for LLM workflows (redact → review → send → rehydrate)
+# ---------------------------------------------------------------------------
+
+# Patterns for pentest/security data that should never reach an LLM
+_PENTEST_PATTERNS: list[tuple[re.Pattern, str, str]] = [
+    # MAC addresses — must come before IPv6 (MACs look like short IPv6)
+    (re.compile(r"\b(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}\b"),
+     "mac_address", "MAC address"),
+
+    # CIDR ranges — must come before bare IPv4
+    (re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}/\d{1,2}\b"),
+     "cidr_range", "CIDR range"),
+
+    # IPv4 addresses
+    (re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b"),
+     "ip_address", "IP address"),
+
+    # IPv6 addresses (simplified — common formats)
+    (re.compile(r"\b(?:[0-9a-fA-F]{1,4}:){2,7}[0-9a-fA-F]{1,4}\b"),
+     "ipv6_address", "IPv6 address"),
+
+    # Hostnames / FQDNs (conservative — requires at least 2 dots or common TLDs)
+    (re.compile(r"\b(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.){2,}[a-zA-Z]{2,}\b"),
+     "hostname", "hostname"),
+
+    # Internal domain names (single-label .local, .internal, .corp, .lan)
+    (re.compile(r"\b[a-zA-Z0-9-]+\.(?:local|internal|corp|lan|home|intranet)\b", re.IGNORECASE),
+     "internal_host", "internal hostname"),
+
+    # SSIDs in common pentest output patterns
+    (re.compile(r'(?:SSID|ESSID|network)\s*[:=]\s*["\']?([^\s"\']+)["\']?', re.IGNORECASE),
+     "ssid", "WiFi SSID"),
+
+    # Windows domain\user patterns
+    (re.compile(r"\b[A-Z][A-Z0-9_-]{1,15}\\[a-zA-Z0-9._-]+\b"),
+     "domain_user", "domain\\user"),
+
+    # File paths that may reveal internal structure
+    (re.compile(r"(?:/(?:home|opt|var|etc|usr|root)/[^\s]{3,}|[A-Z]:\\[^\s]{3,})"),
+     "file_path", "file path"),
+]
+
+
+class RedactionVault:
+    """Stores original values keyed by placeholder tags for later rehydration.
+
+    Usage:
+        vault = RedactionVault()
+        redacted = vault.redact(raw_text)
+        # User reviews `redacted` text and `vault.entries` before approving
+        # After LLM generates report text using placeholders:
+        final = vault.rehydrate(llm_output)
+    """
+
+    def __init__(self) -> None:
+        self._store: dict[str, str] = {}  # tag -> original value
+        self._labels: dict[str, str] = {}  # tag -> human-readable label
+        self._counter: int = 0
+
+    @property
+    def entries(self) -> list[dict[str, str]]:
+        """Return all redacted entries for human review.
+
+        Returns list of {tag, original, label} dicts.
+        """
+        return [
+            {"tag": tag, "original": self._store[tag], "label": self._labels[tag]}
+            for tag in sorted(self._store)
+        ]
+
+    @property
+    def entry_count(self) -> int:
+        return len(self._store)
+
+    def _next_tag(self, category: str) -> str:
+        self._counter += 1
+        return f"[{category.upper()}_{self._counter}]"
+
+    def redact(self, text: str) -> str:
+        """Redact pentest-sensitive data from text, storing originals for rehydration.
+
+        Applies both standard credential/financial patterns (one-way, not rehydratable)
+        and pentest-specific patterns (reversible via rehydrate()).
+        """
+        if not text:
+            return text
+
+        # First pass: apply standard one-way redaction (credentials, financial)
+        result = redact_sensitive(text, RedactionLevel.STRICT)
+        text = result.text
+
+        # Second pass: reversible redaction of pentest-specific data
+        for pattern, category, label in _PENTEST_PATTERNS:
+            for match in pattern.finditer(text):
+                original = match.group(0)
+                # Skip if already redacted by first pass
+                if original.startswith("[REDACTED"):
+                    continue
+                # Reuse existing tag if we've seen this exact value before
+                existing_tag = None
+                for tag, val in self._store.items():
+                    if val == original:
+                        existing_tag = tag
+                        break
+                tag = existing_tag or self._next_tag(category)
+                if not existing_tag:
+                    self._store[tag] = original
+                    self._labels[tag] = label
+                text = text.replace(original, tag)
+
+        return text
+
+    def rehydrate(self, text: str) -> str:
+        """Replace placeholder tags with original values in LLM-generated text."""
+        for tag, original in self._store.items():
+            text = text.replace(tag, original)
+        return text
+
+    def to_dict(self) -> dict:
+        """Serialize vault for API transport / storage."""
+        return {
+            "entries": self.entries,
+            "store": dict(self._store),
+            "labels": dict(self._labels),
+            "counter": self._counter,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "RedactionVault":
+        """Reconstruct vault from serialized dict."""
+        vault = cls()
+        vault._store = dict(data.get("store", {}))
+        vault._labels = dict(data.get("labels", {}))
+        vault._counter = data.get("counter", 0)
+        return vault
+
+
 def redact_email_content(
     body_text: str | None,
     body_html: str | None,

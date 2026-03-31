@@ -32,6 +32,7 @@ from app.api.gateway import router as gateway_router
 from app.api.cost_tracker import router as cost_tracker_router
 from app.api.organization_settings import router as org_settings_router
 from app.api.cron_jobs import router as cron_jobs_router
+from app.api.model_registry import router as model_registry_router
 from app.api.paper_bets import router as paper_bets_router
 from app.api.paper_trading import router as paper_trading_router
 from app.api.polymarket import router as polymarket_router
@@ -900,6 +901,7 @@ api_v1.include_router(paper_bets_router)
 api_v1.include_router(cost_tracker_router)
 api_v1.include_router(org_settings_router)
 api_v1.include_router(cron_jobs_router)
+api_v1.include_router(model_registry_router)
 api_v1.include_router(board_memory_router)
 api_v1.include_router(board_webhooks_router)
 api_v1.include_router(board_onboarding_router)

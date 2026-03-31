@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from app.api.deps import ORG_MEMBER_DEP
 from app.core.logging import get_logger
+from app.core.redact import redact_sensitive
 from app.core.workspace import resolve_org_workspace
 from app.services.organizations import OrganizationContext
 
@@ -69,7 +70,18 @@ async def read_memory_file(
         return MemoryFile(name=filename, description=desc, content="")
 
     content = path.read_text(encoding="utf-8")
-    return MemoryFile(name=filename, description=desc, content=content)
+    # Strip credentials/tokens before serving to browser
+    result = redact_sensitive(content)
+    if result.redaction_count > 0:
+        logger.warning(
+            "memory.file.credentials_redacted",
+            extra={
+                "filename": filename,
+                "redaction_count": result.redaction_count,
+                "categories": sorted(result.categories),
+            },
+        )
+    return MemoryFile(name=filename, description=desc, content=result.text)
 
 
 @router.put("/files/{filename}", summary="Update a memory file")

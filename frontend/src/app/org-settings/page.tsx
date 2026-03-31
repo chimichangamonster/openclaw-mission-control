@@ -3,6 +3,7 @@
 export const dynamic = "force-dynamic";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Key, Shield, Save, Trash2, Eye, EyeOff, AlertTriangle, DollarSign,
   Server, Upload, Image, ShieldCheck, Globe, CheckCircle2, XCircle, Loader2,
@@ -10,6 +11,7 @@ import {
 
 import { useAuth } from "@/auth/clerk";
 import { DashboardPageLayout } from "@/components/templates/DashboardPageLayout";
+import { ModelRegistrySection } from "@/components/organization/ModelRegistrySection";
 import { customFetch } from "@/api/mutator";
 
 interface OrgSettings {
@@ -190,6 +192,8 @@ function CostCalculator({
 
 export default function OrgSettingsPage() {
   const { isSignedIn } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [settings, setSettings] = useState<OrgSettings | null>(null);
   const [llmRouting, setLlmRouting] = useState<LLMRouting | null>(null);
   const [auditLog, setAuditLog] = useState<AuditEntry[]>([]);
@@ -243,6 +247,24 @@ export default function OrgSettingsPage() {
     note: string;
   } | null>(null);
   const [showBudgetPrompt, setShowBudgetPrompt] = useState(false);
+
+  // OAuth callback banner
+  const [oauthBanner, setOauthBanner] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  useEffect(() => {
+    if (searchParams.get("gcal_connected") === "true") {
+      setOauthBanner({ type: "success", message: "Google Calendar connected successfully." });
+      router.replace("/org-settings", { scroll: false });
+    } else if (searchParams.get("gcal_error")) {
+      setOauthBanner({ type: "error", message: `Google Calendar connection failed: ${searchParams.get("gcal_error")}` });
+      router.replace("/org-settings", { scroll: false });
+    } else if (searchParams.get("graph_connected") === "true") {
+      setOauthBanner({ type: "success", message: "Microsoft Graph connected successfully." });
+      router.replace("/org-settings", { scroll: false });
+    } else if (searchParams.get("graph_error")) {
+      setOauthBanner({ type: "error", message: `Microsoft Graph connection failed: ${searchParams.get("graph_error")}` });
+      router.replace("/org-settings", { scroll: false });
+    }
+  }, [searchParams, router]);
 
   // Microsoft Graph state
   const [connectingGraph, setConnectingGraph] = useState(false);
@@ -484,6 +506,25 @@ export default function OrgSettingsPage() {
           <h1 className="text-xl font-bold text-slate-900">Organization Settings</h1>
           <p className="text-sm text-slate-500">API keys, integrations, data policy, and audit trail</p>
         </div>
+
+        {/* OAuth callback banner */}
+        {oauthBanner && (
+          <div
+            className={`rounded-lg border px-4 py-3 text-sm ${
+              oauthBanner.type === "success"
+                ? "border-green-200 bg-green-50 text-green-800"
+                : "border-red-200 bg-red-50 text-red-800"
+            }`}
+          >
+            {oauthBanner.message}
+            <button
+              className="ml-2 font-medium underline"
+              onClick={() => setOauthBanner(null)}
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
 
         {/* Admin Warning */}
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-3 flex gap-3">
@@ -1085,6 +1126,9 @@ export default function OrgSettingsPage() {
                 </div>
               </div>
             </div>
+
+            {/* Model Registry & Pinning */}
+            <ModelRegistrySection isAdmin={settings?.is_admin ?? false} />
 
             {/* Audit Log */}
             <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
