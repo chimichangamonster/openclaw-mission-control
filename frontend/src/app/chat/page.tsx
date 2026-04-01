@@ -22,9 +22,9 @@ import {
 import { ChatSessionSidebar } from "@/components/ChatSessionSidebar";
 import { ChatActivityPanel } from "@/components/ChatActivityPanel";
 import type { LiveSSEEvent } from "@/components/ChatActivityPanel";
+import { useNotifications } from "@/components/providers/NotificationProvider";
 
 import { useAuth } from "@/auth/clerk";
-import { usePageActive } from "@/hooks/usePageActive";
 import { DashboardPageLayout } from "@/components/templates/DashboardPageLayout";
 import { customFetch } from "@/api/mutator";
 import { Button } from "@/components/ui/button";
@@ -163,16 +163,7 @@ function formatMessageTime(ts: string | undefined): string | null {
 
 export default function ChatPage() {
   const { isSignedIn, getToken } = useAuth();
-  const isPageActive = usePageActive();
-  const isPageActiveRef = useRef(true);
-  useEffect(() => { isPageActiveRef.current = isPageActive; }, [isPageActive]);
-
-  // Request notification permission on mount
-  useEffect(() => {
-    if (typeof Notification !== "undefined" && Notification.permission === "default") {
-      void Notification.requestPermission();
-    }
-  }, []);
+  const { unreadSessions, markSessionRead } = useNotifications();
 
   // Board resolution — pick first board with a gateway
   const [boardId, setBoardId] = useState<string | null>(null);
@@ -273,6 +264,7 @@ export default function ChatPage() {
         if (claw) {
           setMainSessionKey(claw.key);
           setSessionKey(claw.key);
+          markSessionRead(claw.key);
           setSessionTokens({
             total: claw.totalTokens ?? 0,
             input: claw.inputTokens ?? 0,
@@ -430,21 +422,6 @@ export default function ChatPage() {
               setTimeout(() => void fetchHistory(currentKey), 500);
             }
 
-            // Browser notification when tab is not active
-            if (
-              !isPageActiveRef.current &&
-              typeof Notification !== "undefined" &&
-              Notification.permission === "granted"
-            ) {
-              const agentLabel = data.agent_name || "The Claw";
-              const preview = data.message ? data.message.slice(0, 100) : "New response ready";
-              const n = new Notification(`${agentLabel} responded`, {
-                body: preview,
-                icon: "/favicon.ico",
-                tag: "chat-response",
-              });
-              n.onclick = () => { window.focus(); n.close(); };
-            }
           }
         } catch {
           /* ignore parse errors */
@@ -740,6 +717,7 @@ export default function ChatPage() {
     setActivityEvents([]);
     setActivityPanelOpen(false);
     manualPanelOverride.current = false;
+    markSessionRead(key);
     // Update token display from allSessions
     const match = allSessions.find((s) => s.key === key);
     if (match) {
@@ -775,6 +753,7 @@ export default function ChatPage() {
               sessions={allSessions}
               activeSessionKey={sessionKey}
               mainSessionKey={mainSessionKey}
+              unreadSessions={unreadSessions}
               onSelectSession={handleSelectSession}
               onCreateSession={createSession}
               onRenameSession={renameSession}
@@ -793,6 +772,7 @@ export default function ChatPage() {
                 sessions={allSessions}
                 activeSessionKey={sessionKey}
                 mainSessionKey={mainSessionKey}
+                unreadSessions={unreadSessions}
                 onSelectSession={(key) => { handleSelectSession(key); setSidebarOpen(false); }}
                 onCreateSession={createSession}
                 onRenameSession={renameSession}

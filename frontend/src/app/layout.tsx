@@ -8,6 +8,7 @@ import { DM_Serif_Display, IBM_Plex_Sans, Sora } from "next/font/google";
 import { AuthProvider } from "@/components/providers/AuthProvider";
 import { QueryProvider } from "@/components/providers/QueryProvider";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
+import { NotificationProvider } from "@/components/providers/NotificationProvider";
 import { TermsGate } from "@/components/auth/TermsGate";
 import { GlobalLoader } from "@/components/ui/global-loader";
 
@@ -56,9 +57,11 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <AuthProvider>
             <QueryProvider>
               <GlobalLoader />
-              <TermsGate>
-                {children}
-              </TermsGate>
+              <NotificationProvider>
+                <TermsGate>
+                  {children}
+                </TermsGate>
+              </NotificationProvider>
             </QueryProvider>
           </AuthProvider>
         </ThemeProvider>

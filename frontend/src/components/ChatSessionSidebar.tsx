@@ -26,6 +26,7 @@ interface ChatSessionSidebarProps {
   sessions: SessionItem[];
   activeSessionKey: string | null;
   mainSessionKey: string | null;
+  unreadSessions?: Set<string>;
   onSelectSession: (key: string) => void;
   onCreateSession: (label: string) => Promise<void>;
   onRenameSession: (key: string, label: string) => Promise<void>;
@@ -56,6 +57,7 @@ export function ChatSessionSidebar({
   sessions,
   activeSessionKey,
   mainSessionKey,
+  unreadSessions,
   onSelectSession,
   onCreateSession,
   onRenameSession,
@@ -175,6 +177,7 @@ export function ChatSessionSidebar({
           sessions.map((session) => {
             const isActive = session.key === activeSessionKey;
             const isMain = session.key === mainSessionKey;
+            const isUnread = !isActive && (unreadSessions?.has(session.key) ?? false);
             const label = sessionLabel(session, mainSessionKey);
 
             return (
@@ -209,7 +212,10 @@ export function ChatSessionSidebar({
                     )}
                   >
                     <MessageSquare className={cn("h-3.5 w-3.5 shrink-0", isActive ? "text-[color:var(--accent)]" : "")} />
-                    <span className="flex-1 truncate">{label}</span>
+                    <span className={cn("flex-1 truncate", isUnread && "font-semibold text-[color:var(--text)]")}>{label}</span>
+                    {isUnread && (
+                      <span className="h-2 w-2 shrink-0 rounded-full bg-blue-500" />
+                    )}
                     {session.totalTokens ? (
                       <span className="shrink-0 text-[10px] tabular-nums text-[color:var(--text-quiet)] opacity-60">
                         {formatTokens(session.totalTokens)}
