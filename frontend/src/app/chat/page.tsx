@@ -20,6 +20,8 @@ import {
   PanelLeft,
 } from "lucide-react";
 import { ChatSessionSidebar } from "@/components/ChatSessionSidebar";
+import { ChatActivityPanel } from "@/components/ChatActivityPanel";
+import type { LiveSSEEvent } from "@/components/ChatActivityPanel";
 
 import { useAuth } from "@/auth/clerk";
 import { DashboardPageLayout } from "@/components/templates/DashboardPageLayout";
@@ -80,16 +82,7 @@ interface ChatAttachment {
   preview_url?: string; // local blob URL for image preview
 }
 
-interface LiveSSEEvent {
-  id: string;
-  event_type: string;
-  agent_name: string;
-  channel: string;
-  message: string;
-  model: string;
-  metadata: Record<string, unknown>;
-  timestamp: string;
-}
+// LiveSSEEvent imported from ChatActivityPanel
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -198,6 +191,12 @@ export default function ChatPage() {
 
   // SSE
   const [sseConnected, setSseConnected] = useState(false);
+
+  // Activity panel
+  const [activityEvents, setActivityEvents] = useState<LiveSSEEvent[]>([]);
+  const [activityPanelOpen, setActivityPanelOpen] = useState(false);
+  const manualPanelOverride = useRef(false);
+  const MAX_ACTIVITY_EVENTS = 15;
 
   // Refs
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -357,6 +356,14 @@ export default function ChatPage() {
             agent.includes("mc-gateway");
           if (!isRelevant) return;
 
+          // Accumulate for activity panel
+          setActivityEvents((prev) => {
+            const next = [...prev, data];
+            return next.length > MAX_ACTIVITY_EVENTS
+              ? next.slice(next.length - MAX_ACTIVITY_EVENTS)
+              : next;
+          });
+
           // Agent is thinking/working
           if (
             eventType.includes("thinking") ||
@@ -369,6 +376,10 @@ export default function ChatPage() {
               () => setAgentTyping(false),
               15000,
             );
+            // Auto-expand activity panel (unless user manually toggled)
+            if (!manualPanelOverride.current) {
+              setActivityPanelOpen(true);
+            }
           }
 
           // Agent responded — refetch history
@@ -378,6 +389,11 @@ export default function ChatPage() {
           ) {
             setAgentTyping(false);
             if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+            // Auto-collapse activity panel
+            if (!manualPanelOverride.current) {
+              setActivityPanelOpen(false);
+            }
+            manualPanelOverride.current = false;
             const currentKey = sessionKeyRef.current;
             if (currentKey) {
               setTimeout(() => void fetchHistory(currentKey), 500);
@@ -664,10 +680,18 @@ export default function ChatPage() {
     } catch { /* ignore */ }
   }, [boardId, sessionKey, mainSessionKey, refreshSessions]);
 
+  const toggleActivityPanel = useCallback(() => {
+    manualPanelOverride.current = true;
+    setActivityPanelOpen((prev) => !prev);
+  }, []);
+
   const handleSelectSession = useCallback((key: string) => {
     if (key === sessionKey) return;
     setSessionKey(key);
     setAgentTyping(false);
+    setActivityEvents([]);
+    setActivityPanelOpen(false);
+    manualPanelOverride.current = false;
     // Update token display from allSessions
     const match = allSessions.find((s) => s.key === key);
     if (match) {
@@ -924,6 +948,16 @@ export default function ChatPage() {
 
           <div ref={messagesEndRef} />
         </div>
+
+        {/* ─── Activity panel ────────────────────────────────────────── */}
+        {(activityEvents.length > 0 || agentTyping) && (
+          <ChatActivityPanel
+            events={activityEvents}
+            isOpen={activityPanelOpen}
+            onToggle={toggleActivityPanel}
+            agentTyping={agentTyping}
+          />
+        )}
 
         {/* ─── Input area ──────────────────────────────────────────────── */}
         {!resolving && !resolveError ? (
