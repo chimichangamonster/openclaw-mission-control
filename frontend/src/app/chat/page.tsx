@@ -24,6 +24,7 @@ import { ChatActivityPanel } from "@/components/ChatActivityPanel";
 import type { LiveSSEEvent } from "@/components/ChatActivityPanel";
 
 import { useAuth } from "@/auth/clerk";
+import { usePageActive } from "@/hooks/usePageActive";
 import { DashboardPageLayout } from "@/components/templates/DashboardPageLayout";
 import { customFetch } from "@/api/mutator";
 import { Button } from "@/components/ui/button";
@@ -71,6 +72,7 @@ interface ChatMessage {
   id: string;
   role: "user" | "assistant" | "system";
   content: string;
+  timestamp?: string; // ISO string from gateway or locally assigned
 }
 
 interface ChatAttachment {
@@ -129,19 +131,48 @@ function parseHistory(history: unknown[]): ChatMessage[] {
           : role === "assistant" || role === "model"
             ? "assistant"
             : "system";
+      // Gateway may provide createdAt, timestamp, or created_at
+      const ts = msg.createdAt ?? msg.timestamp ?? msg.created_at;
       return {
         id: String(msg.id ?? `msg-${i}`),
         role: normalizedRole,
         content: extractTextContent(msg.content),
+        timestamp: typeof ts === "string" ? ts : undefined,
       };
     })
     .filter((msg) => msg.role !== "system" && msg.content.trim().length > 0);
+}
+
+function formatMessageTime(ts: string | undefined): string | null {
+  if (!ts) return null;
+  const date = new Date(ts);
+  if (isNaN(date.getTime())) return null;
+  const now = new Date();
+  const isToday = date.toDateString() === now.toDateString();
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const isYesterday = date.toDateString() === yesterday.toDateString();
+
+  const time = date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  if (isToday) return time;
+  if (isYesterday) return `Yesterday ${time}`;
+  return `${date.toLocaleDateString([], { month: "short", day: "numeric" })} ${time}`;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function ChatPage() {
   const { isSignedIn, getToken } = useAuth();
+  const isPageActive = usePageActive();
+  const isPageActiveRef = useRef(true);
+  useEffect(() => { isPageActiveRef.current = isPageActive; }, [isPageActive]);
+
+  // Request notification permission on mount
+  useEffect(() => {
+    if (typeof Notification !== "undefined" && Notification.permission === "default") {
+      void Notification.requestPermission();
+    }
+  }, []);
 
   // Board resolution — pick first board with a gateway
   const [boardId, setBoardId] = useState<string | null>(null);
@@ -398,6 +429,22 @@ export default function ChatPage() {
             if (currentKey) {
               setTimeout(() => void fetchHistory(currentKey), 500);
             }
+
+            // Browser notification when tab is not active
+            if (
+              !isPageActiveRef.current &&
+              typeof Notification !== "undefined" &&
+              Notification.permission === "granted"
+            ) {
+              const agentLabel = data.agent_name || "The Claw";
+              const preview = data.message ? data.message.slice(0, 100) : "New response ready";
+              const n = new Notification(`${agentLabel} responded`, {
+                body: preview,
+                icon: "/favicon.ico",
+                tag: "chat-response",
+              });
+              n.onclick = () => { window.focus(); n.close(); };
+            }
           }
         } catch {
           /* ignore parse errors */
@@ -505,6 +552,7 @@ export default function ChatPage() {
       id: `user-${Date.now()}`,
       role: "user",
       content: displayContent,
+      timestamp: new Date().toISOString(),
     };
     setMessages((prev) => [...prev, optimisticMsg]);
     setAgentTyping(true);
@@ -910,20 +958,30 @@ export default function ChatPage() {
                     <Bot className="h-4 w-4 text-white" />
                   </div>
                 ) : null}
-                <div
-                  className={cn(
-                    "max-w-[90%] md:max-w-[75%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed",
-                    msg.role === "user"
-                      ? "bg-[color:var(--accent-strong)] text-white rounded-br-md"
-                      : "bg-[color:var(--surface-muted)] text-[color:var(--text)] rounded-bl-md",
-                  )}
-                >
-                  {msg.role === "user" ? (
-                    <p className="whitespace-pre-wrap break-words">{msg.content}</p>
-                  ) : (
-                    <div className="break-words [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
-                      <Markdown content={msg.content} variant="description" />
-                    </div>
+                <div>
+                  <div
+                    className={cn(
+                      "max-w-[90%] md:max-w-[75%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed",
+                      msg.role === "user"
+                        ? "bg-[color:var(--accent-strong)] text-white rounded-br-md"
+                        : "bg-[color:var(--surface-muted)] text-[color:var(--text)] rounded-bl-md",
+                    )}
+                  >
+                    {msg.role === "user" ? (
+                      <p className="whitespace-pre-wrap break-words">{msg.content}</p>
+                    ) : (
+                      <div className="break-words [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+                        <Markdown content={msg.content} variant="description" />
+                      </div>
+                    )}
+                  </div>
+                  {formatMessageTime(msg.timestamp) && (
+                    <p className={cn(
+                      "mt-1 text-[10px] text-[color:var(--text-quiet)]",
+                      msg.role === "user" ? "text-right" : "text-left",
+                    )}>
+                      {formatMessageTime(msg.timestamp)}
+                    </p>
                   )}
                 </div>
               </div>
@@ -955,6 +1013,7 @@ export default function ChatPage() {
             events={activityEvents}
             isOpen={activityPanelOpen}
             onToggle={toggleActivityPanel}
+            onAbort={abortChat}
             agentTyping={agentTyping}
           />
         )}

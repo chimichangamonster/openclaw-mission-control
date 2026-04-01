@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   ChevronUp,
   ChevronDown,
+  Square,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -28,6 +29,7 @@ interface ChatActivityPanelProps {
   events: LiveSSEEvent[];
   isOpen: boolean;
   onToggle: () => void;
+  onAbort?: () => void;
   agentTyping: boolean;
 }
 
@@ -66,6 +68,7 @@ export function ChatActivityPanel({
   events,
   isOpen,
   onToggle,
+  onAbort,
   agentTyping,
 }: ChatActivityPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -106,6 +109,19 @@ export function ChatActivityPanel({
         {events.length > 0 && (
           <span className="rounded-full bg-[color:var(--surface)] px-1.5 py-0.5 text-[10px] tabular-nums text-[color:var(--text-quiet)]">
             {events.length}
+          </span>
+        )}
+        {agentTyping && onAbort && (
+          <span
+            role="button"
+            tabIndex={0}
+            onClick={(e) => { e.stopPropagation(); onAbort(); }}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); onAbort(); } }}
+            className="flex items-center gap-1 rounded-md bg-rose-500/10 px-1.5 py-0.5 text-[10px] font-medium text-rose-500 hover:bg-rose-500/20 transition"
+            title="Stop response"
+          >
+            <Square className="h-2.5 w-2.5 fill-current" />
+            Stop
           </span>
         )}
         {isOpen ? (
