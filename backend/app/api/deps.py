@@ -173,7 +173,9 @@ def require_feature(flag: str) -> Callable:
     Usage: ``router = APIRouter(dependencies=[Depends(require_feature("paper_trading"))])``
 
     Resolves the caller's organization, loads OrganizationSettings, and raises
-    403 if the flag is disabled.
+    403 if the flag is disabled.  Accepts both user (Bearer) and agent
+    (X-Agent-Token) authentication so gateway agents can access
+    feature-gated routers.
     """
 
     async def _check(

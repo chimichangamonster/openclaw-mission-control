@@ -537,5 +537,15 @@ async def update_approval(
                     "approval.email_hook_failed approval_id=%s",
                     approval.id,
                 )
+        if approval.action_type == "pentest_tx":
+            try:
+                from app.services.pentest.hooks import handle_pentest_tx_approval_resolution
+
+                await handle_pentest_tx_approval_resolution(session=session, approval=approval)
+            except Exception:
+                logger.exception(
+                    "approval.pentest_tx_hook_failed approval_id=%s",
+                    approval.id,
+                )
     reads = await _approval_reads(session, [approval])
     return reads[0]

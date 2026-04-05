@@ -23,5 +23,17 @@ export function extractTextContent(content: unknown): string {
       .map((p) => p.text)
       .join("\n");
   }
+  // Handle nested message objects (gateway sometimes wraps content)
+  if (content && typeof content === "object") {
+    const obj = content as Record<string, unknown>;
+    if (typeof obj.content === "string") return obj.content;
+    if (typeof obj.text === "string") return obj.text;
+    // Last resort — JSON stringify to prevent [object Object]
+    try {
+      return JSON.stringify(content);
+    } catch {
+      return "";
+    }
+  }
   return String(content ?? "");
 }

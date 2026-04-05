@@ -101,6 +101,14 @@ const renderMentions = (
       renderMentions(childProps.children, keyPrefix),
     );
   }
+  // Safety: plain objects are not valid React children — stringify them
+  if (typeof content === "object") {
+    try {
+      return JSON.stringify(content);
+    } catch {
+      return "";
+    }
+  }
   return content;
 };
 

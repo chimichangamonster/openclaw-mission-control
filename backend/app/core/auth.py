@@ -522,6 +522,19 @@ async def get_auth_context(
     session: AsyncSession = SESSION_DEP,
 ) -> AuthContext:
     """Resolve required authenticated user context for the configured auth mode."""
+    # Gateway agent fallback: accept LOCAL_AUTH_TOKEN via X-Agent-Token or
+    # Authorization: Bearer in any auth mode so agents calling MC endpoints via
+    # exec+curl can authenticate without a Clerk JWT.
+    if settings.local_auth_token:
+        token = request.headers.get("X-Agent-Token") or ""
+        if not token:
+            auth_header = request.headers.get("Authorization", "")
+            if auth_header.lower().startswith("bearer "):
+                token = auth_header[7:].strip()
+        if token and compare_digest(token, settings.local_auth_token.strip()):
+            user = await _get_or_create_local_user(session)
+            return AuthContext(actor_type="user", user=user)
+
     if settings.auth_mode == AuthMode.LOCAL:
         local_auth = await _resolve_local_auth_context(
             request=request,
@@ -591,6 +604,13 @@ async def get_auth_context_optional(
 ) -> AuthContext | None:
     """Resolve user context if available, otherwise return `None`."""
     if request.headers.get("X-Agent-Token"):
+        # In Clerk mode, also accept LOCAL_AUTH_TOKEN via X-Agent-Token so
+        # gateway agents can call feature-gated endpoints without a Clerk JWT.
+        if settings.auth_mode != AuthMode.LOCAL and settings.local_auth_token:
+            token = request.headers["X-Agent-Token"]
+            if compare_digest(token, settings.local_auth_token.strip()):
+                user = await _get_or_create_local_user(session)
+                return AuthContext(actor_type="user", user=user)
         return None
     if settings.auth_mode == AuthMode.LOCAL:
         return await _resolve_local_auth_context(

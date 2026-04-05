@@ -1,11 +1,11 @@
 # ruff: noqa: INP001
-"""Tests for sensitive data redaction — credentials, financial, PII patterns."""
+"""Tests for sensitive data redaction — credentials, financial, PII, pentest patterns."""
 
 from __future__ import annotations
 
 import pytest
 
-from app.core.redact import RedactionLevel, RedactionResult, redact_email_content, redact_sensitive
+from app.core.redact import RedactionLevel, RedactionResult, RedactionVault, redact_email_content, redact_sensitive
 
 
 class TestCredentialRedaction:
@@ -195,6 +195,188 @@ Sarah"""
         # Dollar amounts and invoice numbers should NOT be redacted
         assert "$5,000.00" in result.text
         assert "#1234" in result.text
+
+
+class TestPentestRedaction:
+    """Pentest-specific patterns in RedactionVault (reversible redaction)."""
+
+    def test_ntlm_hash_pair(self):
+        text = "Administrator:500:aad3b435b51404eeaad3b435b51404ee:fc525c9683e8fe067095ba2ddc971889:::"
+        vault = RedactionVault()
+        redacted = vault.redact(text)
+        assert "aad3b435b51404ee" not in redacted
+        assert "fc525c9683e8fe067095ba2ddc971889" not in redacted
+        assert vault.entry_count > 0
+        rehydrated = vault.rehydrate(redacted)
+        assert "aad3b435b51404ee" in rehydrated
+
+    def test_netntlmv2_hash(self):
+        text = "admin::WORKGROUP:1122334455667788:aabbccddaabbccddaabbccddaabbccdd:0011223344556677"
+        vault = RedactionVault()
+        redacted = vault.redact(text)
+        assert "1122334455667788" not in redacted
+        assert vault.entry_count > 0
+
+    def test_wifi_password(self):
+        text = "WPA passphrase: MySecretWiFi123"
+        vault = RedactionVault()
+        redacted = vault.redact(text)
+        assert "MySecretWiFi123" not in redacted
+        rehydrated = vault.rehydrate(redacted)
+        assert "MySecretWiFi123" in rehydrated
+
+    def test_wifi_psk(self):
+        text = "PSK: SuperS3cretKey!"
+        vault = RedactionVault()
+        redacted = vault.redact(text)
+        assert "SuperS3cretKey!" not in redacted
+
+    def test_ssh_private_key(self):
+        text = """Found key:
+-----BEGIN RSA PRIVATE KEY-----
+MIIEpAIBAAKCAQEA0Z3VS5JJcds3xfn/ygWyF8PbnGcY5unA
+-----END RSA PRIVATE KEY-----
+at /home/admin/.ssh/id_rsa"""
+        vault = RedactionVault()
+        redacted = vault.redact(text)
+        assert "MIIEpAIBAAKCAQEA0Z3VS5JJcds3xfn" not in redacted
+        assert "BEGIN RSA PRIVATE KEY" not in redacted
+        rehydrated = vault.rehydrate(redacted)
+        assert "BEGIN RSA PRIVATE KEY" in rehydrated
+
+    def test_openssh_private_key(self):
+        text = "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAA\n-----END OPENSSH PRIVATE KEY-----"
+        vault = RedactionVault()
+        redacted = vault.redact(text)
+        assert "OPENSSH PRIVATE KEY" not in redacted
+
+    def test_db_connection_string_postgres(self):
+        text = "DATABASE_URL=postgres://admin:p4ssw0rd@10.0.0.5:5432/production"
+        vault = RedactionVault()
+        redacted = vault.redact(text)
+        assert "p4ssw0rd" not in redacted
+        assert "admin" not in redacted or "DB_CONNECTION_STRING" in redacted
+
+    def test_db_connection_string_mysql(self):
+        text = "mysql://root:secret@db.internal:3306/app"
+        vault = RedactionVault()
+        redacted = vault.redact(text)
+        assert "secret" not in redacted
+
+    def test_db_connection_string_mongodb(self):
+        text = "mongodb://user:pass123@mongo.corp.local:27017/admin"
+        vault = RedactionVault()
+        redacted = vault.redact(text)
+        assert "pass123" not in redacted
+
+    def test_aws_sts_key(self):
+        text = "AWS_ACCESS_KEY_ID=ASIAIOSFODNN7EXAMPLE"
+        vault = RedactionVault()
+        redacted = vault.redact(text)
+        assert "ASIAIOSFODNN7EXAMPLE" not in redacted
+
+    def test_credential_pair_in_context(self):
+        text = "credential: admin/Password123!"
+        vault = RedactionVault()
+        redacted = vault.redact(text)
+        assert "Password123!" not in redacted
+
+    def test_ip_address_redacted(self):
+        text = "Target host 192.168.1.100 is vulnerable"
+        vault = RedactionVault()
+        redacted = vault.redact(text)
+        assert "192.168.1.100" not in redacted
+        assert "[IP_ADDRESS_" in redacted
+        rehydrated = vault.rehydrate(redacted)
+        assert "192.168.1.100" in rehydrated
+
+    def test_mac_address_redacted(self):
+        text = "Device MAC AA:BB:CC:DD:EE:FF detected"
+        vault = RedactionVault()
+        redacted = vault.redact(text)
+        assert "AA:BB:CC:DD:EE:FF" not in redacted
+        assert "[MAC_ADDRESS_" in redacted
+
+    def test_internal_hostname_redacted(self):
+        text = "Domain controller at dc01.corp.local"
+        vault = RedactionVault()
+        redacted = vault.redact(text)
+        assert "dc01.corp.local" not in redacted
+
+    def test_domain_user_redacted(self):
+        text = r"Compromised account: ACME\john.admin"
+        vault = RedactionVault()
+        redacted = vault.redact(text)
+        assert "ACME\\john.admin" not in redacted
+
+    def test_ssid_redacted(self):
+        text = "SSID: CorpWiFi-5G"
+        vault = RedactionVault()
+        redacted = vault.redact(text)
+        assert "CorpWiFi-5G" not in redacted
+
+    def test_file_path_redacted(self):
+        text = "Config found at /etc/shadow with weak permissions"
+        vault = RedactionVault()
+        redacted = vault.redact(text)
+        assert "/etc/shadow" not in redacted
+
+    def test_hash_in_context(self):
+        text = "Hash: 5f4dcc3b5aa765d61d8327deb882cf99aabbccddee112233"
+        vault = RedactionVault()
+        redacted = vault.redact(text)
+        assert "5f4dcc3b5aa765d61d8327deb882cf99" not in redacted
+
+    def test_vault_serialization_roundtrip(self):
+        """Vault can be serialized to dict and reconstructed."""
+        vault = RedactionVault()
+        text = "Host 192.168.1.1 has SSID: TestNet and MAC AA:BB:CC:DD:EE:FF"
+        redacted = vault.redact(text)
+        data = vault.to_dict()
+        vault2 = RedactionVault.from_dict(data)
+        rehydrated = vault2.rehydrate(redacted)
+        assert "192.168.1.1" in rehydrated
+        assert "TestNet" in rehydrated
+        assert "AA:BB:CC:DD:EE:FF" in rehydrated
+
+    def test_vault_deduplicates_same_value(self):
+        """Same IP appearing twice gets the same tag."""
+        vault = RedactionVault()
+        text = "Scan 192.168.1.1 then rescan 192.168.1.1"
+        redacted = vault.redact(text)
+        # Should only have one entry for the IP
+        ip_entries = [e for e in vault.entries if e["original"] == "192.168.1.1"]
+        assert len(ip_entries) == 1
+
+    def test_full_pentest_output(self):
+        """Realistic pentest tool output gets fully redacted."""
+        text = """Nmap scan results for 10.10.10.40:
+PORT    STATE SERVICE
+22/tcp  open  ssh
+445/tcp open  microsoft-ds
+Host: DC01.acme.internal
+SSID: ACME-Corp-5G
+WPA passphrase: Welcome2ACME!
+Admin hash: aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0
+Found SSH key at /home/admin/.ssh/id_rsa
+Lateral: ACME\\svc.backup has access to file server"""
+        vault = RedactionVault()
+        redacted = vault.redact(text)
+        # None of the sensitive data should remain
+        assert "10.10.10.40" not in redacted
+        assert "acme.internal" not in redacted
+        assert "ACME-Corp-5G" not in redacted
+        assert "Welcome2ACME!" not in redacted
+        assert "aad3b435b51404ee" not in redacted
+        assert "ACME\\svc.backup" not in redacted
+        # But the structure should remain readable
+        assert "PORT" in redacted
+        assert "STATE" in redacted
+        assert "ssh" in redacted
+        # And it should be fully rehydratable
+        rehydrated = vault.rehydrate(redacted)
+        assert "10.10.10.40" in rehydrated
+        assert "Welcome2ACME!" in rehydrated
 
 
 class TestDataPolicy:

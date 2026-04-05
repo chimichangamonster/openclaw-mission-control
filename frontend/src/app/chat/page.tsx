@@ -371,13 +371,10 @@ export default function ChatPage() {
           const data: LiveSSEEvent = JSON.parse(e.data);
           const eventType = data.event_type || "";
 
-          // Only care about events from The Claw / main agent
-          const agent = data.agent_name || "";
-          const isRelevant =
-            agent.includes("the-claw") ||
-            agent.includes("main") ||
-            agent.includes("mc-gateway");
-          if (!isRelevant) return;
+          // Accept events from any agent on this org — web chat uses
+          // dynamic gateway agent IDs that don't match static names
+          const ignoredTypes = ["cron."];
+          if (ignoredTypes.some((t) => eventType.startsWith(t))) return;
 
           // Accumulate for activity panel
           setActivityEvents((prev) => {
@@ -560,16 +557,17 @@ export default function ChatPage() {
     }
   }, [sessionKey, input, isSending, pendingFiles, boardId]);
 
-  // ─── Fallback polling when SSE is unavailable ────────────────────────────
-  // If SSE isn't connected and agent is typing, poll history every 3s
-  // to catch the response even without real-time events.
+  // ─── Safety-net polling while agent is working ─────────────────────────────
+  // Always poll when agentTyping, even if SSE is connected — SSE provides
+  // instant refetch on responded/completed events, but if the event is missed
+  // (wrong type, dropped connection) this catches it within 3s.
   const lastMessageCountRef = useRef(0);
   useEffect(() => {
     lastMessageCountRef.current = messages.length;
   }, [messages]);
 
   useEffect(() => {
-    if (!agentTyping || sseConnected || !sessionKey) return;
+    if (!agentTyping || !sessionKey) return;
     const countBefore = lastMessageCountRef.current;
     const poll = setInterval(async () => {
       const bid = boardIdRef.current;
@@ -591,7 +589,7 @@ export default function ChatPage() {
       } catch { /* ignore */ }
     }, 3000);
     return () => clearInterval(poll);
-  }, [agentTyping, sseConnected, sessionKey]);
+  }, [agentTyping, sessionKey]);
 
   // ─── Session commands ─────────────────────────────────────────────────────
 
@@ -948,10 +946,10 @@ export default function ChatPage() {
                     )}
                   >
                     {msg.role === "user" ? (
-                      <p className="whitespace-pre-wrap break-words">{msg.content}</p>
+                      <p className="whitespace-pre-wrap break-words">{typeof msg.content === "string" ? msg.content : String(msg.content)}</p>
                     ) : (
                       <div className="break-words [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
-                        <Markdown content={msg.content} variant="description" />
+                        <Markdown content={typeof msg.content === "string" ? msg.content : String(msg.content)} variant="description" />
                       </div>
                     )}
                   </div>

@@ -223,6 +223,42 @@ _PENTEST_PATTERNS: list[tuple[re.Pattern, str, str]] = [
     (re.compile(r'(?:SSID|ESSID|network)\s*[:=]\s*["\']?([^\s"\']+)["\']?', re.IGNORECASE),
      "ssid", "WiFi SSID"),
 
+    # WiFi PSK / WPA passwords in tool output
+    (re.compile(r'(?:PSK|WPA\s*(?:passphrase|password|key)|pre[- ]?shared[- ]?key|wifi[- ]?pass(?:word)?)\s*[:=]\s*["\']?(\S+)["\']?', re.IGNORECASE),
+     "wifi_password", "WiFi password"),
+
+    # NTLM hashes (LM:NT format from secretsdump, or standalone 32-char hex)
+    (re.compile(r"\b[0-9a-fA-F]{32}:[0-9a-fA-F]{32}\b"),
+     "ntlm_hash", "NTLM hash pair"),
+
+    # NetNTLMv2 hashes (user::domain:challenge:response format from Responder)
+    (re.compile(r"\b\S+::\S+:[0-9a-fA-F]{16}:[0-9a-fA-F]{32}:[0-9a-fA-F]+\b"),
+     "netntlmv2_hash", "NetNTLMv2 hash"),
+
+    # Standalone password hashes in tool output (hashcat/john context)
+    (re.compile(r'(?:hash|Hash|HASH)\s*[:=]\s*["\']?([0-9a-fA-F]{32,128})["\']?'),
+     "password_hash", "password hash"),
+
+    # SSH private keys (PEM blocks)
+    (re.compile(r"-----BEGIN (?:RSA |OPENSSH |EC |ED25519 |DSA )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |OPENSSH |EC |ED25519 |DSA )?PRIVATE KEY-----"),
+     "ssh_private_key", "SSH private key"),
+
+    # Database connection strings with embedded credentials
+    (re.compile(r"(?:mongodb|mysql|postgres(?:ql)?|mssql|redis|amqp)://[^\s\"']+@[^\s\"']+", re.IGNORECASE),
+     "db_connection_string", "database connection string"),
+
+    # Kerberos ticket blobs (krb5 base64, typically from klist or ticket exports)
+    (re.compile(r"\bkrb(?:tgt|5cc|5_)\S{20,}\b", re.IGNORECASE),
+     "kerberos_ticket", "Kerberos ticket"),
+
+    # AWS temporary session tokens (STS)
+    (re.compile(r"\bASIA[0-9A-Z]{16}\b"),
+     "aws_sts_key", "AWS STS key"),
+
+    # Credential pairs in pentest tool output (user:pass, user/pass patterns in context)
+    (re.compile(r'(?:credential|cred|login|logon|username/password|user/pass)\s*[:=]\s*["\']?(\S+\s*[:/]\s*\S+)["\']?', re.IGNORECASE),
+     "credential_pair", "credential pair"),
+
     # Windows domain\user patterns
     (re.compile(r"\b[A-Z][A-Z0-9_-]{1,15}\\[a-zA-Z0-9._-]+\b"),
      "domain_user", "domain\\user"),

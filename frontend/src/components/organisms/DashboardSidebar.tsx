@@ -16,6 +16,7 @@ import {
   HelpCircle,
   LayoutGrid,
   Mail,
+  MapPin,
   MessageSquare,
   Moon,
   Network,
@@ -31,13 +32,10 @@ import {
 import { useTheme } from "next-themes";
 
 import { useAuth } from "@/auth/clerk";
-import { ApiError } from "@/api/mutator";
+import { customFetch } from "@/api/mutator";
 import { useFeatureFlags } from "@/lib/use-feature-flags";
 import { useOrganizationMembership } from "@/lib/use-organization-membership";
-import {
-  type healthzHealthzGetResponse,
-  useHealthzHealthzGet,
-} from "@/api/generated/default/default";
+import { useQuery } from "@tanstack/react-query";
 import { OrgSwitcher } from "@/components/organisms/OrgSwitcher";
 import { cn } from "@/lib/utils";
 
@@ -47,18 +45,23 @@ export function DashboardSidebar() {
   const { isSignedIn } = useAuth();
   const { isAdmin } = useOrganizationMembership(isSignedIn);
   const { isFeatureEnabled } = useFeatureFlags(Boolean(isSignedIn));
-  const healthQuery = useHealthzHealthzGet<healthzHealthzGetResponse, ApiError>(
-    {
-      query: {
-        refetchInterval: 30_000,
-        refetchOnMount: "always",
-        retry: false,
-      },
-      request: { cache: "no-store" },
+  const healthQuery = useQuery({
+    queryKey: ["/api/v1/system/health"],
+    queryFn: async () => {
+      const res: any = await customFetch("/api/v1/system/health", { method: "GET" });
+      return res?.data ?? res;
     },
-  );
+    refetchInterval: 30_000,
+    refetchOnMount: "always" as const,
+    retry: false,
+  });
 
-  const okValue = healthQuery.data?.data?.ok;
+  const healthData = healthQuery.data as { status?: string } | undefined;
+  const okValue = healthData?.status === "healthy"
+    ? true
+    : healthData?.status === "degraded" || healthData?.status === "down"
+      ? false
+      : undefined;
   const systemStatus: "unknown" | "operational" | "degraded" =
     okValue === true
       ? "operational"
@@ -342,6 +345,18 @@ export function DashboardSidebar() {
               >
                 <Radio className="h-4 w-4" />
                 SDR Workspace
+              </Link>
+              <Link
+                href="/pentest/wardrive"
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-[color:var(--text)] transition",
+                  pathname.startsWith("/pentest/wardrive")
+                    ? "bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)] font-medium"
+                    : "hover:bg-[color:var(--surface-muted)]",
+                )}
+              >
+                <MapPin className="h-4 w-4" />
+                Wardriving
               </Link>
             </div>
           </div>

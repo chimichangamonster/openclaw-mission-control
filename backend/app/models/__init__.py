@@ -46,6 +46,7 @@ from app.models.organization_members import OrganizationMember
 from app.models.organizations import Organization
 from app.models.paper_bets import PaperBet
 from app.models.pentest_scans import PentestScanRecord
+from app.models.tx_audit_records import TxAuditRecord
 from app.models.paper_trading import PaperPortfolio, PaperPosition, PaperTrade
 from app.models.skills import GatewayInstalledSkill, MarketplaceSkill, SkillPack
 from app.models.tag_assignments import TagAssignment
@@ -108,6 +109,7 @@ __all__ = [
     "User",
     "PaperBet",
     "PentestScanRecord",
+    "TxAuditRecord",
     "PaperPortfolio",
     "PaperPosition",
     "PaperTrade",
