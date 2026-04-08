@@ -23,4 +23,5 @@ backend/~/
 backend/coverage.*
 backend/.coverage
 frontend/coverage
-backend/app/services/openclaw/.device-keysbackend/test.db
+backend/app/services/openclaw/.device-keys
+backend/test.db
