@@ -9,6 +9,7 @@ import {
   Bot,
   Boxes,
   CheckCircle2,
+  Eye,
   FileText,
   Folder,
   Building2,
@@ -357,6 +358,30 @@ export function DashboardSidebar() {
               >
                 <MapPin className="h-4 w-4" />
                 Wardriving
+              </Link>
+              <Link
+                href="/pentest/network"
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-[color:var(--text)] transition",
+                  pathname.startsWith("/pentest/network")
+                    ? "bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)] font-medium"
+                    : "hover:bg-[color:var(--surface-muted)]",
+                )}
+              >
+                <Network className="h-4 w-4" />
+                Network Map
+              </Link>
+              <Link
+                href="/pentest/tscm"
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-[color:var(--text)] transition",
+                  pathname.startsWith("/pentest/tscm")
+                    ? "bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)] font-medium"
+                    : "hover:bg-[color:var(--surface-muted)]",
+                )}
+              >
+                <Eye className="h-4 w-4" />
+                TSCM Workspace
               </Link>
             </div>
           </div>

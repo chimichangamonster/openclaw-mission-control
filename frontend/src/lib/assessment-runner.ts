@@ -21,13 +21,35 @@ import {
   generateScanReport,
   type ScanResult,
   type ScanReport,
+  type AnalysisMode,
 } from "@/lib/pentest-api";
+
+// Analysis modes that skip the live LLM call entirely — scans persist, but
+// the operator analyzes the data offline at home.
+export const TAKE_HOME_ANALYSIS_MODES: readonly AnalysisMode[] = [
+  "none",
+  "cloud_take_home",
+  "local_take_home",
+] as const;
+
+export function isTakeHomeMode(mode: AnalysisMode | undefined): boolean {
+  return mode !== undefined && (TAKE_HOME_ANALYSIS_MODES as readonly string[]).includes(mode);
+}
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-export type AssessmentType = "passive_recon" | "network" | "external_recon" | "vuln_assessment" | "credential_audit" | "wifi_security" | "full" | "custom";
+export type AssessmentType =
+  | "passive_recon"
+  | "network"
+  | "external_recon"
+  | "vuln_assessment"
+  | "credential_audit"
+  | "wifi_security"
+  | "tscm_sweep"
+  | "full"
+  | "custom";
 export type StepStatus = "pending" | "running" | "complete" | "failed" | "skipped";
 export type AssessmentPhase = "configure" | "pre_flight" | "running" | "review" | "analyzing" | "complete" | "error";
 
@@ -77,6 +99,12 @@ export interface AssessmentState {
   analysisError?: string;
   preFlightResults?: PreFlightResult[];
   preFlightPassed?: boolean;
+  // Take-home analysis workflow — controls whether scans trigger a live LLM
+  // analysis or stop at scan completion for offline analysis at home
+  analysisMode?: AnalysisMode;
+  // Subject Area label for live_sanitized mode (TSCM sweeps) — goes into the
+  // LLM prompt instead of real room names
+  subjectArea?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -84,7 +112,15 @@ export interface AssessmentState {
 // ---------------------------------------------------------------------------
 
 export type AssessmentAction =
-  | { type: "CONFIGURE"; assessmentType: AssessmentType; steps: StepDefinition[]; profileKey?: string; target?: string }
+  | {
+      type: "CONFIGURE";
+      assessmentType: AssessmentType;
+      steps: StepDefinition[];
+      profileKey?: string;
+      target?: string;
+      analysisMode?: AnalysisMode;
+      subjectArea?: string;
+    }
   | { type: "PRE_FLIGHT_START" }
   | { type: "PRE_FLIGHT_COMPLETE"; results: PreFlightResult[]; passed: boolean }
   | { type: "START" }
@@ -121,6 +157,8 @@ export function assessmentReducer(state: AssessmentState, action: AssessmentActi
         type: action.assessmentType,
         profileKey: action.profileKey,
         target: action.target,
+        analysisMode: action.analysisMode,
+        subjectArea: action.subjectArea,
         steps: action.steps.map((d) => ({
           id: d.id,
           label: d.label,
@@ -182,7 +220,21 @@ export function assessmentReducer(state: AssessmentState, action: AssessmentActi
     }
     case "SCANS_DONE": {
       const hasFailed = state.steps.some((s) => s.status === "failed");
-      return { ...state, phase: hasFailed ? "review" : "analyzing" };
+      if (hasFailed) {
+        return { ...state, phase: "review" };
+      }
+      // Take-home modes skip the live LLM call — scans are persisted, but the
+      // operator analyzes the data offline at home. Jump straight to complete
+      // with a take-home status message instead of entering analyzing phase.
+      if (isTakeHomeMode(state.analysisMode)) {
+        return {
+          ...state,
+          phase: "complete",
+          completedAt: Date.now(),
+          analysisMessage: takeHomeCompletionMessage(state.analysisMode),
+        };
+      }
+      return { ...state, phase: "analyzing" };
     }
     case "PROCEED_TO_ANALYSIS":
       return { ...state, phase: "analyzing" };
@@ -349,6 +401,76 @@ const WIFI_SECURITY_STEPS: StepDefinition[] = [
   },
 ];
 
+// TSCM sweep — broader SDR spectrum coverage + Sub-GHz + BLE + WiFi discovery
+// for finding hidden surveillance devices. Linear methodology per Subject Area.
+// Scan chain differs from passive_recon: wider SDR sweep (100 MHz-1.75 GHz
+// range instead of just 400-500 MHz ISM), longer Sub-GHz dwell, passive WiFi
+// AP discovery for rogue bugs, BLE active scan for trackers. NLJD sweep and
+// physical search are operator-driven and captured separately in the TSCM
+// Workspace (they are not automated scan steps).
+const TSCM_SWEEP_STEPS: StepDefinition[] = [
+  {
+    id: "sdr_tscm_lowband",
+    label: "SDR Low-Band Sweep (300-500 MHz, Sub-GHz bugs)",
+    scanType: "SDR Spectrum",
+    fn: (opts) =>
+      triggerSdrSpectrumScan({
+        freq_start: "300M",
+        freq_end: "500M",
+        bin_size: "500k",
+        gain: 40,
+        duration: 15,
+        profile_key: opts.profileKey,
+      }),
+  },
+  {
+    id: "sdr_tscm_midband",
+    label: "SDR Mid-Band Sweep (800-1000 MHz, cellular bugs)",
+    scanType: "SDR Spectrum",
+    fn: (opts) =>
+      triggerSdrSpectrumScan({
+        freq_start: "800M",
+        freq_end: "1000M",
+        bin_size: "500k",
+        gain: 40,
+        duration: 15,
+        profile_key: opts.profileKey,
+      }),
+  },
+  {
+    id: "sdr_tscm_highband",
+    label: "SDR High-Band Sweep (1200-1750 MHz, DECT/GPS)",
+    scanType: "SDR Spectrum",
+    fn: (opts) =>
+      triggerSdrSpectrumScan({
+        freq_start: "1200M",
+        freq_end: "1750M",
+        bin_size: "1M",
+        gain: 40,
+        duration: 15,
+        profile_key: opts.profileKey,
+      }),
+  },
+  {
+    id: "subghz_tscm",
+    label: "Sub-GHz Active Scan (audio bug frequencies)",
+    scanType: "Sub-GHz Scan",
+    fn: () => triggerRfScan(30),
+  },
+  {
+    id: "ble_tscm",
+    label: "BLE Active Scan (trackers, beacons)",
+    scanType: "BLE Scan (Pi)",
+    fn: () => triggerBleScan(30),
+  },
+  {
+    id: "wifi_tscm",
+    label: "WiFi AP Discovery (rogue AP check)",
+    scanType: "WiFi Quick Scan",
+    fn: () => triggerWifiScan(),
+  },
+];
+
 export const ASSESSMENT_PRESETS: Record<Exclude<AssessmentType, "custom">, { label: string; description: string; steps: StepDefinition[] }> = {
   passive_recon: {
     label: "Passive Recon",
@@ -380,6 +502,12 @@ export const ASSESSMENT_PRESETS: Record<Exclude<AssessmentType, "custom">, { lab
     description: "Full WiFi scan with monitor mode + AP discovery. Requires Alfa adapter. Authorized TX mode.",
     steps: WIFI_SECURITY_STEPS,
   },
+  tscm_sweep: {
+    label: "TSCM Sweep",
+    description:
+      "Technical Surveillance Counter-Measures sweep — wide SDR spectrum coverage, Sub-GHz, BLE, and WiFi rogue AP discovery. Run per Subject Area. Pairs with NLJD + physical search in the TSCM Workspace.",
+    steps: TSCM_SWEEP_STEPS,
+  },
   full: {
     label: "Full Assessment",
     description: "Passive recon + network + vulnerability assessment combined.",
@@ -389,7 +517,15 @@ export const ASSESSMENT_PRESETS: Record<Exclude<AssessmentType, "custom">, { lab
 
 export function getStepsForType(type: AssessmentType, customStepIds?: string[]): StepDefinition[] {
   if (type === "custom" && customStepIds) {
-    const all = [...PASSIVE_STEPS, ...NETWORK_STEPS, ...EXTERNAL_RECON_STEPS, ...VULN_ASSESSMENT_STEPS, ...CREDENTIAL_AUDIT_STEPS, ...WIFI_SECURITY_STEPS];
+    const all = [
+      ...PASSIVE_STEPS,
+      ...NETWORK_STEPS,
+      ...EXTERNAL_RECON_STEPS,
+      ...VULN_ASSESSMENT_STEPS,
+      ...CREDENTIAL_AUDIT_STEPS,
+      ...WIFI_SECURITY_STEPS,
+      ...TSCM_SWEEP_STEPS,
+    ];
     return all.filter((s) => customStepIds.includes(s.id));
   }
   return ASSESSMENT_PRESETS[type as keyof typeof ASSESSMENT_PRESETS]?.steps ?? [];
@@ -425,6 +561,49 @@ export async function executeStep(
 // LLM analysis prompt builder
 // ---------------------------------------------------------------------------
 
+/**
+ * Completion message displayed when scans finish in a take-home analysis mode.
+ * This is the operator-facing explanation of what to do next.
+ */
+export function takeHomeCompletionMessage(mode: AnalysisMode | undefined): string {
+  switch (mode) {
+    case "none":
+      return `## Scans Complete — Manual Analysis Mode
+
+All scan results have been persisted to scan history. This profile is configured for **pure manual analysis** — no AI will review this data in any phase.
+
+**Next steps:**
+1. Open **Scan History** to review the raw findings
+2. Use the **Export** button on the profile to bundle all scan records
+3. Write the final report by hand in your controlled environment
+4. No cloud AI service will see any of this data`;
+    case "cloud_take_home":
+      return `## Scans Complete — Take-Home Analysis Mode
+
+All scan results have been persisted to scan history. This profile is configured for **take-home analysis with Cloud Claude + manual sanitization** (the default for network, web, and wireless pentests).
+
+**Next steps:**
+1. Transport the Pi rig home (Faraday bag, wireless off)
+2. Use the **Export** button to bundle all scan records as an encrypted archive
+3. Analyze at home with Cloud Claude — manually sanitize each finding using \`[Host A]\`, \`[Host B]\` placeholders before pasting
+4. Substitute real values back into the final report
+
+See \`docs/operations/pentest-engagement-workflow.md\` for the full runbook.`;
+    case "local_take_home":
+      return `## Scans Complete — Local LLM Analysis Mode
+
+All scan results have been persisted to scan history. This profile is configured for **take-home analysis on a local LLM** (the default for government, defense, and regulated engagements).
+
+**Next steps:**
+1. Transport the Pi rig home (Faraday bag, wireless off)
+2. Use the **Export** button to bundle all scan records
+3. Analyze at home on your local Qwen 2.5 / Llama 3.3 instance — no cloud LLM exposure
+4. Bring current threat intel to the prompt yourself (local model knowledge cutoffs)`;
+    default:
+      return "Scans complete. Review findings in scan history.";
+  }
+}
+
 export function buildAnalysisPrompt(state: AssessmentState): string {
   const completedSteps = state.steps.filter((s) => s.status === "complete");
   const failedSteps = state.steps.filter((s) => s.status === "failed");
@@ -450,12 +629,20 @@ Raw data summary: ${JSON.stringify(summarizeScanResult(s.result), null, 2)}`;
     ? `\n\nFailed scans (${failedSteps.length}):\n${failedSteps.map((s) => `- ${s.label}: ${s.error}`).join("\n")}`
     : "";
 
+  // In live_sanitized mode (TSCM default), use a generic Subject Area label
+  // instead of client-identifying location info. The operator maps labels →
+  // real rooms locally; the LLM only sees the label.
+  const locationLine =
+    state.analysisMode === "live_sanitized" && state.subjectArea
+      ? `Subject Area: ${state.subjectArea}  (operator-defined label, not a real location)`
+      : `Target: ${state.target ?? "default"}`;
+
   return `[PENTEST ASSESSMENT RESULTS - DO NOT EXECUTE ANY TOOLS]
 [ANALYZE THE FOLLOWING COMPLETED SCAN DATA AND PRODUCE A RISK REPORT]
 
 Assessment Type: ${ASSESSMENT_PRESETS[state.type as keyof typeof ASSESSMENT_PRESETS]?.label ?? state.type}
 Profile: ${state.profileKey ?? "none"}
-Target: ${state.target ?? "default"}
+${locationLine}
 Date: ${new Date().toISOString()}
 Completed: ${completedSteps.length}/${state.steps.length} scans
 
