@@ -852,10 +852,9 @@ async def system_health():
                     if jobs_file.exists():
                         candidate_files.append(jobs_file)
 
-        legacy_path = Path("/app/gateway-cron/jobs.json")
-        if legacy_path.exists():
-            candidate_files.append(legacy_path)
-
+        # Legacy single-tenant fallback retired 2026-04-11. Per-org gateways
+        # are the only source of truth — falling back to /app/gateway-cron was
+        # double-counting Personal org cron jobs (phantom failures).
         for jobs_path in candidate_files:
             try:
                 data = json.loads(jobs_path.read_text())

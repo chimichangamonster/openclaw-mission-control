@@ -32,9 +32,6 @@ router = APIRouter(
     dependencies=[Depends(require_feature("cron_jobs")), ORG_RATE_LIMIT_DEP],
 )
 
-# Legacy shared path (fallback when per-org workspace not available)
-LEGACY_CRON_JOBS_FILE = Path("/app/gateway-cron/jobs.json")
-
 _OPERATOR_DEP = Depends(require_org_role("operator"))
 
 
@@ -43,13 +40,14 @@ _OPERATOR_DEP = Depends(require_org_role("operator"))
 # ---------------------------------------------------------------------------
 
 def _resolve_cron_file(org_ctx: OrganizationContext) -> Path:
-    """Resolve the cron jobs.json path for the current org."""
+    """Resolve the cron jobs.json path for the current org.
+
+    Legacy single-tenant fallback (LEGACY_CRON_JOBS_FILE) retired 2026-04-11 —
+    per-org gateways are the only source of truth.
+    """
     workspace = resolve_org_workspace(org_ctx.organization)
     # cron/ is a sibling of workspace/ inside .openclaw/
-    org_cron = workspace.parent / "cron" / "jobs.json"
-    if org_cron.exists():
-        return org_cron
-    return LEGACY_CRON_JOBS_FILE
+    return workspace.parent / "cron" / "jobs.json"
 
 
 def _read_jobs(cron_file: Path) -> list[dict]:
