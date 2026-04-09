@@ -826,22 +826,63 @@ async def system_health():
     if error_count_1h >= 10:
         issues.append(f"{error_count_1h} errors in last hour")
 
-    # ── Cron Health (last failed status) ───────────────────────────────────
+    # ── Cron Health (per-org gateway scan) ─────────────────────────────────
+    # Walks both per-org workspaces (GATEWAY_WORKSPACES_ROOT/*/​.openclaw/cron/jobs.json)
+    # and the legacy single-tenant fallback path. Aggregates failed counts across
+    # all gateways. The previous implementation only checked the legacy path and
+    # always returned status: "unknown" once per-org gateways shipped.
     cron_failed = 0
+    cron_total = 0
+    cron_gateways_scanned = 0
     try:
         import json
+        import os
         from pathlib import Path
-        jobs_path = Path("/app/gateway-cron/jobs.json")
-        if jobs_path.exists():
-            jobs = json.loads(jobs_path.read_text())
-            for job in jobs:
-                if job.get("last_status") in ("error", "failed"):
-                    cron_failed += 1
-            components["cron_jobs"] = {"failed": cron_failed, "total": len(jobs)}
-        else:
+
+        candidate_files: list[Path] = []
+
+        workspaces_root = os.environ.get("GATEWAY_WORKSPACES_ROOT")
+        if workspaces_root:
+            root = Path(workspaces_root)
+            if root.exists():
+                for org_dir in root.iterdir():
+                    if not org_dir.is_dir():
+                        continue
+                    jobs_file = org_dir / ".openclaw" / "cron" / "jobs.json"
+                    if jobs_file.exists():
+                        candidate_files.append(jobs_file)
+
+        legacy_path = Path("/app/gateway-cron/jobs.json")
+        if legacy_path.exists():
+            candidate_files.append(legacy_path)
+
+        for jobs_path in candidate_files:
+            try:
+                data = json.loads(jobs_path.read_text())
+                jobs = data["jobs"] if isinstance(data, dict) and "jobs" in data else data
+                if not isinstance(jobs, list):
+                    continue
+                cron_gateways_scanned += 1
+                cron_total += len(jobs)
+                for job in jobs:
+                    state = job.get("state") or {}
+                    last_status = state.get("lastRunStatus") or job.get("last_status")
+                    if last_status in ("error", "failed"):
+                        cron_failed += 1
+            except (json.JSONDecodeError, OSError):
+                continue
+
+        if cron_gateways_scanned == 0:
             components["cron_jobs"] = {"status": "no_data"}
-    except Exception:
-        components["cron_jobs"] = {"status": "unknown"}
+        else:
+            components["cron_jobs"] = {
+                "status": "ok" if cron_failed == 0 else "failing",
+                "failed": cron_failed,
+                "total": cron_total,
+                "gateways_scanned": cron_gateways_scanned,
+            }
+    except Exception as exc:
+        components["cron_jobs"] = {"status": "unknown", "error": str(exc)[:100]}
 
     if cron_failed > 0:
         issues.append(f"{cron_failed} cron job(s) in failed state")
