@@ -3,9 +3,9 @@
 VantageClaw fork of abhi1693/openclaw-mission-control. Separate git repo (not a submodule).
 
 ## Remotes
-- `origin` — upstream (abhi1693/openclaw-mission-control)
-- `fork` — our fork (chimichangamonster/openclaw-mission-control)
-- Push to `fork`, not `origin`
+- `origin` — our fork (chimichangamonster/openclaw-mission-control) — push here
+- `upstream` — abhi1693/openclaw-mission-control — read-only, used by `make sync-upstream` if needed
+- Reconfigured 2026-04-09: previously `origin`/`fork` swap, renamed so `git status` reports honest "ahead/behind" against the fork instead of phantom drift against upstream
 
 ## Backend (Python 3.12 + FastAPI)
 - Entry: `backend/app/main.py`
