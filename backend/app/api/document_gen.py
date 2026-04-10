@@ -93,12 +93,12 @@ async def _get_adobe_credentials(org_id) -> tuple[str, str] | None:
 
 
 def _save_to_workspace(content: bytes, filename: str, extension: str) -> str:
-    """Save generated content to the gateway workspace and return relative path."""
-    workspace = settings.gateway_workspace_path
+    """Save generated content to the gateway workspaces root and return relative path."""
+    workspace = settings.gateway_workspaces_root or settings.gateway_workspace_path
     if not workspace:
         raise HTTPException(
             status_code=503,
-            detail="GATEWAY_WORKSPACE_PATH not configured.",
+            detail="GATEWAY_WORKSPACES_ROOT not configured.",
         )
 
     docs_dir = Path(workspace) / "documents"
@@ -662,7 +662,7 @@ async def delete_generated_document(
         raise HTTPException(status_code=404, detail="Document not found")
 
     # Try to delete file from disk
-    workspace = settings.gateway_workspace_path
+    workspace = settings.gateway_workspaces_root or settings.gateway_workspace_path
     if workspace:
         file_path = Path(workspace) / doc.relative_path
         if file_path.exists():

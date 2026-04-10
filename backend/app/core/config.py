@@ -128,8 +128,8 @@ class Settings(BaseSettings):
     polymarket_queue_name: str = "trade_execution"
 
     # File serving (gateway workspace access)
-    gateway_workspace_path: str = ""
     gateway_workspaces_root: str = ""  # Parent dir for per-org gateways (e.g., /app/gateway-workspaces)
+    gateway_workspace_path: str = ""  # DEPRECATED — legacy fallback, remove after compose mounts dropped
 
     # Adobe PDF Services (platform-level fallback for BYOK)
     adobe_pdf_client_id: str = ""

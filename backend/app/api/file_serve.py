@@ -46,11 +46,11 @@ _MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024  # 50 MB
 
 
 def _get_workspace_root() -> Path:
-    wp = settings.gateway_workspace_path
+    wp = settings.gateway_workspaces_root or settings.gateway_workspace_path
     if not wp:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="File serving not configured (GATEWAY_WORKSPACE_PATH not set).",
+            detail="File serving not configured (GATEWAY_WORKSPACES_ROOT not set).",
         )
     return Path(wp)
 

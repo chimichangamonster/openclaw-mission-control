@@ -290,7 +290,7 @@ async def upload_workspace_to_onedrive(
     await session.commit()
 
     # Read file from workspace
-    workspace_root = Path(settings.gateway_workspace_path)
+    workspace_root = Path(settings.gateway_workspaces_root or settings.gateway_workspace_path)
     file_path = (workspace_root / workspace_path).resolve()
     if not str(file_path).startswith(str(workspace_root.resolve())):
         raise HTTPException(status_code=403, detail="Path outside workspace.")

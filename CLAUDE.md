@@ -102,7 +102,6 @@ VantageClaw fork of abhi1693/openclaw-mission-control. Separate git repo (not a 
 ## Environment Variables (mc-backend)
 - `OPENROUTER_API_KEY` — required for cost tracking page (added to docker-compose.mission-control.yml)
 - `GATEWAY_WORKSPACES_ROOT` — parent directory for per-org gateway workspaces (e.g., `/app/gateway-workspaces`)
-- `GATEWAY_WORKSPACE_PATH` — legacy single-workspace fallback (e.g., `/app/gateway-workspace`)
 - `DATABASE_URL`, `LOCAL_AUTH_TOKEN`, `ENCRYPTION_KEY` — standard config in .env.production
 
 ## Build & Deploy

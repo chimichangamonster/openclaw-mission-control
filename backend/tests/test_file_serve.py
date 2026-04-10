@@ -215,7 +215,8 @@ def _app_client(_workspace: Path):
         patch("app.api.file_serve.settings") as mock_settings,
         patch("app.core.file_tokens.settings") as mock_token_settings,
     ):
-        mock_settings.gateway_workspace_path = str(_workspace)
+        mock_settings.gateway_workspaces_root = str(_workspace)
+        mock_settings.gateway_workspace_path = ""
         mock_settings.local_auth_token = "test-token-long-enough-for-validation-purposes-here"
         mock_settings.base_url = "http://100.100.202.83:8000"
         mock_token_settings.encryption_key = "test-encryption-key-for-hmac-signing"
