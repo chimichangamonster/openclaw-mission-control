@@ -108,7 +108,7 @@ TEMPLATES: dict[str, IndustryTemplate] = {
             "email": True,
             "cron_jobs": True,
         },
-        skills=["bookkeeping", "expense-capture", "doc-gen", "competitor-intel"],
+        skills=["bookkeeping", "expense-capture", "doc-gen", "competitor-intel", "email-triage"],
         default_config={
             "service_catalog": [
                 ConfigItem("bin_rental_20yd", "20 Yard Bin Rental", {"price": 350.00, "unit": "per_haul", "description": "20 yard roll-off bin"}),
@@ -251,7 +251,7 @@ TEMPLATES: dict[str, IndustryTemplate] = {
             "discovery-prep", "proposal-builder", "project-tracker",
             "social-media", "news-intelligence", "scheduling",
             "notifications", "document-intake", "roi-calculator",
-            "regulatory-tracker", "waste-market-intel",
+            "regulatory-tracker", "waste-market-intel", "email-triage",
         ],
         default_config={
             "product_catalog": [

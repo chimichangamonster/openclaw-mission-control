@@ -20,6 +20,32 @@ import {
   X,
 } from "lucide-react";
 
+import { cn } from "@/lib/utils";
+
+/* ── Triage color maps (shared with list page) ── */
+
+const TRIAGE_STATUS_COLORS: Record<string, string> = {
+  pending: "bg-amber-100 text-amber-800",
+  triaged: "bg-blue-100 text-blue-700",
+  actioned: "bg-green-100 text-green-700",
+  ignored: "bg-slate-100 text-slate-500",
+  needs_review: "bg-orange-100 text-orange-700",
+  spam: "bg-red-100 text-red-600",
+  archived: "bg-slate-100 text-slate-500",
+};
+
+const TRIAGE_CATEGORY_COLORS: Record<string, string> = {
+  inquiry: "bg-emerald-100 text-emerald-700",
+  invoice: "bg-violet-100 text-violet-700",
+  regulatory: "bg-red-100 text-red-700",
+  stakeholder: "bg-indigo-100 text-indigo-700",
+  follow_up: "bg-amber-100 text-amber-700",
+  vendor: "bg-slate-100 text-slate-600",
+  scheduling: "bg-cyan-100 text-cyan-700",
+  spam: "bg-red-50 text-red-500",
+  fyi: "bg-slate-50 text-slate-500",
+};
+
 import { useAuth } from "@/auth/clerk";
 import { DashboardPageLayout } from "@/components/templates/DashboardPageLayout";
 import { Button } from "@/components/ui/button";
@@ -233,12 +259,12 @@ export default function EmailMessagePage() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <span className="rounded bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600">
-                  {message.triage_status}
+                <span className={cn("rounded px-2 py-1 text-xs font-medium", TRIAGE_STATUS_COLORS[message.triage_status] ?? "bg-slate-100 text-slate-600")}>
+                  {message.triage_status.replace("_", " ")}
                 </span>
                 {message.triage_category ? (
-                  <span className="rounded bg-blue-100 px-2 py-1 text-xs font-medium text-blue-700">
-                    {message.triage_category}
+                  <span className={cn("rounded px-2 py-1 text-xs font-medium", TRIAGE_CATEGORY_COLORS[message.triage_category] ?? "bg-blue-100 text-blue-700")}>
+                    {message.triage_category.replace("_", " ")}
                   </span>
                 ) : null}
               </div>

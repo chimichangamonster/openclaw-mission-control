@@ -2,10 +2,13 @@
 
 export const dynamic = "force-dynamic";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
+  AlertTriangle,
   Archive,
+  CheckCircle2,
+  Clock,
   Inbox,
   Mail,
   MailOpen,
@@ -30,7 +33,59 @@ import {
 import { cn } from "@/lib/utils";
 
 type Folder = "inbox" | "sent" | "archive" | "trash";
-type TriageFilter = "" | "pending" | "triaged" | "actioned" | "ignored";
+type TriageFilter = "" | "pending" | "triaged" | "actioned" | "ignored" | "needs_review" | "spam";
+
+/* ── Triage color maps ── */
+
+const TRIAGE_STATUS_COLORS: Record<string, string> = {
+  pending: "bg-amber-100 text-amber-800",
+  triaged: "bg-blue-100 text-blue-700",
+  actioned: "bg-green-100 text-green-700",
+  ignored: "bg-slate-100 text-slate-500",
+  needs_review: "bg-orange-100 text-orange-700",
+  spam: "bg-red-100 text-red-600",
+  archived: "bg-slate-100 text-slate-500",
+};
+
+const TRIAGE_CATEGORY_COLORS: Record<string, string> = {
+  inquiry: "bg-emerald-100 text-emerald-700",
+  invoice: "bg-violet-100 text-violet-700",
+  regulatory: "bg-red-100 text-red-700",
+  stakeholder: "bg-indigo-100 text-indigo-700",
+  follow_up: "bg-amber-100 text-amber-700",
+  vendor: "bg-slate-100 text-slate-600",
+  scheduling: "bg-cyan-100 text-cyan-700",
+  spam: "bg-red-50 text-red-500",
+  fyi: "bg-slate-50 text-slate-500",
+};
+
+const PRIORITY_DOT: Record<string, string> = {
+  urgent: "bg-red-500",
+  high: "bg-orange-400",
+  medium: "bg-blue-400",
+  low: "bg-slate-300",
+};
+
+function triageStatusBadge(status: string) {
+  const colors = TRIAGE_STATUS_COLORS[status] ?? "bg-slate-100 text-slate-600";
+  return colors;
+}
+
+function triageCategoryBadge(category: string) {
+  const colors = TRIAGE_CATEGORY_COLORS[category] ?? "bg-slate-100 text-slate-600";
+  return colors;
+}
+
+/** Infer priority from category for the dot indicator. */
+function inferPriority(msg: EmailMessage): string | null {
+  const cat = msg.triage_category;
+  if (!cat || msg.triage_status === "pending") return null;
+  if (cat === "regulatory" || cat === "stakeholder") return "urgent";
+  if (cat === "inquiry" || cat === "follow_up") return "high";
+  if (cat === "invoice" || cat === "vendor" || cat === "scheduling") return "medium";
+  if (cat === "spam" || cat === "fyi") return "low";
+  return null;
+}
 
 export default function EmailPage() {
   const { isSignedIn } = useAuth();
@@ -110,8 +165,21 @@ export default function EmailPage() {
     { key: "pending", label: "Pending" },
     { key: "triaged", label: "Triaged" },
     { key: "actioned", label: "Actioned" },
+    { key: "needs_review", label: "Review" },
     { key: "ignored", label: "Ignored" },
+    { key: "spam", label: "Spam" },
   ];
+
+  /* ── Triage summary counts (computed from current messages when showing All) ── */
+  const triageCounts = useMemo(() => {
+    if (triageFilter !== "") return null; // Only show counts in "All" view
+    const counts: Record<string, number> = {};
+    for (const m of messages) {
+      const s = m.triage_status || "pending";
+      counts[s] = (counts[s] || 0) + 1;
+    }
+    return counts;
+  }, [messages, triageFilter]);
 
   return (
     <FeatureGate flag="email" label="Email">
@@ -282,7 +350,45 @@ export default function EmailPage() {
           </div>
 
           {/* Message list */}
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 flex-1 space-y-3">
+            {/* Triage summary banner */}
+            {triageCounts && messages.length > 0 && (
+              <div className="flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-2.5">
+                <span className="text-sm font-medium text-slate-700">
+                  {messages.length} messages
+                </span>
+                <span className="text-slate-300">|</span>
+                {(triageCounts.pending ?? 0) > 0 && (
+                  <span className="flex items-center gap-1.5 text-xs font-medium text-amber-700">
+                    <Clock className="h-3.5 w-3.5" />
+                    {triageCounts.pending} pending
+                  </span>
+                )}
+                {(triageCounts.needs_review ?? 0) > 0 && (
+                  <span className="flex items-center gap-1.5 text-xs font-medium text-orange-700">
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                    {triageCounts.needs_review} needs review
+                  </span>
+                )}
+                {(triageCounts.triaged ?? 0) > 0 && (
+                  <span className="flex items-center gap-1.5 text-xs font-medium text-blue-600">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    {triageCounts.triaged} triaged
+                  </span>
+                )}
+                {(triageCounts.actioned ?? 0) > 0 && (
+                  <span className="text-xs text-green-600">
+                    {triageCounts.actioned} actioned
+                  </span>
+                )}
+                {(triageCounts.spam ?? 0) > 0 && (
+                  <span className="text-xs text-red-500">
+                    {triageCounts.spam} spam
+                  </span>
+                )}
+              </div>
+            )}
+
             {loading ? (
               <p className="py-8 text-center text-sm text-slate-500">
                 Loading messages...
@@ -293,7 +399,9 @@ export default function EmailPage() {
               </p>
             ) : (
               <div className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">
-                {messages.map((msg) => (
+                {messages.map((msg) => {
+                  const priority = inferPriority(msg);
+                  return (
                   <div
                     key={msg.id}
                     className={cn(
@@ -301,6 +409,17 @@ export default function EmailPage() {
                       !msg.is_read && "bg-blue-50/50",
                     )}
                   >
+                    {/* Priority dot */}
+                    <div className="flex shrink-0 pt-1.5">
+                      {priority ? (
+                        <span
+                          className={cn("h-2 w-2 rounded-full", PRIORITY_DOT[priority] ?? "bg-slate-300")}
+                          title={priority}
+                        />
+                      ) : (
+                        <span className="h-2 w-2" />
+                      )}
+                    </div>
                     <div className="min-w-0 flex-1">
                       <Link
                         href={`/email/${msg.id}?account=${msg.email_account_id}`}
@@ -317,11 +436,16 @@ export default function EmailPage() {
                           >
                             {msg.sender_name || msg.sender_email}
                           </span>
-                          {msg.triage_status !== "pending" ? (
-                            <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
-                              {msg.triage_status}
+                          {msg.triage_status && msg.triage_status !== "pending" && (
+                            <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-medium", triageStatusBadge(msg.triage_status))}>
+                              {msg.triage_status.replace("_", " ")}
                             </span>
-                          ) : null}
+                          )}
+                          {msg.triage_category && (
+                            <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-medium", triageCategoryBadge(msg.triage_category))}>
+                              {msg.triage_category.replace("_", " ")}
+                            </span>
+                          )}
                           {msg.has_attachments ? (
                             <span className="text-xs text-slate-400">📎</span>
                           ) : null}
@@ -367,7 +491,8 @@ export default function EmailPage() {
                       </div>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
