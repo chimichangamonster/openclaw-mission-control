@@ -69,6 +69,174 @@ class TestSimplePdf:
         result = generate_simple_pdf(title="Empty Doc", sections=[])
         assert result[:5] == b"%PDF-"
 
+    def test_with_accent_color(self):
+        """Custom accent color produces valid PDF."""
+        result = generate_simple_pdf(
+            title="Branded Report",
+            sections=[{"heading": "Test", "content": "Content"}],
+            accent_color="#e74c3c",
+        )
+        assert result[:5] == b"%PDF-"
+        assert len(result) > 100
+
+    def test_with_logo_png(self, tmp_path: Path):
+        """Logo image is embedded in PDF header."""
+        # Create a minimal 1x1 red PNG
+        import struct
+        import zlib
+
+        def _make_png() -> bytes:
+            sig = b"\x89PNG\r\n\x1a\n"
+            ihdr_data = struct.pack(">IIBBBBB", 1, 1, 8, 2, 0, 0, 0)
+            ihdr_crc = zlib.crc32(b"IHDR" + ihdr_data) & 0xFFFFFFFF
+            ihdr = struct.pack(">I", 13) + b"IHDR" + ihdr_data + struct.pack(">I", ihdr_crc)
+            raw = zlib.compress(b"\x00\xff\x00\x00")
+            idat_crc = zlib.crc32(b"IDAT" + raw) & 0xFFFFFFFF
+            idat = struct.pack(">I", len(raw)) + b"IDAT" + raw + struct.pack(">I", idat_crc)
+            iend_crc = zlib.crc32(b"IEND") & 0xFFFFFFFF
+            iend = struct.pack(">I", 0) + b"IEND" + struct.pack(">I", iend_crc)
+            return sig + ihdr + idat + iend
+
+        logo_file = tmp_path / "logo.png"
+        logo_file.write_bytes(_make_png())
+
+        result = generate_simple_pdf(
+            title="Logo Report",
+            sections=[{"heading": "Overview", "content": "Details here."}],
+            company={"name": "Acme Corp", "email": "info@acme.com"},
+            logo_path=str(logo_file),
+        )
+        assert result[:5] == b"%PDF-"
+        # PDF with logo should be larger than without
+        no_logo = generate_simple_pdf(
+            title="Logo Report",
+            sections=[{"heading": "Overview", "content": "Details here."}],
+        )
+        assert len(result) > len(no_logo)
+
+    def test_with_missing_logo(self):
+        """Missing logo path is silently skipped."""
+        result = generate_simple_pdf(
+            title="Missing Logo",
+            sections=[{"heading": "Test", "content": "Content"}],
+            logo_path="/nonexistent/logo.png",
+        )
+        assert result[:5] == b"%PDF-"
+
+    def test_svg_logo_skipped(self, tmp_path: Path):
+        """SVG logos are skipped (reportlab can't render them)."""
+        svg_file = tmp_path / "logo.svg"
+        svg_file.write_text('<svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>')
+        result = generate_simple_pdf(
+            title="SVG Skip",
+            sections=[{"heading": "Test", "content": "Content"}],
+            logo_path=str(svg_file),
+        )
+        assert result[:5] == b"%PDF-"
+
+    def test_with_generated_date(self):
+        """Custom date string appears in output."""
+        result = generate_simple_pdf(
+            title="Dated Report",
+            sections=[{"heading": "Test", "content": "Content"}],
+            generated_date="April 10, 2026",
+        )
+        assert result[:5] == b"%PDF-"
+        assert len(result) > 100
+
+    def test_full_branding(self, tmp_path: Path):
+        """All branding options combined produce valid PDF."""
+        import struct
+        import zlib
+
+        def _make_png() -> bytes:
+            sig = b"\x89PNG\r\n\x1a\n"
+            ihdr_data = struct.pack(">IIBBBBB", 1, 1, 8, 2, 0, 0, 0)
+            ihdr_crc = zlib.crc32(b"IHDR" + ihdr_data) & 0xFFFFFFFF
+            ihdr = struct.pack(">I", 13) + b"IHDR" + ihdr_data + struct.pack(">I", ihdr_crc)
+            raw = zlib.compress(b"\x00\xff\x00\x00")
+            idat_crc = zlib.crc32(b"IDAT" + raw) & 0xFFFFFFFF
+            idat = struct.pack(">I", len(raw)) + b"IDAT" + raw + struct.pack(">I", idat_crc)
+            iend_crc = zlib.crc32(b"IEND") & 0xFFFFFFFF
+            iend = struct.pack(">I", 0) + b"IEND" + struct.pack(">I", iend_crc)
+            return sig + ihdr + idat + iend
+
+        logo_file = tmp_path / "logo.png"
+        logo_file.write_bytes(_make_png())
+
+        result = generate_simple_pdf(
+            title="Full Branded Report",
+            sections=[
+                {"heading": "Summary", "content": "Executive summary content."},
+                {
+                    "heading": "Data",
+                    "content": [
+                        {"Metric": "Revenue", "Value": "$100K"},
+                        {"Metric": "Costs", "Value": "$60K"},
+                    ],
+                },
+            ],
+            company={"name": "Waste Gurus", "email": "info@wastegurus.ca"},
+            logo_path=str(logo_file),
+            accent_color="#2ecc71",
+            generated_date="April 10, 2026",
+        )
+        assert result[:5] == b"%PDF-"
+        assert len(result) > 500
+
+
+# ---------------------------------------------------------------------------
+# Helper functions
+# ---------------------------------------------------------------------------
+
+
+class TestHelperFunctions:
+    """Tests for PDF branding helper functions."""
+
+    def test_lighten_hex(self):
+        from app.services.document_gen import _lighten_hex
+
+        # Very light tint of dark blue
+        result = _lighten_hex("#1a1a2e", 0.95)
+        assert result.startswith("#")
+        assert len(result) == 7
+        # Should be much lighter (closer to white)
+        r = int(result[1:3], 16)
+        assert r > 200  # near white
+
+    def test_lighten_hex_black(self):
+        from app.services.document_gen import _lighten_hex
+
+        result = _lighten_hex("#000000", 0.95)
+        r, g, b = int(result[1:3], 16), int(result[3:5], 16), int(result[5:7], 16)
+        assert r == g == b  # should be uniform gray near white
+        assert r > 240
+
+    def test_format_company_lines_full(self):
+        from app.services.document_gen import _format_company_lines
+
+        result = _format_company_lines({"name": "Acme", "address": "123 Main St", "email": "hi@acme.com"})
+        assert "Acme" in result
+        assert "123 Main St" in result
+        assert "hi@acme.com" in result
+        assert " | " in result
+
+    def test_format_company_lines_empty(self):
+        from app.services.document_gen import _format_company_lines
+
+        assert _format_company_lines(None) == ""
+        assert _format_company_lines({}) == ""
+
+    def test_load_logo_image_none(self):
+        from app.services.document_gen import _load_logo_image
+
+        assert _load_logo_image(None) is None
+
+    def test_load_logo_image_missing(self):
+        from app.services.document_gen import _load_logo_image
+
+        assert _load_logo_image("/nonexistent/path.png") is None
+
 
 # ---------------------------------------------------------------------------
 # Template rendering

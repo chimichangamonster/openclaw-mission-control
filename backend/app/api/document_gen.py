@@ -44,6 +44,7 @@ class SimpleDocRequest(BaseModel):
     company: dict[str, str] | None = None
     filename: str = Field(default="document.pdf", description="Output filename")
     page_size: str = Field(default="letter", pattern="^(letter|a4)$")
+    org_id: str | None = Field(default=None, description="Organization ID — auto-resolves logo and accent color")
 
 
 class ComplexDocRequest(BaseModel):
@@ -90,6 +91,63 @@ async def _get_adobe_credentials(org_id) -> tuple[str, str] | None:
         return (env_id, env_secret)
 
     return None
+
+
+async def _resolve_org_branding(org_id_str: str | None) -> dict[str, str | None]:
+    """Resolve logo absolute path and accent color from org settings.
+
+    Returns dict with keys: logo_path, accent_color, company_name.
+    All values may be None if org not found or no branding configured.
+    """
+    if not org_id_str:
+        return {"logo_path": None, "accent_color": None, "company_name": None}
+
+    try:
+        from uuid import UUID
+
+        from sqlmodel import select as sel
+
+        from app.models.organizations import Organization
+
+        oid = UUID(org_id_str)
+    except (ValueError, TypeError):
+        logger.warning("document_gen.invalid_org_id org_id=%s", org_id_str)
+        return {"logo_path": None, "accent_color": None, "company_name": None}
+
+    async with async_session_maker() as session:
+        # Get org settings for branding
+        result = await session.execute(
+            sel(OrganizationSettings).where(OrganizationSettings.organization_id == oid)
+        )
+        org_settings = result.scalars().first()
+
+        # Get org name
+        org_result = await session.execute(
+            sel(Organization).where(Organization.id == oid)
+        )
+        org = org_result.scalars().first()
+
+    branding = org_settings.branding if org_settings else {}
+    logo_rel = branding.get("logo_path")
+    accent = branding.get("primary_color")
+    company_name = org.name if org else None
+
+    # Resolve logo relative path to absolute
+    logo_abs = None
+    if logo_rel:
+        workspace = settings.gateway_workspaces_root or settings.gateway_workspace_path
+        if workspace:
+            candidate = Path(workspace) / logo_rel
+            if candidate.exists():
+                logo_abs = str(candidate)
+            else:
+                logger.info("document_gen.logo_file_missing path=%s", candidate)
+
+    return {
+        "logo_path": logo_abs,
+        "accent_color": accent,
+        "company_name": company_name,
+    }
 
 
 def _save_to_workspace(content: bytes, filename: str, extension: str) -> str:
@@ -219,18 +277,35 @@ async def generate_simple(
     body: SimpleDocRequest,
     token: str = Query(..., description="Auth token"),
 ):
-    """Generate a simple PDF using reportlab (tables, text, basic formatting)."""
+    """Generate a simple PDF using reportlab (tables, text, basic formatting).
+
+    When ``org_id`` is provided in the request body, the endpoint auto-resolves
+    the organization's logo and accent color from branding settings so agents
+    don't need to pass them manually.
+    """
     if token != settings.local_auth_token:
         raise HTTPException(status_code=401, detail="Invalid token")
 
     from app.services.document_gen import generate_simple_pdf
 
+    # Auto-resolve branding when org_id is provided
+    branding = await _resolve_org_branding(body.org_id)
+    logo_path = branding["logo_path"]
+    accent_color = branding["accent_color"] or "#1a1a2e"
+
+    # Merge org name into company dict if not already provided
+    company = body.company or {}
+    if branding["company_name"] and not company.get("name"):
+        company["name"] = branding["company_name"]
+
     sections = [s.model_dump() for s in body.sections]
     pdf_bytes = generate_simple_pdf(
         title=body.title,
         sections=sections,
-        company=body.company,
+        company=company or None,
         page_size=body.page_size,
+        logo_path=logo_path,
+        accent_color=accent_color,
     )
 
     relative_path = _save_to_workspace(pdf_bytes, body.filename, ".pdf")
