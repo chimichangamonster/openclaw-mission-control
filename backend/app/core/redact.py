@@ -13,9 +13,10 @@ Usage:
 
 from __future__ import annotations
 
+import json
 import re
 from enum import Enum
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
 from app.core.logging import get_logger
 
@@ -96,7 +97,8 @@ _FINANCIAL_PATTERNS: list[tuple[re.Pattern, str, str]] = [
 
 _PII_PATTERNS: list[tuple[re.Pattern, str, str]] = [
     # Phone numbers (North American + international)
-    (re.compile(r"\b(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b"),
+    # Negative lookbehind for '.' prevents matching decimal numbers like GPS coords
+    (re.compile(r"(?<!\d\.)(?<!\d)\b(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b(?!\.\d)"),
      "[REDACTED_PHONE]", "phone"),
 
     # Email addresses (within body text, not sender/recipient headers)
@@ -195,6 +197,16 @@ def redact_sensitive(
 
 # Patterns for pentest/security data that should never reach an LLM
 _PENTEST_PATTERNS: list[tuple[re.Pattern, str, str]] = [
+    # GPS coordinates — must come before IP/phone patterns to prevent false matches
+    # Matches lat,lon pairs like "53.590542, -113.522905" or "53.590542/-113.522905"
+    (re.compile(r"-?\d{1,3}\.\d{4,8}\s*[,/]\s*-?\d{1,3}\.\d{4,8}"),
+     "gps_coordinates", "GPS coordinates"),
+
+    # Database connection strings — must come before IP/hostname patterns
+    # so the whole URL is redacted before IP regex strips the embedded address
+    (re.compile(r"(?:mongodb|mysql|postgres(?:ql)?|mssql|redis|amqp)://[^\s\"']+@[^\s\"']+", re.IGNORECASE),
+     "db_connection_string", "database connection string"),
+
     # MAC addresses — must come before IPv6 (MACs look like short IPv6)
     (re.compile(r"\b(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}\b"),
      "mac_address", "MAC address"),
@@ -219,8 +231,18 @@ _PENTEST_PATTERNS: list[tuple[re.Pattern, str, str]] = [
     (re.compile(r"\b[a-zA-Z0-9-]+\.(?:local|internal|corp|lan|home|intranet)\b", re.IGNORECASE),
      "internal_host", "internal hostname"),
 
+    # Hostnames in keyword context (Hostname: X, Computer Name: X, NetBIOS: X)
+    (re.compile(r"(?:hostname|computer\s*name|netbios\s*name|device\s*name)\s*[:=]\s*[\"']?([A-Za-z0-9][A-Za-z0-9._-]{2,})[\"']?", re.IGNORECASE),
+     "hostname_context", "hostname"),
+
+    # Windows-style hostnames: uppercase + digits + hyphens, 8+ chars (e.g. W482CAD-LNWZ77E6BDD4FB0)
+    # Only match when ALL-CAPS with digits mixed in (avoids false positives on normal words)
+    (re.compile(r"\b[A-Z][A-Z0-9]{2,}-[A-Z0-9]{4,}\b"),
+     "windows_hostname", "Windows hostname"),
+
     # SSIDs in common pentest output patterns
-    (re.compile(r'(?:SSID|ESSID|network)\s*[:=]\s*["\']?([^\s"\']+)["\']?', re.IGNORECASE),
+    # \b prefix prevents matching tail of "BSSID:" as "B" + "SSID:"
+    (re.compile(r'\b(?:E?SSID|network)\s*[:=]\s*["\']?([^\s"\']+)["\']?', re.IGNORECASE),
      "ssid", "WiFi SSID"),
 
     # WiFi PSK / WPA passwords in tool output
@@ -242,10 +264,6 @@ _PENTEST_PATTERNS: list[tuple[re.Pattern, str, str]] = [
     # SSH private keys (PEM blocks)
     (re.compile(r"-----BEGIN (?:RSA |OPENSSH |EC |ED25519 |DSA )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |OPENSSH |EC |ED25519 |DSA )?PRIVATE KEY-----"),
      "ssh_private_key", "SSH private key"),
-
-    # Database connection strings with embedded credentials
-    (re.compile(r"(?:mongodb|mysql|postgres(?:ql)?|mssql|redis|amqp)://[^\s\"']+@[^\s\"']+", re.IGNORECASE),
-     "db_connection_string", "database connection string"),
 
     # Kerberos ticket blobs (krb5 base64, typically from klist or ticket exports)
     (re.compile(r"\bkrb(?:tgt|5cc|5_)\S{20,}\b", re.IGNORECASE),
@@ -309,6 +327,9 @@ class RedactionVault:
 
         Applies both standard credential/financial patterns (one-way, not rehydratable)
         and pentest-specific patterns (reversible via rehydrate()).
+
+        Uses null-byte placeholders (\x00TAG\x00) during replacement to prevent
+        later regex patterns from matching inside earlier replacement tags.
         """
         if not text:
             return text
@@ -318,11 +339,12 @@ class RedactionVault:
         text = result.text
 
         # Second pass: reversible redaction of pentest-specific data
+        # Use \x00-delimited placeholders to prevent nested tag corruption
         for pattern, category, label in _PENTEST_PATTERNS:
             for match in pattern.finditer(text):
                 original = match.group(0)
-                # Skip if already redacted by first pass
-                if original.startswith("[REDACTED"):
+                # Skip if already redacted by first pass or contains a placeholder
+                if original.startswith("[REDACTED") or "\x00" in original:
                     continue
                 # Reuse existing tag if we've seen this exact value before
                 existing_tag = None
@@ -334,9 +356,47 @@ class RedactionVault:
                 if not existing_tag:
                     self._store[tag] = original
                     self._labels[tag] = label
-                text = text.replace(original, tag)
+                # Use null-byte wrapper so subsequent regexes skip placeholders
+                text = text.replace(original, f"\x00{tag}\x00")
+
+        # Final pass: strip null-byte wrappers to produce clean [TAG_N] output
+        text = text.replace("\x00", "")
 
         return text
+
+    def redact_json(self, data: str | dict | list) -> str | dict | list:
+        """Redact pentest-sensitive data from JSON structures.
+
+        Parses JSON (if string), recursively walks all string values,
+        redacts each individually, then returns the same structure.
+        Avoids regex issues with JSON escaping and structural context.
+
+        Args:
+            data: JSON string, dict, or list to redact.
+
+        Returns:
+            Same type as input with string values redacted.
+        """
+        if isinstance(data, str):
+            try:
+                parsed = json.loads(data)
+            except (json.JSONDecodeError, TypeError):
+                # Not valid JSON — fall back to plain text redaction
+                return self.redact(data)
+            result = self._walk_and_redact(parsed)
+            return json.dumps(result)
+        return self._walk_and_redact(data)
+
+    def _walk_and_redact(self, obj: Any) -> Any:
+        """Recursively walk a parsed JSON structure, redacting string values."""
+        if isinstance(obj, str):
+            return self.redact(obj)
+        if isinstance(obj, dict):
+            return {k: self._walk_and_redact(v) for k, v in obj.items()}
+        if isinstance(obj, list):
+            return [self._walk_and_redact(item) for item in obj]
+        # Numbers, bools, None — pass through unchanged
+        return obj
 
     def rehydrate(self, text: str) -> str:
         """Replace placeholder tags with original values in LLM-generated text."""

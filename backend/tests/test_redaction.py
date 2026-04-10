@@ -379,6 +379,332 @@ Lateral: ACME\\svc.backup has access to file server"""
         assert "Welcome2ACME!" in rehydrated
 
 
+class TestGPSNotMatchedAsPhone:
+    """Bug 1: GPS coordinates should not be matched as phone numbers."""
+
+    def test_gps_longitude_not_phone(self):
+        """GPS longitude like -113.5229053 should not become [REDACTED_PHONE]."""
+        text = "Location: 53.590542, -113.522905"
+        result = redact_sensitive(text, level=RedactionLevel.STRICT)
+        assert "[REDACTED_PHONE]" not in result.text
+
+    def test_gps_coordinates_redacted_in_vault(self):
+        """GPS coordinate pairs should be caught by the vault's GPS pattern."""
+        text = "GPS fix: 53.590542, -113.522905"
+        vault = RedactionVault()
+        redacted = vault.redact(text)
+        assert "53.590542" not in redacted
+        assert "-113.522905" not in redacted
+        assert "[GPS_COORDINATES_" in redacted
+        rehydrated = vault.rehydrate(redacted)
+        assert "53.590542" in rehydrated
+
+    def test_gps_slash_separator(self):
+        text = "Position: 53.590542/-113.522905"
+        vault = RedactionVault()
+        redacted = vault.redact(text)
+        assert "53.590542" not in redacted
+
+    def test_real_phone_still_redacted(self):
+        """Actual phone numbers should still be caught."""
+        text = "Call 403-555-1234"
+        result = redact_sensitive(text, level=RedactionLevel.STRICT)
+        assert "[REDACTED_PHONE]" in result.text
+
+
+class TestBSSIDNotCorrupted:
+    """Bug 2: BSSID: should not be parsed as B + SSID:."""
+
+    def test_bssid_not_split(self):
+        """BSSID: AA:BB:CC:DD:EE:FF should redact the MAC, not the SSID."""
+        text = "BSSID: AA:BB:CC:DD:EE:FF"
+        vault = RedactionVault()
+        redacted = vault.redact(text)
+        # The MAC should be redacted
+        assert "AA:BB:CC:DD:EE:FF" not in redacted
+        # There should be no orphaned 'B' — BSSID label stays intact
+        assert "B[SSID_" not in redacted
+        assert "BSSID:" in redacted
+
+    def test_ssid_still_redacted(self):
+        """Regular SSID: patterns still work."""
+        text = "SSID: MyHomeWiFi"
+        vault = RedactionVault()
+        redacted = vault.redact(text)
+        assert "MyHomeWiFi" not in redacted
+
+    def test_essid_still_redacted(self):
+        text = "ESSID: CorpNet-5G"
+        vault = RedactionVault()
+        redacted = vault.redact(text)
+        assert "CorpNet-5G" not in redacted
+
+    def test_bssid_with_ssid_both_handled(self):
+        """Line with both BSSID and SSID — no corruption."""
+        text = "BSSID: AA:BB:CC:DD:EE:FF  SSID: CorpWiFi"
+        vault = RedactionVault()
+        redacted = vault.redact(text)
+        assert "AA:BB:CC:DD:EE:FF" not in redacted
+        assert "CorpWiFi" not in redacted
+        # No nested tag corruption
+        assert "B[" not in redacted
+
+
+class TestHostnameRedaction:
+    """Bug 3: Generic hostnames should be caught."""
+
+    def test_windows_hostname(self):
+        """Windows machine names like W482CAD-LNWZ77E6BDD4FB0."""
+        text = "Host: W482CAD-LNWZ77E6BDD4FB0"
+        vault = RedactionVault()
+        redacted = vault.redact(text)
+        assert "W482CAD-LNWZ77E6BDD4FB0" not in redacted
+
+    def test_hostname_in_context(self):
+        """Hostname: keyword provides context."""
+        text = "Hostname: pi-pentest"
+        vault = RedactionVault()
+        redacted = vault.redact(text)
+        assert "pi-pentest" not in redacted
+
+    def test_computer_name_context(self):
+        text = "Computer Name: CORP-DC01"
+        vault = RedactionVault()
+        redacted = vault.redact(text)
+        assert "CORP-DC01" not in redacted
+
+    def test_netbios_name_context(self):
+        text = "NetBIOS Name: FILESERVER01"
+        vault = RedactionVault()
+        redacted = vault.redact(text)
+        assert "FILESERVER01" not in redacted
+
+    def test_normal_words_not_caught(self):
+        """Regular English words should not be caught by hostname patterns."""
+        text = "The server was running normally"
+        vault = RedactionVault()
+        redacted = vault.redact(text)
+        # "server" and "running" should not be redacted
+        assert "server" in redacted
+        assert "running" in redacted
+
+
+class TestNestedTagCorruption:
+    """Bug 4: Regex replacement should not corrupt earlier tags."""
+
+    def test_no_nested_brackets(self):
+        """Tags from earlier patterns should not be re-matched by later ones."""
+        # BSSID + SSID on same line — the MAC tag should not be eaten by SSID regex
+        text = "BSSID: AA:BB:CC:DD:EE:FF  SSID: TestNet"
+        vault = RedactionVault()
+        redacted = vault.redact(text)
+        # No nested tags like [SSID_[MAC_ADDRESS_1]]
+        import re as _re
+        nested = _re.findall(r"\[[A-Z_]+\[", redacted)
+        assert nested == [], f"Found nested tags: {nested}"
+
+    def test_ip_in_ssid_context_no_corruption(self):
+        """IP address followed by SSID context should produce clean tags."""
+        text = "network: 192.168.1.0 SSID: HomeNet"
+        vault = RedactionVault()
+        redacted = vault.redact(text)
+        # Both should be independently redacted
+        assert "192.168.1.0" not in redacted
+        assert "HomeNet" not in redacted
+        # No null bytes left over
+        assert "\x00" not in redacted
+
+    def test_multiple_pattern_types_clean(self):
+        """Mix of IPs, MACs, SSIDs, hostnames should produce clean output."""
+        text = "Host dc01.corp.local (192.168.1.1) MAC AA:BB:CC:DD:EE:FF SSID: Corp"
+        vault = RedactionVault()
+        redacted = vault.redact(text)
+        assert "\x00" not in redacted
+        # All sensitive values gone
+        assert "dc01.corp.local" not in redacted
+        assert "192.168.1.1" not in redacted
+        assert "AA:BB:CC:DD:EE:FF" not in redacted
+        assert "Corp" not in redacted
+        # Rehydration works
+        rehydrated = vault.rehydrate(redacted)
+        assert "192.168.1.1" in rehydrated
+        assert "AA:BB:CC:DD:EE:FF" in rehydrated
+
+
+class TestJSONAwareRedaction:
+    """Bug 5: JSON scan results should be parsed and redacted field-by-field."""
+
+    def test_json_string_input(self):
+        """JSON string gets parsed, values redacted, re-serialized."""
+        import json
+        data = json.dumps({
+            "target": "192.168.1.100",
+            "ssid": "SSID: CorpWiFi",
+            "mac": "AA:BB:CC:DD:EE:FF",
+            "port": 22,
+            "open": True,
+        })
+        vault = RedactionVault()
+        result = vault.redact_json(data)
+        assert isinstance(result, str)
+        parsed = json.loads(result)
+        assert "192.168.1.100" not in parsed["target"]
+        assert "CorpWiFi" not in parsed["ssid"]
+        assert "AA:BB:CC:DD:EE:FF" not in parsed["mac"]
+        # Non-string values pass through
+        assert parsed["port"] == 22
+        assert parsed["open"] is True
+
+    def test_json_dict_input(self):
+        """Dict input gets walked directly (no parse step)."""
+        data = {"host": "10.0.0.5", "info": "clean"}
+        vault = RedactionVault()
+        result = vault.redact_json(data)
+        assert isinstance(result, dict)
+        assert "10.0.0.5" not in result["host"]
+
+    def test_json_nested_structure(self):
+        """Deeply nested JSON structures get redacted recursively."""
+        import json
+        data = {
+            "scan": {
+                "hosts": [
+                    {"ip": "192.168.1.1", "mac": "AA:BB:CC:DD:EE:FF"},
+                    {"ip": "192.168.1.2", "mac": "11:22:33:44:55:66"},
+                ],
+                "metadata": {"location": "53.5905, -113.5229"}
+            }
+        }
+        vault = RedactionVault()
+        result = vault.redact_json(data)
+        assert "192.168.1.1" not in json.dumps(result)
+        assert "AA:BB:CC:DD:EE:FF" not in json.dumps(result)
+        assert "192.168.1.2" not in json.dumps(result)
+        # Rehydration via serialized form
+        rehydrated = vault.rehydrate(json.dumps(result))
+        assert "192.168.1.1" in rehydrated
+        assert "AA:BB:CC:DD:EE:FF" in rehydrated
+
+    def test_json_list_input(self):
+        """List input gets walked."""
+        data = [{"ip": "10.0.0.1"}, {"ip": "10.0.0.2"}]
+        vault = RedactionVault()
+        result = vault.redact_json(data)
+        assert isinstance(result, list)
+        assert "10.0.0.1" not in str(result)
+
+    def test_invalid_json_falls_back(self):
+        """Non-JSON string falls back to plain text redaction."""
+        text = "Target: 192.168.1.100 is vulnerable"
+        vault = RedactionVault()
+        result = vault.redact_json(text)
+        assert isinstance(result, str)
+        assert "192.168.1.100" not in result
+
+    def test_json_with_escaped_values(self):
+        """JSON with escaped quotes in values still gets redacted."""
+        import json
+        data = json.dumps({"note": 'SSID: "CorpNet-5G" found'})
+        vault = RedactionVault()
+        result = vault.redact_json(data)
+        parsed = json.loads(result)
+        assert "CorpNet-5G" not in parsed["note"]
+
+
+class TestRealisticScanOutput:
+    """End-to-end tests against realistic pentest scan output."""
+
+    def test_full_scan_no_false_positives(self):
+        """Real bedroom scan data: GPS, BSSIDs, SSIDs, IPs — no corruption."""
+        text = """WiFi scan results:
+BSSID: AA:BB:CC:DD:EE:FF  SSID: HomeNet-5G  Signal: -45dBm
+BSSID: 11:22:33:44:55:66  SSID: NeighborWiFi  Signal: -72dBm
+GPS: 53.590542, -113.522905
+Device: W482CAD-LNWZ77E6BDD4FB0
+Hostname: pi-pentest
+Gateway: 192.168.1.1
+Client: 192.168.1.71"""
+        vault = RedactionVault()
+        redacted = vault.redact(text)
+        # All sensitive data gone
+        assert "AA:BB:CC:DD:EE:FF" not in redacted
+        assert "HomeNet-5G" not in redacted
+        assert "11:22:33:44:55:66" not in redacted
+        assert "NeighborWiFi" not in redacted
+        assert "53.590542" not in redacted
+        assert "-113.522905" not in redacted
+        assert "W482CAD-LNWZ77E6BDD4FB0" not in redacted
+        assert "pi-pentest" not in redacted
+        assert "192.168.1.1" not in redacted
+        assert "192.168.1.71" not in redacted
+        # No corruption
+        assert "\x00" not in redacted
+        assert "B[" not in redacted
+        assert "[REDACTED_PHONE]" not in redacted
+        # Structure preserved
+        assert "WiFi scan results:" in redacted
+        assert "Signal: -45dBm" in redacted
+        # Full roundtrip
+        rehydrated = vault.rehydrate(redacted)
+        assert "AA:BB:CC:DD:EE:FF" in rehydrated
+        assert "192.168.1.1" in rehydrated
+        assert "53.590542" in rehydrated
+
+    def test_nmap_output(self):
+        """Nmap-style scan output gets properly redacted."""
+        text = """Nmap scan report for 192.168.1.41
+Host is up (0.0023s latency).
+Hostname: W482CAD-LNWZ77E6BDD4FB0
+MAC Address: AA:BB:CC:DD:EE:FF (Intel Corporate)
+22/tcp   open  ssh
+80/tcp   open  http
+445/tcp  open  microsoft-ds
+OS: Windows 10 Build 19041"""
+        vault = RedactionVault()
+        redacted = vault.redact(text)
+        assert "192.168.1.41" not in redacted
+        assert "W482CAD-LNWZ77E6BDD4FB0" not in redacted
+        assert "AA:BB:CC:DD:EE:FF" not in redacted
+        # Service info preserved
+        assert "22/tcp" in redacted
+        assert "ssh" in redacted
+        assert "microsoft-ds" in redacted
+
+    def test_json_scan_results(self):
+        """JSON scan payload gets field-level redaction."""
+        import json
+        data = json.dumps({
+            "scan_type": "wifi",
+            "results": [
+                {
+                    "bssid": "AA:BB:CC:DD:EE:FF",
+                    "ssid": "SSID: CorpWiFi-5G",
+                    "signal": -45,
+                    "channel": 36,
+                },
+                {
+                    "bssid": "11:22:33:44:55:66",
+                    "ssid": "ESSID: GuestNet",
+                    "signal": -72,
+                    "channel": 1,
+                },
+            ],
+            "gps": "53.590542, -113.522905",
+            "target_ip": "192.168.1.1",
+        })
+        vault = RedactionVault()
+        result = vault.redact_json(data)
+        parsed = json.loads(result)
+        # MACs redacted
+        assert "AA:BB:CC:DD:EE:FF" not in json.dumps(parsed)
+        # SSIDs redacted (with keyword context in value)
+        assert "CorpWiFi-5G" not in json.dumps(parsed)
+        assert "GuestNet" not in json.dumps(parsed)
+        # Numeric values preserved
+        assert parsed["results"][0]["signal"] == -45
+        assert parsed["results"][0]["channel"] == 36
+
+
 class TestDataPolicy:
     """Per-org data policy defaults."""
 
