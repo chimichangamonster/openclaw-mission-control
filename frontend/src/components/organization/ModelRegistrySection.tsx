@@ -192,7 +192,7 @@ export function ModelRegistrySection({ isAdmin }: Props) {
                 </p>
                 <div className="space-y-3">
                   {PIN_KEYS.map(({ key, label, description }) => (
-                    <div key={key} className="grid grid-cols-3 gap-3 items-start">
+                    <div key={key} className="space-y-1.5 sm:grid sm:grid-cols-3 sm:gap-3 sm:space-y-0 sm:items-start">
                       <div>
                         <div className="text-xs font-medium text-slate-700">{label}</div>
                         <div className="text-[10px] text-slate-400">{description}</div>
@@ -200,7 +200,7 @@ export function ModelRegistrySection({ isAdmin }: Props) {
                       <select
                         value={pins[key] || ""}
                         onChange={(e) => handlePinChange(key, e.target.value)}
-                        className="col-span-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                        className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400 sm:col-span-2"
                       >
                         <option value="">Latest (unpinned)</option>
                         {configuredModels.map((m) => (
