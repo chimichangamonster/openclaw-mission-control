@@ -45,6 +45,11 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
       - name: Install backend dependencies
         run: make backend-sync
 
@@ -172,6 +177,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "22"
+
+      - name: Set up Bun for installer smoke tests
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
 
       - name: Start PostgreSQL for macOS installer smoke test
         if: ${{ matrix.run_macos_local_smoke_test }}
@@ -331,6 +341,11 @@ jobs:
           node-version: "22"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
 
       - name: Install frontend dependencies
         run: make frontend-sync
