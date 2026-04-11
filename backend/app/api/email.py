@@ -165,7 +165,7 @@ async def delete_email_account(
     account = await _get_account_or_404(account_id, ctx, session)
 
     # Delete attachments for this account's messages
-    msg_ids_stmt = select(EmailMessage.id).where(EmailMessage.email_account_id == account.id)
+    msg_ids_stmt = select(EmailMessage.id).where(EmailMessage.email_account_id == account.id)  # type: ignore[call-overload]
     from sqlalchemy import delete as sa_delete
 
     await session.execute(

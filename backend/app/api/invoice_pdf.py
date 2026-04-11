@@ -39,7 +39,7 @@ async def list_invoices(
     async with async_session_maker() as session:
         result = await session.execute(
             select(BkInvoice, BkClient.name)
-            .join(BkClient, BkInvoice.client_id == BkClient.id)
+            .join(BkClient, BkInvoice.client_id == BkClient.id)  # type: ignore[arg-type]
             .where(BkInvoice.organization_id == ctx.organization.id)
             .order_by(BkInvoice.created_at.desc())  # type: ignore[attr-defined]
         )

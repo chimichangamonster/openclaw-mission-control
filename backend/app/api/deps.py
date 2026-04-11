@@ -19,7 +19,7 @@ of re-implementing permission checks in the router.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Callable, Literal
+from typing import TYPE_CHECKING, Any, Callable, Literal
 from uuid import UUID
 
 from fastapi import Depends, HTTPException, Request, status

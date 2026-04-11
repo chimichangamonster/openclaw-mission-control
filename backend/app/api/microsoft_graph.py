@@ -86,7 +86,7 @@ async def oauth_callback(
         )
     client.delete(f"msgraph_oauth_state:{state}")
 
-    state_data = json.loads(raw_state if isinstance(raw_state, str) else raw_state.decode())
+    state_data = json.loads(raw_state if isinstance(raw_state, str) else raw_state.decode())  # type: ignore[union-attr]
     user_id = state_data["user_id"]
     organization_id = state_data["organization_id"]
 

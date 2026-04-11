@@ -63,9 +63,13 @@ async def get_live_feed(
     now_ms = datetime.now(UTC).timestamp() * 1000
     sessions = []
 
-    for s in (
-        sessions_data if isinstance(sessions_data, list) else sessions_data.get("sessions", [])
-    ):
+    if isinstance(sessions_data, list):
+        session_list = sessions_data
+    elif isinstance(sessions_data, dict):
+        session_list = sessions_data.get("sessions", [])
+    else:
+        session_list = []
+    for s in session_list:
         key = s.get("key", "")
         if "heartbeat" in key or "mc-gateway" in key:
             continue  # Skip internal sessions

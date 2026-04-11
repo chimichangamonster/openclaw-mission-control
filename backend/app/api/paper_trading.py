@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import Date, cast, func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.api.deps import (
+from app.api.deps import (  # type: ignore[attr-defined]
     ORG_RATE_LIMIT_DEP,
     PORTFOLIO_DEP,
     get_session,

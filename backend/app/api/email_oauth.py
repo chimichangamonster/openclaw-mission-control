@@ -89,7 +89,7 @@ async def oauth_callback(
         )
     client.delete(f"email_oauth_state:{state}")
 
-    state_data = json.loads(raw_state if isinstance(raw_state, str) else raw_state.decode())
+    state_data = json.loads(raw_state if isinstance(raw_state, str) else raw_state.decode())  # type: ignore[union-attr]
     if state_data.get("provider") != provider:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

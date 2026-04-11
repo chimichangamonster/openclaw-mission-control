@@ -434,7 +434,7 @@ async def create_approval(
     if approval.status == "pending":
         reason = ""
         if isinstance(payload.payload, dict):
-            reason = payload.payload.get("reason", "") or payload.payload.get("description", "")
+            reason = str(payload.payload.get("reason") or payload.payload.get("description") or "")
         agent_name = "Unknown"
         if payload.agent_id:
             agent = await session.get(Agent, payload.agent_id)

@@ -106,7 +106,7 @@ async def agent_list_email_accounts(
         select(EmailAccount)
         .where(
             EmailAccount.organization_id == board.organization_id,  # type: ignore[arg-type]
-            EmailAccount.sync_enabled == True,  # noqa: E712  # type: ignore[arg-type]
+            EmailAccount.sync_enabled.is_(True),  # type: ignore[attr-defined]
             EmailAccount.visibility == "shared",  # type: ignore[arg-type]
         )
         .order_by(EmailAccount.created_at.desc())  # type: ignore[attr-defined]
@@ -136,7 +136,7 @@ async def agent_list_email_messages(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
 
     # Only include messages from shared (non-private) accounts
-    shared_account_ids = select(EmailAccount.id).where(
+    shared_account_ids = select(EmailAccount.id).where(  # type: ignore[call-overload]
         EmailAccount.organization_id == board.organization_id,
         EmailAccount.visibility == "shared",
     )

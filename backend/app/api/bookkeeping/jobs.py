@@ -127,7 +127,7 @@ async def get_job_costs(job_id: str, org_ctx: OrganizationContext = ORG_ACTOR_DE
         # Labour costs from timesheets + placements
         ts_result = await session.execute(
             select(BkTimesheet, BkPlacement)
-            .join(BkPlacement, BkTimesheet.placement_id == BkPlacement.id, isouter=True)
+            .join(BkPlacement, BkTimesheet.placement_id == BkPlacement.id, isouter=True)  # type: ignore[arg-type]
             .where(BkTimesheet.job_id == job_id, BkTimesheet.organization_id == org_id)
         )
         labour_cost = 0.0

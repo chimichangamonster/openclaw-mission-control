@@ -434,7 +434,7 @@ class RedactionVault:
 
         return text
 
-    def redact_json(self, data: str | dict | list[Any]) -> str | dict | list[Any]:
+    def redact_json(self, data: str | dict[str, Any] | list[Any]) -> str | dict[str, Any] | list[Any]:
         """Redact pentest-sensitive data from JSON structures.
 
         Parses JSON (if string), recursively walks all string values,

@@ -81,7 +81,7 @@ async def margin_report(
     async with async_session_maker() as session:
         stmt = (
             select(BkTimesheet, BkPlacement)
-            .join(BkPlacement, BkTimesheet.placement_id == BkPlacement.id)
+            .join(BkPlacement, BkTimesheet.placement_id == BkPlacement.id)  # type: ignore[arg-type]
             .where(BkTimesheet.organization_id == org_id)
         )
         if from_date:
