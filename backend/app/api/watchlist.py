@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.api.deps import (
+from app.api.deps import (  # type: ignore[attr-defined]
     ORG_RATE_LIMIT_DEP,
     PORTFOLIO_DEP,
     get_session,
@@ -248,7 +248,7 @@ async def watchlist_summary(
             WatchlistItem.portfolio_id == portfolio.id,  # type: ignore[arg-type]
             WatchlistItem.status == "alerting",  # type: ignore[arg-type]
         )
-        .order_by(WatchlistItem.rsi.asc())
+        .order_by(WatchlistItem.rsi.asc())  # type: ignore[union-attr]
     )
     alerts = (await session.execute(alert_stmt)).scalars().all()
 

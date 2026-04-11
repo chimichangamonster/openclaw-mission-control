@@ -73,7 +73,7 @@ class DocumentResponse(BaseModel):
     onedrive_edit_url: str | None = None
 
 
-async def _get_adobe_credentials(org_id: UUID) -> tuple[str, str] | None:
+async def _get_adobe_credentials(org_id: UUID | None) -> tuple[str, str] | None:
     """Retrieve Adobe PDF Services credentials for the org, falling back to platform env."""
     async with async_session_maker() as session:
         result = await session.execute(
@@ -698,7 +698,7 @@ async def list_generated_documents(
     stmt = (
         select(GeneratedDocument)
         .where(
-            (GeneratedDocument.organization_id == ctx.organization.id)
+            (col(GeneratedDocument.organization_id) == ctx.organization.id)
             | (col(GeneratedDocument.organization_id).is_(None))
         )
         .order_by(col(GeneratedDocument.created_at).desc())

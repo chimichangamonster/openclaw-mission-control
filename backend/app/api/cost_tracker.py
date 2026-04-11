@@ -638,7 +638,7 @@ async def get_agent_spend(
     async with async_session_maker() as session:
         stmt = select(DailyAgentSpend).where(
             DailyAgentSpend.organization_id == org_id,
-            DailyAgentSpend.date >= text(f"CURRENT_DATE - INTERVAL '{days} days'"),
+            DailyAgentSpend.date >= text(f"CURRENT_DATE - INTERVAL '{days} days'"),  # type: ignore[operator]
         )
         if agent:
             stmt = stmt.where(DailyAgentSpend.agent_name == agent)
@@ -677,7 +677,7 @@ async def get_error_log(
         stmt = (
             select(ActivityEvent)
             .where(ActivityEvent.event_type.startswith("system.error"))
-            .order_by(sa_desc(ActivityEvent.created_at))
+            .order_by(sa_desc(ActivityEvent.created_at))  # type: ignore[arg-type]
             .limit(min(limit, 100))
         )
         result = await session.execute(stmt)
@@ -706,7 +706,7 @@ async def clear_error_log() -> Any:
         result = await session.execute(stmt)
         await session.commit()
 
-    return {"cleared": result.rowcount}
+    return {"cleared": result.rowcount}  # type: ignore[attr-defined]
 
 
 # ─── Cost Estimate ───────────────────────────────────────────────────────────

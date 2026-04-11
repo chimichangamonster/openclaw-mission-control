@@ -102,7 +102,7 @@ def generate_simple_pdf(
         spaceAfter=6,
         spaceBefore=16,
         fontName="Helvetica-Bold",
-        borderPadding=(0, 0, 2, 0),
+        borderPadding=(0, 0, 2, 0),  # type: ignore[arg-type]
     )
     normal_style = ParagraphStyle(
         "DocNormal",
