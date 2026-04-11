@@ -124,14 +124,14 @@ async def agent_list_proposals(
     stmt = (
         select(TradeProposal)
         .where(
-            TradeProposal.organization_id == org_id,
-            TradeProposal.agent_id == agent.id,
+            TradeProposal.organization_id == org_id,  # type: ignore[arg-type]
+            TradeProposal.agent_id == agent.id,  # type: ignore[arg-type]
         )
-        .order_by(TradeProposal.created_at.desc())
+        .order_by(TradeProposal.created_at.desc())  # type: ignore[attr-defined]
         .limit(limit)
     )
     if proposal_status:
-        stmt = stmt.where(TradeProposal.status == proposal_status)
+        stmt = stmt.where(TradeProposal.status == proposal_status)  # type: ignore[arg-type]
     result = await session.execute(stmt)
     return list(result.scalars().all())
 
@@ -150,8 +150,8 @@ async def agent_list_positions(
     org_id = await _get_org_id(agent_ctx, session)
     stmt = (
         select(PolymarketPosition)
-        .where(PolymarketPosition.organization_id == org_id)
-        .order_by(PolymarketPosition.created_at.desc())
+        .where(PolymarketPosition.organization_id == org_id)  # type: ignore[arg-type]
+        .order_by(PolymarketPosition.created_at.desc())  # type: ignore[attr-defined]
     )
     result = await session.execute(stmt)
     return list(result.scalars().all())

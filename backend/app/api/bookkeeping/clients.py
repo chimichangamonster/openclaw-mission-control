@@ -1,6 +1,9 @@
 """Bookkeeping clients CRUD."""
 
+
 from __future__ import annotations
+
+from typing import Any
 
 from uuid import uuid4
 
@@ -38,7 +41,7 @@ class ClientUpdate(BaseModel):
 
 
 @router.post("", status_code=201)
-async def create_client(payload: ClientCreate, org_ctx: OrganizationContext = ORG_ACTOR_DEP):
+async def create_client(payload: ClientCreate, org_ctx: OrganizationContext = ORG_ACTOR_DEP) -> Any:
     async with async_session_maker() as session:
         client = BkClient(
             id=uuid4(),
@@ -60,7 +63,7 @@ async def create_client(payload: ClientCreate, org_ctx: OrganizationContext = OR
 
 
 @router.get("")
-async def list_clients(org_ctx: OrganizationContext = ORG_ACTOR_DEP):
+async def list_clients(org_ctx: OrganizationContext = ORG_ACTOR_DEP) -> Any:
     async with async_session_maker() as session:
         result = await session.execute(
             select(BkClient)
@@ -71,7 +74,7 @@ async def list_clients(org_ctx: OrganizationContext = ORG_ACTOR_DEP):
 
 
 @router.get("/{client_id}")
-async def get_client(client_id: str, org_ctx: OrganizationContext = ORG_ACTOR_DEP):
+async def get_client(client_id: str, org_ctx: OrganizationContext = ORG_ACTOR_DEP) -> Any:
     async with async_session_maker() as session:
         result = await session.execute(
             select(BkClient).where(
@@ -87,7 +90,7 @@ async def get_client(client_id: str, org_ctx: OrganizationContext = ORG_ACTOR_DE
 @router.put("/{client_id}")
 async def update_client(
     client_id: str, payload: ClientUpdate, org_ctx: OrganizationContext = ORG_ACTOR_DEP
-):
+) -> Any:
     async with async_session_maker() as session:
         result = await session.execute(
             select(BkClient).where(
@@ -106,7 +109,7 @@ async def update_client(
         return _serialize(client)
 
 
-def _serialize(c: BkClient) -> dict:
+def _serialize(c: BkClient) -> dict[str, Any]:
     return {
         "id": str(c.id),
         "name": c.name,

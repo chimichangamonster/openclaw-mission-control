@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from datetime import date, datetime
-from typing import Optional
+from typing import Any, Optional
 from uuid import UUID, uuid4
 
 from sqlmodel import Field
@@ -56,8 +56,8 @@ class BkWorker(TenantScoped, table=True):
     updated_at: datetime = Field(default_factory=utcnow)
 
     @property
-    def safety_certs(self) -> list[dict]:
-        return json.loads(self.safety_certs_json)
+    def safety_certs(self) -> list[dict[str, Any]]:
+        return json.loads(self.safety_certs_json)  # type: ignore[no-any-return]
 
 
 class BkJob(TenantScoped, table=True):
@@ -141,8 +141,8 @@ class BkExpense(TenantScoped, table=True):
     updated_at: datetime = Field(default_factory=utcnow)
 
     @property
-    def ocr_data(self) -> dict:
-        return json.loads(self.ocr_data_json)
+    def ocr_data(self) -> dict[str, Any]:
+        return json.loads(self.ocr_data_json)  # type: ignore[no-any-return]
 
 
 class BkInvoice(TenantScoped, table=True):

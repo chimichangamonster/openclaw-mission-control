@@ -1,6 +1,9 @@
 """Per-organization settings — BYOK keys, feature flags, model config, branding."""
 
+
 from __future__ import annotations
+
+from typing import Any
 
 import json
 from datetime import datetime
@@ -91,24 +94,24 @@ class OrganizationSettings(QueryModel, table=True):
 
     @property
     def configured_models(self) -> list[str]:
-        return json.loads(self.configured_models_json)
+        return json.loads(self.configured_models_json)  # type: ignore[no-any-return]
 
     @property
     def model_pins(self) -> dict[str, str]:
-        return json.loads(self.model_pins_json)
+        return json.loads(self.model_pins_json)  # type: ignore[no-any-return]
 
     @property
-    def agent_defaults(self) -> dict:
-        return json.loads(self.agent_defaults_json)
+    def agent_defaults(self) -> dict[str, Any]:
+        return json.loads(self.agent_defaults_json)  # type: ignore[no-any-return]
 
     @property
-    def custom_llm_endpoint(self) -> dict:
-        return json.loads(self.custom_llm_endpoint_json)
+    def custom_llm_endpoint(self) -> dict[str, Any]:
+        return json.loads(self.custom_llm_endpoint_json)  # type: ignore[no-any-return]
 
     @property
-    def data_policy(self) -> dict:
-        return json.loads(self.data_policy_json)
+    def data_policy(self) -> dict[str, Any]:
+        return json.loads(self.data_policy_json)  # type: ignore[no-any-return]
 
     @property
-    def branding(self) -> dict:
-        return json.loads(self.branding_json)
+    def branding(self) -> dict[str, Any]:
+        return json.loads(self.branding_json)  # type: ignore[no-any-return]

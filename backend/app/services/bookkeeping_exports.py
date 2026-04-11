@@ -133,14 +133,14 @@ def generate_expense_summary(expenses: list[dict[str, Any]]) -> dict[str, Any]:
         cat = e.get("category") or "uncategorized"
         if cat not in by_category:
             by_category[cat] = {"count": 0, "total": 0.0, "gst": 0.0}
-        by_category[cat]["count"] += 1  # type: ignore[operator]
+        by_category[cat]["count"] += 1
         by_category[cat]["total"] += amt
         by_category[cat]["gst"] += gst
 
         job = str(e.get("job_id") or "unassigned")
         if job not in by_job:
             by_job[job] = {"count": 0, "total": 0.0, "gst": 0.0}
-        by_job[job]["count"] += 1  # type: ignore[operator]
+        by_job[job]["count"] += 1
         by_job[job]["total"] += amt
         by_job[job]["gst"] += gst
 

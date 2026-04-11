@@ -11,3 +11,6 @@ requirements-dev.txt
 
 # Generated for orval input (avoid needing a running backend/DB).
 openapi.json
+
+# Scratch files from mypy cleanup scripts (see scripts/fix_*.py)
+mypy.log.tmp

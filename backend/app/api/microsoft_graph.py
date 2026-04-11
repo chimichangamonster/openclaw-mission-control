@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import secrets
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal, overload
 from uuid import uuid4
 
 import redis
@@ -492,6 +492,24 @@ async def list_outlook_calendars(
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+@overload
+async def _get_connection(
+    session: AsyncSession,
+    org_id: Any,
+    *,
+    require: Literal[True],
+) -> MicrosoftConnection: ...
+
+
+@overload
+async def _get_connection(
+    session: AsyncSession,
+    org_id: Any,
+    *,
+    require: bool = ...,
+) -> MicrosoftConnection | None: ...
 
 
 async def _get_connection(

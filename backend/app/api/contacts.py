@@ -38,7 +38,7 @@ async def list_contacts(
     """List contacts for the current organization."""
     stmt = (
         select(OrgContact)
-        .where(OrgContact.organization_id == ctx.organization.id)
+        .where(OrgContact.organization_id == ctx.organization.id)  # type: ignore[arg-type]
         .order_by(OrgContact.name, OrgContact.email)
         .offset(offset)
         .limit(limit)
@@ -55,7 +55,7 @@ async def list_contacts(
             )
         )
     if source:
-        stmt = stmt.where(OrgContact.source == source)
+        stmt = stmt.where(OrgContact.source == source)  # type: ignore[arg-type]
     result = await session.execute(stmt)
     return list(result.scalars().all())
 
@@ -71,8 +71,8 @@ async def create_contact(
     existing = (
         await session.execute(
             select(OrgContact).where(
-                OrgContact.organization_id == ctx.organization.id,
-                OrgContact.email == payload.email.lower(),
+                OrgContact.organization_id == ctx.organization.id,  # type: ignore[arg-type]
+                OrgContact.email == payload.email.lower(),  # type: ignore[arg-type]
             )
         )
     ).scalar_one_or_none()

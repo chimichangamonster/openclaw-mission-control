@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
 from app.core.logging import get_logger
 from app.services.email.token_manager import get_valid_access_token
@@ -39,7 +39,7 @@ async def handle_email_approval_resolution(
         logger.warning("email.approval.unknown_action", extra={"action": action})
 
 
-async def _execute_email_reply(session: AsyncSession, payload: dict) -> None:
+async def _execute_email_reply(session: AsyncSession, payload: dict[str, Any]) -> None:
     """Send the approved email reply."""
     from sqlmodel import select
 
@@ -71,9 +71,9 @@ async def _execute_email_reply(session: AsyncSession, payload: dict) -> None:
     access_token = await get_valid_access_token(session, account)
 
     if account.provider == "zoho":
-        from app.services.email.providers.zoho import send_message
+        from app.services.email.providers.zoho import send_message as zoho_send_message
 
-        await send_message(
+        await zoho_send_message(
             access_token,
             account.provider_account_id or "",
             to=msg.sender_email,
@@ -82,9 +82,9 @@ async def _execute_email_reply(session: AsyncSession, payload: dict) -> None:
             in_reply_to=msg.provider_message_id,
         )
     elif account.provider == "microsoft":
-        from app.services.email.providers.microsoft import send_message
+        from app.services.email.providers.microsoft import send_message as msft_send_message
 
-        await send_message(
+        await msft_send_message(
             access_token,
             to=msg.sender_email,
             subject=f"Re: {msg.subject or ''}",
@@ -102,7 +102,7 @@ async def _execute_email_reply(session: AsyncSession, payload: dict) -> None:
     )
 
 
-async def _execute_email_forward(session: AsyncSession, payload: dict) -> None:
+async def _execute_email_forward(session: AsyncSession, payload: dict[str, Any]) -> None:
     """Send the approved email forward."""
     # Similar to reply but with forward_to address
     logger.info("email.approval.forward_not_implemented")

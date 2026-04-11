@@ -1,6 +1,9 @@
 """Bookkeeping placements — assign workers to jobs with bill/pay rates."""
 
+
 from __future__ import annotations
+
+from typing import Any
 
 from datetime import date
 from uuid import uuid4
@@ -28,7 +31,7 @@ class PlacementCreate(BaseModel):
 
 
 @router.post("", status_code=201)
-async def create_placement(payload: PlacementCreate, org_ctx: OrganizationContext = ORG_ACTOR_DEP):
+async def create_placement(payload: PlacementCreate, org_ctx: OrganizationContext = ORG_ACTOR_DEP) -> Any:
     org_id = org_ctx.organization.id
     async with async_session_maker() as session:
         placement = BkPlacement(
@@ -67,7 +70,7 @@ async def list_placements(
     job_id: str | None = None,
     worker_id: str | None = None,
     org_ctx: OrganizationContext = ORG_ACTOR_DEP,
-):
+) -> Any:
     async with async_session_maker() as session:
         stmt = select(BkPlacement).where(BkPlacement.organization_id == org_ctx.organization.id)
         if status:
@@ -76,13 +79,13 @@ async def list_placements(
             stmt = stmt.where(BkPlacement.job_id == job_id)
         if worker_id:
             stmt = stmt.where(BkPlacement.worker_id == worker_id)
-        stmt = stmt.order_by(BkPlacement.created_at.desc())  # type: ignore[union-attr]
+        stmt = stmt.order_by(BkPlacement.created_at.desc())  # type: ignore[attr-defined]
         result = await session.execute(stmt)
         return [_serialize(p) for p in result.scalars().all()]
 
 
 @router.get("/{placement_id}")
-async def get_placement(placement_id: str, org_ctx: OrganizationContext = ORG_ACTOR_DEP):
+async def get_placement(placement_id: str, org_ctx: OrganizationContext = ORG_ACTOR_DEP) -> Any:
     async with async_session_maker() as session:
         result = await session.execute(
             select(BkPlacement).where(
@@ -97,7 +100,7 @@ async def get_placement(placement_id: str, org_ctx: OrganizationContext = ORG_AC
 
 
 @router.put("/{placement_id}/end")
-async def end_placement(placement_id: str, org_ctx: OrganizationContext = ORG_ACTOR_DEP):
+async def end_placement(placement_id: str, org_ctx: OrganizationContext = ORG_ACTOR_DEP) -> Any:
     """Mark a placement as completed and set worker back to available if no other active placements."""
     org_id = org_ctx.organization.id
     async with async_session_maker() as session:
@@ -139,7 +142,7 @@ async def end_placement(placement_id: str, org_ctx: OrganizationContext = ORG_AC
         return _serialize(placement)
 
 
-def _serialize(p: BkPlacement) -> dict:
+def _serialize(p: BkPlacement) -> dict[str, Any]:
     return {
         "id": str(p.id),
         "worker_id": str(p.worker_id),

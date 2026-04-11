@@ -34,7 +34,7 @@ async def store_wallet(
 
     from sqlalchemy import select
 
-    stmt = select(PolymarketWallet).where(PolymarketWallet.organization_id == org_id)
+    stmt = select(PolymarketWallet).where(PolymarketWallet.organization_id == org_id)  # type: ignore[arg-type]
     existing = (await session.execute(stmt)).scalar_one_or_none()
 
     now = utcnow()
@@ -61,7 +61,7 @@ async def store_wallet(
 
     session.add(wallet)
     await session.flush()
-    return wallet
+    return wallet  # type: ignore[no-any-return]
 
 
 async def derive_api_credentials(

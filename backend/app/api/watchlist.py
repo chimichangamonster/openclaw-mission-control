@@ -1,6 +1,9 @@
 """Watchlist API — CRUD for tracked tickers from research reports."""
 
+
 from __future__ import annotations
+
+from typing import Any
 
 from uuid import UUID
 
@@ -29,7 +32,7 @@ router = APIRouter(
 )
 
 
-def _item_to_dict(item: WatchlistItem) -> dict:
+def _item_to_dict(item: WatchlistItem) -> dict[str, Any]:
     return {
         "id": str(item.id),
         "portfolio_id": str(item.portfolio_id),
@@ -61,13 +64,13 @@ async def list_watchlist(
     session: AsyncSession = Depends(get_session),
     portfolio: PaperPortfolio = PORTFOLIO_DEP,
     status_filter: str = Query("watching", alias="status"),
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     stmt = select(WatchlistItem).where(
-        WatchlistItem.portfolio_id == portfolio.id,
+        WatchlistItem.portfolio_id == portfolio.id,  # type: ignore[arg-type]
     )
     if status_filter != "all":
-        stmt = stmt.where(WatchlistItem.status == status_filter)
-    stmt = stmt.order_by(WatchlistItem.symbol.asc())
+        stmt = stmt.where(WatchlistItem.status == status_filter)  # type: ignore[arg-type]
+    stmt = stmt.order_by(WatchlistItem.symbol.asc())  # type: ignore[attr-defined]
 
     items = (await session.execute(stmt)).scalars().all()
     return [_item_to_dict(i) for i in items]
@@ -88,13 +91,13 @@ async def add_watchlist_item(
     expected_low: float | None = None,
     expected_high: float | None = None,
     notes: str | None = None,
-) -> dict:
+) -> dict[str, Any]:
     # Verify portfolio exists
     portfolio = (
         await session.execute(
             select(PaperPortfolio).where(
-                PaperPortfolio.id == portfolio_id,
-                PaperPortfolio.organization_id == org_ctx.organization.id,
+                PaperPortfolio.id == portfolio_id,  # type: ignore[arg-type]
+                PaperPortfolio.organization_id == org_ctx.organization.id,  # type: ignore[arg-type]
             )
         )
     ).scalar_one_or_none()
@@ -105,9 +108,9 @@ async def add_watchlist_item(
     existing = (
         await session.execute(
             select(WatchlistItem).where(
-                WatchlistItem.portfolio_id == portfolio_id,
-                WatchlistItem.symbol == symbol,
-                WatchlistItem.status.in_(["watching", "alerting"]),
+                WatchlistItem.portfolio_id == portfolio_id,  # type: ignore[arg-type]
+                WatchlistItem.symbol == symbol,  # type: ignore[arg-type]
+                WatchlistItem.status.in_(["watching", "alerting"]),  # type: ignore[attr-defined]
             )
         )
     ).scalar_one_or_none()
@@ -149,10 +152,10 @@ async def update_watchlist_item(
     report_rating: str | None = None,
     expected_low: float | None = None,
     expected_high: float | None = None,
-) -> dict:
+) -> dict[str, Any]:
     stmt = select(WatchlistItem).where(
-        WatchlistItem.id == item_id,
-        WatchlistItem.portfolio_id == portfolio.id,
+        WatchlistItem.id == item_id,  # type: ignore[arg-type]
+        WatchlistItem.portfolio_id == portfolio.id,  # type: ignore[arg-type]
     )
     item = (await session.execute(stmt)).scalar_one_or_none()
     if not item:
@@ -194,8 +197,8 @@ async def remove_watchlist_item(
     portfolio: PaperPortfolio = PORTFOLIO_DEP,
 ) -> None:
     stmt = select(WatchlistItem).where(
-        WatchlistItem.id == item_id,
-        WatchlistItem.portfolio_id == portfolio.id,
+        WatchlistItem.id == item_id,  # type: ignore[arg-type]
+        WatchlistItem.portfolio_id == portfolio.id,  # type: ignore[arg-type]
     )
     item = (await session.execute(stmt)).scalar_one_or_none()
     if not item:
@@ -209,13 +212,13 @@ async def remove_watchlist_item(
 async def watchlist_summary(
     session: AsyncSession = Depends(get_session),
     portfolio: PaperPortfolio = PORTFOLIO_DEP,
-) -> dict:
+) -> dict[str, Any]:
     """Quick summary: counts by status, any active alerts."""
     watching = (
         await session.execute(
             select(func.count()).where(
-                WatchlistItem.portfolio_id == portfolio.id,
-                WatchlistItem.status == "watching",
+                WatchlistItem.portfolio_id == portfolio.id,  # type: ignore[arg-type]
+                WatchlistItem.status == "watching",  # type: ignore[arg-type]
             )
         )
     ).scalar() or 0
@@ -223,8 +226,8 @@ async def watchlist_summary(
     alerting = (
         await session.execute(
             select(func.count()).where(
-                WatchlistItem.portfolio_id == portfolio.id,
-                WatchlistItem.status == "alerting",
+                WatchlistItem.portfolio_id == portfolio.id,  # type: ignore[arg-type]
+                WatchlistItem.status == "alerting",  # type: ignore[arg-type]
             )
         )
     ).scalar() or 0
@@ -232,8 +235,8 @@ async def watchlist_summary(
     bought = (
         await session.execute(
             select(func.count()).where(
-                WatchlistItem.portfolio_id == portfolio.id,
-                WatchlistItem.status == "bought",
+                WatchlistItem.portfolio_id == portfolio.id,  # type: ignore[arg-type]
+                WatchlistItem.status == "bought",  # type: ignore[arg-type]
             )
         )
     ).scalar() or 0
@@ -242,8 +245,8 @@ async def watchlist_summary(
     alert_stmt = (
         select(WatchlistItem)
         .where(
-            WatchlistItem.portfolio_id == portfolio.id,
-            WatchlistItem.status == "alerting",
+            WatchlistItem.portfolio_id == portfolio.id,  # type: ignore[arg-type]
+            WatchlistItem.status == "alerting",  # type: ignore[arg-type]
         )
         .order_by(WatchlistItem.rsi.asc())
     )
@@ -261,17 +264,17 @@ async def watchlist_summary(
 @router.post("/portfolios/{portfolio_id}/items/bulk", status_code=201)
 async def bulk_add_watchlist(
     portfolio_id: UUID,
-    items: list[dict],
+    items: list[dict[str, Any]],
     session: AsyncSession = Depends(get_session),
     org_ctx: OrganizationContext = Depends(require_org_member),
-) -> dict:
+) -> dict[str, Any]:
     """Bulk add watchlist items from a report scan."""
     # Verify portfolio
     portfolio = (
         await session.execute(
             select(PaperPortfolio).where(
-                PaperPortfolio.id == portfolio_id,
-                PaperPortfolio.organization_id == org_ctx.organization.id,
+                PaperPortfolio.id == portfolio_id,  # type: ignore[arg-type]
+                PaperPortfolio.organization_id == org_ctx.organization.id,  # type: ignore[arg-type]
             )
         )
     ).scalar_one_or_none()
@@ -286,9 +289,9 @@ async def bulk_add_watchlist(
         existing = (
             await session.execute(
                 select(WatchlistItem).where(
-                    WatchlistItem.portfolio_id == portfolio_id,
+                    WatchlistItem.portfolio_id == portfolio_id,  # type: ignore[arg-type]
                     WatchlistItem.symbol == symbol,
-                    WatchlistItem.status.in_(["watching", "alerting"]),
+                    WatchlistItem.status.in_(["watching", "alerting"]),  # type: ignore[attr-defined]
                 )
             )
         ).scalar_one_or_none()

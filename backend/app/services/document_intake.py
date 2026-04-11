@@ -6,7 +6,11 @@ Processes uploaded documents (PDF, images, text) through:
 3. LLM-based classification into document types
 """
 
+
 from __future__ import annotations
+
+from typing import Any
+from uuid import UUID
 
 import base64
 import io
@@ -73,8 +77,8 @@ async def extract_text_from_pdf(file_bytes: bytes) -> str:
 async def extract_text_from_image(
     file_bytes: bytes,
     content_type: str,
-    org_id,
-    db_session,
+    org_id: UUID,
+    db_session: Any,
 ) -> str:
     """Extract text from an image using LLM vision API."""
     import httpx
@@ -117,14 +121,14 @@ async def extract_text_from_image(
         )
         resp.raise_for_status()
         data = resp.json()
-        return data["choices"][0]["message"]["content"]
+        return data["choices"][0]["message"]["content"]  # type: ignore[no-any-return]
 
 
 async def classify_document(
     text: str,
-    org_id,
-    db_session,
-) -> dict:
+    org_id: UUID,
+    db_session: Any,
+) -> dict[str, Any]:
     """Classify a document using LLM based on extracted text."""
     import httpx
 
@@ -166,16 +170,16 @@ async def classify_document(
             DocumentType(result["type"])
         except ValueError:
             result["type"] = "other"
-        return result
+        return result  # type: ignore[no-any-return]
 
 
 async def process_document(
     file_bytes: bytes,
     filename: str,
     content_type: str,
-    org_id,
-    db_session,
-) -> dict:
+    org_id: UUID,
+    db_session: Any,
+) -> dict[str, Any]:
     """Full intake pipeline: extract text, sanitize, classify.
 
     Args:

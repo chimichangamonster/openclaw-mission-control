@@ -41,7 +41,7 @@ async def list_invoices(
             select(BkInvoice, BkClient.name)
             .join(BkClient, BkInvoice.client_id == BkClient.id)
             .where(BkInvoice.organization_id == ctx.organization.id)
-            .order_by(BkInvoice.created_at.desc())  # type: ignore[union-attr]
+            .order_by(BkInvoice.created_at.desc())  # type: ignore[attr-defined]
         )
         return [
             {
@@ -95,7 +95,7 @@ async def get_invoice_pdf(
         lines_result = await session.execute(
             select(BkInvoiceLine)
             .where(BkInvoiceLine.invoice_id == invoice.id)
-            .order_by(BkInvoiceLine.created_at)
+            .order_by(BkInvoiceLine.created_at)  # type: ignore[arg-type]
         )
         lines = lines_result.scalars().all()
 

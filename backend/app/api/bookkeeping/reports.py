@@ -1,6 +1,9 @@
 """Bookkeeping reports — daily snapshot, margin analysis, worker performance."""
 
+
 from __future__ import annotations
+
+from typing import Any
 
 from datetime import date
 
@@ -19,7 +22,7 @@ router = APIRouter(prefix="/reports")
 async def daily_report(
     report_date: date = Query(alias="date", default=None),
     org_ctx: OrganizationContext = ORG_ACTOR_DEP,
-):
+) -> Any:
     """Daily snapshot: hours by job, expenses by job, total workers."""
     d = report_date or date.today()
     org_id = org_ctx.organization.id
@@ -34,7 +37,7 @@ async def daily_report(
         )
         timesheets = ts_result.scalars().all()
 
-        hours_by_job: dict[str, dict] = {}
+        hours_by_job: dict[str, dict[str, Any]] = {}
         workers_today = set()
         for ts in timesheets:
             jid = str(ts.job_id)
@@ -71,7 +74,7 @@ async def margin_report(
     from_date: date | None = Query(default=None, alias="from"),
     to_date: date | None = Query(default=None, alias="to"),
     org_ctx: OrganizationContext = ORG_ACTOR_DEP,
-):
+) -> Any:
     """Margin analysis by job: bill vs pay rates, margin $, margin %."""
     org_id = org_ctx.organization.id
 
@@ -82,13 +85,13 @@ async def margin_report(
             .where(BkTimesheet.organization_id == org_id)
         )
         if from_date:
-            stmt = stmt.where(BkTimesheet.work_date >= from_date)  # type: ignore[operator]
+            stmt = stmt.where(BkTimesheet.work_date >= from_date)
         if to_date:
-            stmt = stmt.where(BkTimesheet.work_date <= to_date)  # type: ignore[operator]
+            stmt = stmt.where(BkTimesheet.work_date <= to_date)
 
         result = await session.execute(stmt)
 
-        by_job: dict[str, dict] = {}
+        by_job: dict[str, dict[str, Any]] = {}
         for ts, pl in result.all():
             jid = str(ts.job_id)
             if jid not in by_job:
@@ -122,21 +125,21 @@ async def worker_report(
     from_date: date | None = Query(default=None, alias="from"),
     to_date: date | None = Query(default=None, alias="to"),
     org_ctx: OrganizationContext = ORG_ACTOR_DEP,
-):
+) -> Any:
     """Worker performance: jobs worked, total hours, days worked."""
     org_id = org_ctx.organization.id
 
     async with async_session_maker() as session:
         stmt = select(BkTimesheet).where(BkTimesheet.organization_id == org_id)
         if from_date:
-            stmt = stmt.where(BkTimesheet.work_date >= from_date)  # type: ignore[operator]
+            stmt = stmt.where(BkTimesheet.work_date >= from_date)
         if to_date:
-            stmt = stmt.where(BkTimesheet.work_date <= to_date)  # type: ignore[operator]
+            stmt = stmt.where(BkTimesheet.work_date <= to_date)
 
         result = await session.execute(stmt)
         timesheets = result.scalars().all()
 
-        by_worker: dict[str, dict] = {}
+        by_worker: dict[str, dict[str, Any]] = {}
         for ts in timesheets:
             wid = str(ts.worker_id)
             if wid not in by_worker:

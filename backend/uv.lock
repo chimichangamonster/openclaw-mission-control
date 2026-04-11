@@ -1555,6 +1555,7 @@ dev = [
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
     { name = "ruff" },
+    { name = "types-reportlab" },
 ]
 
 [package.metadata]
@@ -1594,6 +1595,7 @@ requires-dist = [
     { name = "sqlalchemy", extras = ["asyncio"], specifier = "==2.0.46" },
     { name = "sqlmodel", specifier = "==0.0.32" },
     { name = "sse-starlette", specifier = "==3.2.0" },
+    { name = "types-reportlab", marker = "extra == 'dev'", specifier = ">=4.4" },
     { name = "uvicorn", extras = ["standard"], specifier = "==0.40.0" },
     { name = "websockets", specifier = "==16.0" },
 ]
@@ -2707,6 +2709,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/11/d6/114b492226588d6ff54579d95847662fc69196bdeec318eb45393b24c192/toolz-1.1.0.tar.gz", hash = "sha256:27a5c770d068c110d9ed9323f24f1543e83b2f300a687b7891c1a6d56b697b5b", size = 52613, upload-time = "2025-10-17T04:03:21.661Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/fb/12/5911ae3eeec47800503a238d971e51722ccea5feb8569b735184d5fcdbc0/toolz-1.1.0-py3-none-any.whl", hash = "sha256:15ccc861ac51c53696de0a5d6d4607f99c210739caf987b5d2054f3efed429d8", size = 58093, upload-time = "2025-10-17T04:03:20.435Z" },
+]
+
+[[package]]
+name = "types-reportlab"
+version = "4.4.10.20260408"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/70/b0/f386850507df2350c75c41a1ec6c48b9f961291438d2a4547a2c5f3fd2b2/types_reportlab-4.4.10.20260408.tar.gz", hash = "sha256:89021b00a7748fe948af91f939497420c5bf8f96048f8ea6cce6844ca26eea13", size = 71734, upload-time = "2026-04-08T04:31:18.842Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f2/76/70ec172660f79c09a1454e76a815146824f2b246ba4be716f94d771e2bb1/types_reportlab-4.4.10.20260408-py3-none-any.whl", hash = "sha256:ae7635b66963d89928333a6a0f7c47109a1ffc9cbd26689f15f592c3ba958b34", size = 112766, upload-time = "2026-04-08T04:31:17.753Z" },
 ]
 
 [[package]]

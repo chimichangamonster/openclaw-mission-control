@@ -219,7 +219,7 @@ def generate_simple_pdf(
                 elements.append(t)
                 elements.append(Spacer(1, 0.12 * inch))
 
-    def _draw_footer(canvas_obj, doc_obj):
+    def _draw_footer(canvas_obj: Any, doc_obj: Any) -> None:
         """Draw page number footer on every page."""
         canvas_obj.saveState()
         # Footer line
@@ -372,7 +372,7 @@ async def generate_complex_pdf_adobe(
 
     result_asset = response.get_result().get_asset()
     stream_asset = pdf_services.get_content(result_asset)
-    return stream_asset.get_input_stream()
+    return stream_asset.get_input_stream()  # type: ignore[no-any-return]
 
 
 async def generate_complex_pdf_fallback(html_content: str) -> bytes:

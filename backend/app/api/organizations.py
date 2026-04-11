@@ -738,7 +738,7 @@ async def accept_org_invite(
 async def list_org_domains(
     session: "AsyncSession" = Depends(get_session),
     ctx: Any = Depends(require_org_admin),
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     result = await session.exec(
         select(OrganizationDomain).where(
             col(OrganizationDomain.organization_id) == ctx.member.organization_id,
@@ -758,10 +758,10 @@ async def list_org_domains(
 
 @router.post("/me/domains", status_code=201, summary="Claim a domain for auto-assignment")
 async def add_org_domain(
-    body: dict,
+    body: dict[str, Any],
     session: "AsyncSession" = Depends(get_session),
     ctx: Any = Depends(require_org_admin),
-) -> dict:
+) -> dict[str, Any]:
     domain = body.get("domain", "").strip().lower()
     if not domain or "@" in domain or "." not in domain:
         raise HTTPException(status_code=400, detail="Invalid domain format")

@@ -115,8 +115,8 @@ async def oauth_callback(
 
     stmt = select(EmailAccount).where(
         EmailAccount.organization_id == organization_id,
-        EmailAccount.provider == provider,
-        EmailAccount.email_address == result.email_address,
+        EmailAccount.provider == provider,  # type: ignore[arg-type]
+        EmailAccount.email_address == result.email_address,  # type: ignore[arg-type]
     )
     existing = (await session.execute(stmt)).scalar_one_or_none()
 

@@ -51,14 +51,14 @@ def _resolve_cron_file(org_ctx: OrganizationContext) -> Path:
     return workspace.parent / "cron" / "jobs.json"
 
 
-def _read_jobs(cron_file: Path) -> list[dict]:
+def _read_jobs(cron_file: Path) -> list[dict[str, Any]]:
     """Read cron jobs from a gateway's jobs.json file."""
     if not cron_file.exists():
         return []
     try:
         data = json.loads(cron_file.read_text())
         if isinstance(data, dict) and "jobs" in data:
-            return data["jobs"]
+            return data["jobs"]  # type: ignore[no-any-return]
         if isinstance(data, list):
             return data
         return []
@@ -67,7 +67,7 @@ def _read_jobs(cron_file: Path) -> list[dict]:
         return []
 
 
-def _normalize_job(j: dict) -> dict:
+def _normalize_job(j: dict[str, Any]) -> dict[str, Any]:
     """Normalize a raw gateway job dict into the API response shape."""
     schedule = j.get("schedule", {})
     state = j.get("state", {})
@@ -221,7 +221,7 @@ def _build_update_params(job_id: str, payload: CronJobUpdate) -> dict[str, Any]:
 @router.get("")
 async def list_cron_jobs(
     org_ctx: OrganizationContext = Depends(require_org_member),
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """List cron jobs for the current organization's gateway.
 
     Tries gateway RPC first for fresh data; falls back to reading jobs.json
@@ -250,7 +250,7 @@ async def list_cron_jobs(
 async def create_cron_job(
     payload: CronJobCreate,
     org_ctx: OrganizationContext = Depends(require_org_member),
-) -> dict:
+) -> dict[str, Any]:
     """Create a new cron job via the gateway."""
     config = await _get_gateway_config(org_ctx)
     params = _build_add_params(payload)
@@ -263,7 +263,7 @@ async def update_cron_job(
     job_id: str,
     payload: CronJobUpdate,
     org_ctx: OrganizationContext = Depends(require_org_member),
-) -> dict:
+) -> dict[str, Any]:
     """Update an existing cron job via the gateway."""
     config = await _get_gateway_config(org_ctx)
     params = _build_update_params(job_id, payload)
@@ -285,7 +285,7 @@ async def delete_cron_job(
 async def run_cron_job(
     job_id: str,
     org_ctx: OrganizationContext = Depends(require_org_member),
-) -> dict:
+) -> dict[str, Any]:
     """Manually trigger a cron job to run immediately."""
     config = await _get_gateway_config(org_ctx)
     result = await _rpc_call("cron.run", {"id": job_id}, config)
@@ -296,12 +296,12 @@ async def run_cron_job(
 async def get_cron_job_runs(
     job_id: str,
     org_ctx: OrganizationContext = Depends(require_org_member),
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """Get run history for a cron job."""
     config = await _get_gateway_config(org_ctx)
     result = await _rpc_call("cron.runs", {"id": job_id}, config)
     if isinstance(result, list):
         return result
     if isinstance(result, dict) and "runs" in result:
-        return result["runs"]
+        return result["runs"]  # type: ignore[no-any-return]
     return []

@@ -170,7 +170,7 @@ async def require_org_member(
 ORG_MEMBER_DEP = Depends(require_org_member)
 
 
-def require_feature(flag: str) -> Callable:
+def require_feature(flag: str) -> Callable[..., Any]:
     """Factory that returns a FastAPI dependency enforcing a feature flag.
 
     Usage: ``router = APIRouter(dependencies=[Depends(require_feature("paper_trading"))])``
@@ -232,7 +232,7 @@ async def require_org_admin(
     return ctx
 
 
-def require_org_role(minimum_role: str) -> Callable:
+def require_org_role(minimum_role: str) -> Callable[..., Any]:
     """Factory that returns a FastAPI dependency enforcing a minimum org role.
 
     Role hierarchy: viewer < member < operator < admin < owner
@@ -354,7 +354,7 @@ async def get_portfolio_for_org(
     portfolio = result.scalars().first()
     if portfolio is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
-    return portfolio
+    return portfolio  # type: ignore[no-any-return]
 
 
 PORTFOLIO_DEP = Depends(get_portfolio_for_org)

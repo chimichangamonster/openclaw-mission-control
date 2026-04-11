@@ -43,7 +43,7 @@ class RedactionResult(NamedTuple):
 # Credential patterns (always redacted in moderate+)
 # ---------------------------------------------------------------------------
 
-_CREDENTIAL_PATTERNS: list[tuple[re.Pattern, str, str]] = [
+_CREDENTIAL_PATTERNS: list[tuple[re.Pattern[str], str, str]] = [
     # Password reset / magic links
     (
         re.compile(
@@ -95,7 +95,7 @@ _CREDENTIAL_PATTERNS: list[tuple[re.Pattern, str, str]] = [
 # Financial patterns (redacted in moderate+)
 # ---------------------------------------------------------------------------
 
-_FINANCIAL_PATTERNS: list[tuple[re.Pattern, str, str]] = [
+_FINANCIAL_PATTERNS: list[tuple[re.Pattern[str], str, str]] = [
     # Credit card numbers (13-19 digits, possibly with spaces/dashes)
     (re.compile(r"\b(?:\d{4}[-\s]?){3,4}\d{1,4}\b"), "[REDACTED_CARD]", "credit_card"),
     # Bank account / routing numbers in context
@@ -121,7 +121,7 @@ _FINANCIAL_PATTERNS: list[tuple[re.Pattern, str, str]] = [
 # PII patterns (only in strict mode)
 # ---------------------------------------------------------------------------
 
-_PII_PATTERNS: list[tuple[re.Pattern, str, str]] = [
+_PII_PATTERNS: list[tuple[re.Pattern[str], str, str]] = [
     # Phone numbers (North American + international)
     # Negative lookbehind for '.' prevents matching decimal numbers like GPS coords
     (
@@ -241,7 +241,7 @@ def redact_sensitive(
 # ---------------------------------------------------------------------------
 
 # Patterns for pentest/security data that should never reach an LLM
-_PENTEST_PATTERNS: list[tuple[re.Pattern, str, str]] = [
+_PENTEST_PATTERNS: list[tuple[re.Pattern[str], str, str]] = [
     # GPS coordinates — must come before IP/phone patterns to prevent false matches
     # Matches lat,lon pairs like "53.590542, -113.522905" or "53.590542/-113.522905"
     (
@@ -434,7 +434,7 @@ class RedactionVault:
 
         return text
 
-    def redact_json(self, data: str | dict | list) -> str | dict | list:
+    def redact_json(self, data: str | dict | list[Any]) -> str | dict | list[Any]:
         """Redact pentest-sensitive data from JSON structures.
 
         Parses JSON (if string), recursively walks all string values,
@@ -455,7 +455,7 @@ class RedactionVault:
                 return self.redact(data)
             result = self._walk_and_redact(parsed)
             return json.dumps(result)
-        return self._walk_and_redact(data)
+        return self._walk_and_redact(data)  # type: ignore[no-any-return]
 
     def _walk_and_redact(self, obj: Any) -> Any:
         """Recursively walk a parsed JSON structure, redacting string values."""
@@ -474,7 +474,7 @@ class RedactionVault:
             text = text.replace(tag, original)
         return text
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize vault for API transport / storage."""
         return {
             "entries": self.entries,
@@ -484,7 +484,7 @@ class RedactionVault:
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> "RedactionVault":
+    def from_dict(cls, data: dict[str, Any]) -> "RedactionVault":
         """Reconstruct vault from serialized dict."""
         vault = cls()
         vault._store = dict(data.get("store", {}))

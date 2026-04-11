@@ -1,6 +1,9 @@
 """Cost tracking endpoints — OpenRouter usage, live model pricing, gateway session data, budget controls."""
 
+
 from __future__ import annotations
+
+from typing import Any
 
 import json
 import time
@@ -36,14 +39,14 @@ router = APIRouter(
 )
 
 # Cache live pricing for 1 hour to avoid hammering OpenRouter
-_pricing_cache: dict | None = None
+_pricing_cache: list[dict[str, Any]] | None = None
 _pricing_cache_ts: float = 0
 
 
-async def _openrouter_get(url: str, api_key: str) -> dict:
+async def _openrouter_get(url: str, api_key: str) -> dict[str, Any]:
     """Fetch from OpenRouter with retry and circuit breaker."""
 
-    async def _fetch() -> dict:
+    async def _fetch() -> dict[str, Any]:
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.get(url, headers={"Authorization": f"Bearer {api_key}"})
             if resp.status_code != 200:
@@ -52,9 +55,9 @@ async def _openrouter_get(url: str, api_key: str) -> dict:
                     request=resp.request,
                     response=resp,
                 )
-            return resp.json()
+            return resp.json()  # type: ignore[no-any-return]
 
-    return await retry_async(
+    return await retry_async(  # type: ignore[no-any-return]
         _fetch, retries=3, base_delay=2.0, breaker=openrouter_breaker, label="openrouter"
     )
 
@@ -62,7 +65,7 @@ async def _openrouter_get(url: str, api_key: str) -> dict:
 @router.get("/usage")
 async def get_usage(
     org_ctx: OrganizationContext = Depends(require_org_member),
-):
+) -> Any:
     """Get OpenRouter usage and budget data."""
     from app.services.openrouter_keys import get_openrouter_key_for_org
 
@@ -106,7 +109,7 @@ async def get_model_pricing(
         "configured",
         description="'configured' = only models in our gateway, 'all' = everything on OpenRouter",
     ),
-):
+) -> Any:
     """Get live model pricing from OpenRouter. Cached for 1 hour."""
     import time
 
@@ -237,7 +240,7 @@ def _get_model_price(short_model: str) -> tuple[float, float]:
 @router.get("/usage-by-model")
 async def get_usage_by_model(
     org_ctx: OrganizationContext = Depends(require_org_member),
-):
+) -> Any:
     """Aggregate gateway session tokens by model and compute cost using live pricing."""
     from sqlmodel import select
 
@@ -262,12 +265,15 @@ async def get_usage_by_model(
         logger.exception("cost_tracker.sessions_rpc_failed")
         return {"models": [], "total_cost": 0}
 
-    raw_sessions = (
-        sessions_data if isinstance(sessions_data, list) else sessions_data.get("sessions", [])
-    )
+    if isinstance(sessions_data, list):
+        raw_sessions = sessions_data
+    elif isinstance(sessions_data, dict):
+        raw_sessions = sessions_data.get("sessions", [])
+    else:
+        raw_sessions = []
 
     # Aggregate by model
-    model_agg: dict[str, dict] = {}
+    model_agg: dict[str, dict[str, Any]] = {}
     for s in raw_sessions:
         key = s.get("key", "")
         if "heartbeat" in key or "mc-gateway" in key:
@@ -324,7 +330,7 @@ async def get_usage_by_model(
 
 
 # Cache activity data for 10 minutes
-_activity_cache: dict | None = None
+_activity_cache: list[dict[str, Any]] | None = None
 _activity_cache_ts: float = 0
 
 
@@ -335,7 +341,7 @@ async def get_activity(
         "daily",
         description="'daily' = per-day rows, 'weekly' = aggregated by week, 'monthly' = aggregated by month",
     ),
-):
+) -> Any:
     """Get historical per-model spending from OpenRouter activity API (last 30 days)."""
     global _activity_cache, _activity_cache_ts
 
@@ -371,13 +377,13 @@ async def get_activity(
     return _build_activity_response(rows, period)
 
 
-def _build_activity_response(rows: list, period: str) -> dict:
+def _build_activity_response(rows: list[Any], period: str) -> dict[str, Any]:
     """Aggregate activity rows by period and model."""
     from collections import defaultdict
     from datetime import datetime, timedelta
 
     # Group rows by (period_key, model)
-    period_model: dict[str, dict[str, dict]] = defaultdict(
+    period_model: dict[str, dict[str, dict[str, Any]]] = defaultdict(
         lambda: defaultdict(
             lambda: {
                 "cost": 0.0,
@@ -388,7 +394,7 @@ def _build_activity_response(rows: list, period: str) -> dict:
         )
     )
     # Also track per-model totals
-    model_totals: dict[str, dict] = defaultdict(
+    model_totals: dict[str, dict[str, Any]] = defaultdict(
         lambda: {
             "cost": 0.0,
             "requests": 0,
@@ -494,7 +500,7 @@ class BudgetConfigUpdate(BaseModel):
 @router.get("/budget")
 async def get_budget(
     org_ctx: OrganizationContext = Depends(require_org_member),
-):
+) -> Any:
     """Get budget config, current month spend, and per-agent daily spend."""
     org_id = org_ctx.organization.id
 
@@ -583,7 +589,7 @@ async def get_budget(
 async def update_budget(
     payload: BudgetConfigUpdate,
     org_ctx: OrganizationContext = Depends(require_org_member),
-):
+) -> Any:
     """Update budget configuration for the current organization."""
     org_id = org_ctx.organization.id
 
@@ -625,7 +631,7 @@ async def get_agent_spend(
     org_ctx: OrganizationContext = Depends(require_org_member),
     days: int = Query(30, description="Lookback days"),
     agent: str | None = Query(None, description="Filter by agent name"),
-):
+) -> Any:
     """Get historical per-agent spend for the current organization."""
     org_id = org_ctx.organization.id
 
@@ -636,7 +642,7 @@ async def get_agent_spend(
         )
         if agent:
             stmt = stmt.where(DailyAgentSpend.agent_name == agent)
-        stmt = stmt.order_by(DailyAgentSpend.date.desc())  # type: ignore[union-attr]
+        stmt = stmt.order_by(DailyAgentSpend.date.desc())  # type: ignore[attr-defined]
 
         result = await session.execute(stmt)
         rows = result.scalars().all()
@@ -663,14 +669,14 @@ async def get_agent_spend(
 @router.get("/errors", dependencies=[ORG_MEMBER_DEP])
 async def get_error_log(
     limit: int = Query(20, description="Max errors to return"),
-):
+) -> Any:
     """Get recent system errors from activity events."""
     from sqlalchemy import desc as sa_desc
 
     async with async_session_maker() as session:
         stmt = (
             select(ActivityEvent)
-            .where(ActivityEvent.event_type.startswith("system.error"))  # type: ignore[union-attr]
+            .where(ActivityEvent.event_type.startswith("system.error"))
             .order_by(sa_desc(ActivityEvent.created_at))
             .limit(min(limit, 100))
         )
@@ -689,13 +695,13 @@ async def get_error_log(
 
 
 @router.delete("/errors", dependencies=[Depends(require_org_role("admin"))])
-async def clear_error_log():
+async def clear_error_log() -> Any:
     """Clear all system error events. Requires admin role."""
     from sqlalchemy import delete as sa_delete
 
     async with async_session_maker() as session:
         stmt = sa_delete(ActivityEvent).where(
-            ActivityEvent.event_type.startswith("system.error")  # type: ignore[union-attr]
+            ActivityEvent.event_type.startswith("system.error")  # type: ignore[arg-type]
         )
         result = await session.execute(stmt)
         await session.commit()
@@ -712,7 +718,7 @@ _EST_TOKENS_PER_CONVERSATION = 4_000  # ~3K input + ~1K output typical
 @router.get("/cost-estimate", dependencies=[ORG_MEMBER_DEP])
 async def get_cost_estimate(
     org_ctx: OrganizationContext = Depends(require_org_member),
-):
+) -> Any:
     """Cost reference card for org settings.
 
     If the org has real spend data (≥3 days), projects from actual usage.
@@ -744,7 +750,7 @@ async def get_cost_estimate(
         projected_monthly = round(daily_avg * 30, 2)
 
     # Per-conversation cost by tier (always useful as reference)
-    tier_costs = []
+    tier_costs: list[dict[str, Any]] = []
     for model, label in [
         ("gpt-5-nano", "Tier 1 — Nano"),
         ("deepseek-v3.2", "Tier 2 — Standard"),

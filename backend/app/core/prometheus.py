@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from fastapi import FastAPI
 from prometheus_client import Gauge, Info
 from prometheus_fastapi_instrumentator import Instrumentator
 
@@ -33,7 +34,7 @@ instrumentator = Instrumentator(
 )
 
 
-def setup_metrics(app):  # noqa: ANN001
+def setup_metrics(app: FastAPI) -> None:
     """Attach Prometheus instrumentation to the FastAPI app."""
     instrumentator.instrument(app).expose(
         app,

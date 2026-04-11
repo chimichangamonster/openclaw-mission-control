@@ -31,8 +31,8 @@ async def store_exchange_account(
     from sqlalchemy import select
 
     stmt = select(ExchangeAccount).where(
-        ExchangeAccount.organization_id == org_id,
-        ExchangeAccount.exchange == exchange,
+        ExchangeAccount.organization_id == org_id,  # type: ignore[arg-type]
+        ExchangeAccount.exchange == exchange,  # type: ignore[arg-type]
     )
     existing = (await session.execute(stmt)).scalar_one_or_none()
 
@@ -69,7 +69,7 @@ async def store_exchange_account(
 
     session.add(account)
     await session.flush()
-    return account
+    return account  # type: ignore[no-any-return]
 
 
 def get_binance_client(account: ExchangeAccount) -> BinanceClient:

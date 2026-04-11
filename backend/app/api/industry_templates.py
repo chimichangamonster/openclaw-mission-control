@@ -1,6 +1,9 @@
 """Industry templates API — list, apply, and track onboarding progress."""
 
+
 from __future__ import annotations
+
+from typing import Any
 
 import json
 from uuid import uuid4
@@ -24,13 +27,13 @@ _ADMIN_DEP = Depends(require_org_role("admin"))
 
 
 @router.get("")
-async def list_available_templates(org_ctx: OrganizationContext = ORG_MEMBER_DEP):
+async def list_available_templates(org_ctx: OrganizationContext = ORG_MEMBER_DEP) -> Any:
     """List all available industry templates."""
     return list_templates()
 
 
 @router.get("/auto-detect")
-async def auto_detect_template(org_ctx: OrganizationContext = ORG_MEMBER_DEP):
+async def auto_detect_template(org_ctx: OrganizationContext = ORG_MEMBER_DEP) -> Any:
     """Auto-detect the best industry template based on org name and metadata.
 
     Returns the recommended template_id and confidence score.
@@ -51,7 +54,7 @@ async def auto_detect_template(org_ctx: OrganizationContext = ORG_MEMBER_DEP):
 
 
 @router.get("/{template_id}")
-async def get_template_detail(template_id: str, org_ctx: OrganizationContext = ORG_MEMBER_DEP):
+async def get_template_detail(template_id: str, org_ctx: OrganizationContext = ORG_MEMBER_DEP) -> Any:
     """Get full template details including default config and onboarding steps."""
     template = get_template(template_id)
     if not template:
@@ -89,7 +92,7 @@ async def apply_template(
     template_id: str,
     payload: ApplyTemplatePayload | None = None,
     org_ctx: OrganizationContext = _ADMIN_DEP,
-):
+) -> Any:
     """Apply an industry template to the current organization.
 
     Seeds default config data, merges feature flags, creates onboarding checklist.
@@ -216,7 +219,7 @@ async def apply_template(
 
 
 @router.get("/onboarding/status")
-async def get_onboarding_status(org_ctx: OrganizationContext = ORG_MEMBER_DEP):
+async def get_onboarding_status(org_ctx: OrganizationContext = ORG_MEMBER_DEP) -> Any:
     """Get onboarding checklist status for the current org."""
     org_id = org_ctx.organization.id
 
@@ -224,7 +227,7 @@ async def get_onboarding_status(org_ctx: OrganizationContext = ORG_MEMBER_DEP):
         result = await session.execute(
             select(OrgOnboardingStep)
             .where(OrgOnboardingStep.organization_id == org_id)
-            .order_by(OrgOnboardingStep.sort_order)
+            .order_by(OrgOnboardingStep.sort_order)  # type: ignore[arg-type]
         )
         steps = result.scalars().all()
 
@@ -251,7 +254,7 @@ async def get_onboarding_status(org_ctx: OrganizationContext = ORG_MEMBER_DEP):
 
 
 @router.patch("/onboarding/{step_key}")
-async def complete_onboarding_step(step_key: str, org_ctx: OrganizationContext = _ADMIN_DEP):
+async def complete_onboarding_step(step_key: str, org_ctx: OrganizationContext = _ADMIN_DEP) -> Any:
     """Mark an onboarding step as complete."""
     org_id = org_ctx.organization.id
 

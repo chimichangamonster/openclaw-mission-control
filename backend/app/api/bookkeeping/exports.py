@@ -1,6 +1,9 @@
 """Bookkeeping exports — QuickBooks CSV/IIF, expense reports, GST summaries."""
 
+
 from __future__ import annotations
+
+from typing import Any
 
 from datetime import date, timedelta
 
@@ -22,15 +25,15 @@ async def export_csv(
     from_date: date | None = Query(default=None, alias="from"),
     to_date: date | None = Query(default=None, alias="to"),
     org_ctx: OrganizationContext = ORG_ACTOR_DEP,
-):
+) -> Any:
     """Export transactions as QuickBooks Online-compatible CSV."""
     async with async_session_maker() as session:
         stmt = select(BkTransaction).where(BkTransaction.organization_id == org_ctx.organization.id)
         if from_date:
-            stmt = stmt.where(BkTransaction.txn_date >= from_date)  # type: ignore[operator]
+            stmt = stmt.where(BkTransaction.txn_date >= from_date)
         if to_date:
-            stmt = stmt.where(BkTransaction.txn_date <= to_date)  # type: ignore[operator]
-        stmt = stmt.order_by(BkTransaction.txn_date)  # type: ignore[union-attr]
+            stmt = stmt.where(BkTransaction.txn_date <= to_date)
+        stmt = stmt.order_by(BkTransaction.txn_date)  # type: ignore[arg-type]
         result = await session.execute(stmt)
 
         transactions = [
@@ -59,15 +62,15 @@ async def export_iif(
     from_date: date | None = Query(default=None, alias="from"),
     to_date: date | None = Query(default=None, alias="to"),
     org_ctx: OrganizationContext = ORG_ACTOR_DEP,
-):
+) -> Any:
     """Export transactions as QuickBooks Desktop IIF format."""
     async with async_session_maker() as session:
         stmt = select(BkTransaction).where(BkTransaction.organization_id == org_ctx.organization.id)
         if from_date:
-            stmt = stmt.where(BkTransaction.txn_date >= from_date)  # type: ignore[operator]
+            stmt = stmt.where(BkTransaction.txn_date >= from_date)
         if to_date:
-            stmt = stmt.where(BkTransaction.txn_date <= to_date)  # type: ignore[operator]
-        stmt = stmt.order_by(BkTransaction.txn_date)  # type: ignore[union-attr]
+            stmt = stmt.where(BkTransaction.txn_date <= to_date)
+        stmt = stmt.order_by(BkTransaction.txn_date)  # type: ignore[arg-type]
         result = await session.execute(stmt)
 
         transactions = [
@@ -95,15 +98,15 @@ async def export_expense_report(
     from_date: date | None = Query(default=None, alias="from"),
     to_date: date | None = Query(default=None, alias="to"),
     org_ctx: OrganizationContext = ORG_ACTOR_DEP,
-):
+) -> Any:
     """Plain text expense report with summary and category breakdown."""
     async with async_session_maker() as session:
         stmt = select(BkExpense).where(BkExpense.organization_id == org_ctx.organization.id)
         if from_date:
-            stmt = stmt.where(BkExpense.expense_date >= from_date)  # type: ignore[operator]
+            stmt = stmt.where(BkExpense.expense_date >= from_date)
         if to_date:
-            stmt = stmt.where(BkExpense.expense_date <= to_date)  # type: ignore[operator]
-        stmt = stmt.order_by(BkExpense.expense_date)  # type: ignore[union-attr]
+            stmt = stmt.where(BkExpense.expense_date <= to_date)
+        stmt = stmt.order_by(BkExpense.expense_date)  # type: ignore[arg-type]
         result = await session.execute(stmt)
         expenses = result.scalars().all()
 

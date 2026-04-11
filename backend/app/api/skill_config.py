@@ -4,7 +4,10 @@ Skills call GET /skill-config/resolve at startup to get org-specific IDs
 instead of hardcoding UUIDs. This makes skills portable across tenants.
 """
 
+
 from __future__ import annotations
+
+from typing import Any
 
 from fastapi import APIRouter, Query
 from sqlmodel import select
@@ -23,7 +26,7 @@ async def resolve_skill_config(
     org_ctx: OrganizationContext = ORG_ACTOR_DEP,
     portfolios: list[str] = Query(default=[]),
     boards: list[str] = Query(default=[]),
-):
+) -> Any:
     """Resolve portfolio and board names to UUIDs for the calling org.
 
     Skills call this once at startup instead of hardcoding IDs.
@@ -32,7 +35,7 @@ async def resolve_skill_config(
         GET /skill-config/resolve?portfolios=Stocks&portfolios=Sports+Betting&boards=Stock+Watchlist
     """
     org_id = org_ctx.organization.id
-    result: dict = {"portfolios": {}, "boards": {}}
+    result: dict[str, Any] = {"portfolios": {}, "boards": {}}
 
     async with async_session_maker() as session:
         if portfolios:

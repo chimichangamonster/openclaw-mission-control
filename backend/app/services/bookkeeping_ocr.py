@@ -117,7 +117,7 @@ async def _call_vision_model(
     if parsed.get("total") is None:
         raise ValueError("OCR failed to extract total amount")
 
-    return parsed
+    return parsed  # type: ignore[no-any-return]
 
 
 async def process_receipt(image_bytes: bytes, org_id: UUID) -> dict[str, Any]:

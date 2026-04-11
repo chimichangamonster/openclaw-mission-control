@@ -91,7 +91,7 @@ async def _get_access_token(corp_id: str, corp_secret: str) -> str:
             f"Failed to get access token: errcode={errcode} errmsg={data.get('errmsg', '')}"
         )
 
-    return data["access_token"]
+    return data["access_token"]  # type: ignore[no-any-return]
 
 
 async def exchange_code_for_user(

@@ -63,15 +63,15 @@ async def create_trade_proposal(
     """
     # Verify wallet exists
     stmt = select(PolymarketWallet).where(
-        PolymarketWallet.organization_id == org_id,
-        PolymarketWallet.is_active == True,  # noqa: E712
+        PolymarketWallet.organization_id == org_id,  # type: ignore[arg-type]
+        PolymarketWallet.is_active == True,  # noqa: E712  # type: ignore[arg-type]
     )
     wallet = (await session.execute(stmt)).scalar_one_or_none()
     if wallet is None:
         raise ValueError("No active Polymarket wallet configured for this organization.")
 
     # Validate risk controls
-    stmt_risk = select(PolymarketRiskConfig).where(PolymarketRiskConfig.organization_id == org_id)
+    stmt_risk = select(PolymarketRiskConfig).where(PolymarketRiskConfig.organization_id == org_id)  # type: ignore[arg-type]
     risk_config = (await session.execute(stmt_risk)).scalar_one_or_none()
     violations = validate_risk_controls(risk_config, params.size_usdc, params.condition_id)
     if violations:
@@ -205,8 +205,8 @@ async def execute_approved_trade(
 
     # Load wallet
     stmt = select(PolymarketWallet).where(
-        PolymarketWallet.organization_id == proposal.organization_id,
-        PolymarketWallet.is_active == True,  # noqa: E712
+        PolymarketWallet.organization_id == proposal.organization_id,  # type: ignore[arg-type]
+        PolymarketWallet.is_active == True,  # noqa: E712  # type: ignore[arg-type]
     )
     wallet = (await session.execute(stmt)).scalar_one_or_none()
     if wallet is None:
@@ -219,7 +219,7 @@ async def execute_approved_trade(
 
     # Re-validate risk controls
     stmt_risk = select(PolymarketRiskConfig).where(
-        PolymarketRiskConfig.organization_id == proposal.organization_id
+        PolymarketRiskConfig.organization_id == proposal.organization_id  # type: ignore[arg-type]
     )
     risk_config = (await session.execute(stmt_risk)).scalar_one_or_none()
     violations = validate_risk_controls(risk_config, proposal.size_usdc, proposal.condition_id)

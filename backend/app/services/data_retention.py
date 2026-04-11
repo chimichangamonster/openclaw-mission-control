@@ -11,7 +11,10 @@ Default retention periods (used when orgs don't override):
 - daily_agent_spends: 365 days
 """
 
+
 from __future__ import annotations
+
+from typing import Any
 
 from datetime import timedelta
 
@@ -36,7 +39,7 @@ DEFAULT_RETENTION = {
 BATCH_SIZE = 1000
 
 
-async def _delete_batched(session, stmt, label: str) -> int:
+async def _delete_batched(session: Any, stmt: Any, label: str) -> int:
     """Execute a DELETE statement in batches. Returns total rows deleted."""
     total = 0
     while True:
@@ -60,7 +63,7 @@ async def _cleanup_table(
 
     cutoff = utcnow() - timedelta(days=cutoff_days)
     where_clause = f"{timestamp_col} < :cutoff"
-    params: dict = {"cutoff": cutoff}
+    params: dict[str, Any] = {"cutoff": cutoff}
 
     if org_filter and org_id:
         # Normalize UUID: strip hyphens for SQLite compat (PostgreSQL handles both forms)
@@ -90,7 +93,7 @@ async def _cleanup_table(
             "data_retention.cleaned",
             extra={"table": table_name, "deleted": total, "cutoff_days": cutoff_days},
         )
-    return total
+    return total  # type: ignore[no-any-return]
 
 
 async def _get_org_retention_settings() -> dict[str, dict[str, int]]:

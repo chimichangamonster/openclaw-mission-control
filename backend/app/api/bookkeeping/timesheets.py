@@ -1,6 +1,9 @@
 """Bookkeeping timesheets — hours logging, approval, weekly summaries."""
 
+
 from __future__ import annotations
+
+from typing import Any
 
 from datetime import date
 from uuid import uuid4
@@ -29,7 +32,7 @@ class TimesheetCreate(BaseModel):
 
 
 @router.post("", status_code=201)
-async def create_timesheet(payload: TimesheetCreate, org_ctx: OrganizationContext = ORG_ACTOR_DEP):
+async def create_timesheet(payload: TimesheetCreate, org_ctx: OrganizationContext = ORG_ACTOR_DEP) -> Any:
     async with async_session_maker() as session:
         ts = BkTimesheet(
             id=uuid4(),
@@ -58,7 +61,7 @@ async def list_timesheets(
     from_date: date | None = Query(default=None, alias="from"),
     to_date: date | None = Query(default=None, alias="to"),
     org_ctx: OrganizationContext = ORG_ACTOR_DEP,
-):
+) -> Any:
     async with async_session_maker() as session:
         stmt = select(BkTimesheet).where(BkTimesheet.organization_id == org_ctx.organization.id)
         if worker_id:
@@ -68,16 +71,16 @@ async def list_timesheets(
         if status:
             stmt = stmt.where(BkTimesheet.status == status)
         if from_date:
-            stmt = stmt.where(BkTimesheet.work_date >= from_date)  # type: ignore[operator]
+            stmt = stmt.where(BkTimesheet.work_date >= from_date)
         if to_date:
-            stmt = stmt.where(BkTimesheet.work_date <= to_date)  # type: ignore[operator]
-        stmt = stmt.order_by(BkTimesheet.work_date.desc())  # type: ignore[union-attr]
+            stmt = stmt.where(BkTimesheet.work_date <= to_date)
+        stmt = stmt.order_by(BkTimesheet.work_date.desc())  # type: ignore[attr-defined]
         result = await session.execute(stmt)
         return [_serialize(ts) for ts in result.scalars().all()]
 
 
 @router.put("/{timesheet_id}/approve")
-async def approve_timesheet(timesheet_id: str, org_ctx: OrganizationContext = ORG_ACTOR_DEP):
+async def approve_timesheet(timesheet_id: str, org_ctx: OrganizationContext = ORG_ACTOR_DEP) -> Any:
     async with async_session_maker() as session:
         result = await session.execute(
             select(BkTimesheet).where(
@@ -102,7 +105,7 @@ async def approve_timesheet(timesheet_id: str, org_ctx: OrganizationContext = OR
 
 
 @router.put("/{timesheet_id}/reject")
-async def reject_timesheet(timesheet_id: str, org_ctx: OrganizationContext = ORG_ACTOR_DEP):
+async def reject_timesheet(timesheet_id: str, org_ctx: OrganizationContext = ORG_ACTOR_DEP) -> Any:
     async with async_session_maker() as session:
         result = await session.execute(
             select(BkTimesheet).where(
@@ -130,18 +133,18 @@ async def weekly_summary(
     from_date: date = Query(alias="from"),
     to_date: date = Query(alias="to"),
     org_ctx: OrganizationContext = ORG_ACTOR_DEP,
-):
+) -> Any:
     """Weekly summary: hours and worker count by job."""
     async with async_session_maker() as session:
         stmt = select(BkTimesheet).where(
             BkTimesheet.organization_id == org_ctx.organization.id,
-            BkTimesheet.work_date >= from_date,  # type: ignore[operator]
-            BkTimesheet.work_date <= to_date,  # type: ignore[operator]
+            BkTimesheet.work_date >= from_date,
+            BkTimesheet.work_date <= to_date,
         )
         result = await session.execute(stmt)
         timesheets = result.scalars().all()
 
-        by_job: dict[str, dict] = {}
+        by_job: dict[str, dict[str, Any]] = {}
         for ts in timesheets:
             jid = str(ts.job_id)
             if jid not in by_job:
@@ -167,7 +170,7 @@ async def weekly_summary(
         ]
 
 
-def _serialize(ts: BkTimesheet) -> dict:
+def _serialize(ts: BkTimesheet) -> dict[str, Any]:
     return {
         "id": str(ts.id),
         "placement_id": str(ts.placement_id) if ts.placement_id else None,

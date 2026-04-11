@@ -1,6 +1,9 @@
 """Model registry API — browse models, refresh from OpenRouter, manage version pins."""
 
+
 from __future__ import annotations
+
+from typing import Any
 
 import json
 from dataclasses import asdict
@@ -46,7 +49,7 @@ class ModelPinsUpdate(BaseModel):
 async def list_models(
     ctx: OrganizationContext = ORG_MEMBER_DEP,
     status_filter: str | None = None,
-) -> dict:
+) -> dict[str, Any]:
     """List all known models in the registry."""
     registry = get_registry()
     entries = registry.list_models(status=status_filter)
@@ -65,7 +68,7 @@ async def list_models(
 @router.post("/registry/refresh", dependencies=[_ADMIN_DEP])
 async def refresh_registry(
     ctx: OrganizationContext = ORG_MEMBER_DEP,
-) -> dict:
+) -> dict[str, Any]:
     """Trigger a refresh of the model registry from OpenRouter."""
     from app.services.openrouter_keys import get_openrouter_key_for_org
 
@@ -86,7 +89,7 @@ async def refresh_registry(
 async def get_family_versions(
     family: str,
     ctx: OrganizationContext = ORG_MEMBER_DEP,
-) -> dict:
+) -> dict[str, Any]:
     """Get all versions of a model family."""
     registry = get_registry()
     versions = registry.get_family_versions(family)
@@ -104,7 +107,7 @@ async def get_family_versions(
 @router.get("/pins")
 async def get_model_pins(
     ctx: OrganizationContext = ORG_MEMBER_DEP,
-) -> dict:
+) -> dict[str, Any]:
     """Get the current model version pins for this organization."""
     async with async_session_maker() as session:
         result = await session.execute(
@@ -130,7 +133,7 @@ async def get_model_pins(
 async def update_model_pins(
     payload: ModelPinsUpdate,
     ctx: OrganizationContext = ORG_MEMBER_DEP,
-) -> dict:
+) -> dict[str, Any]:
     """Set model version pins for this organization.
 
     Validates that each pinned model ID exists in the registry.

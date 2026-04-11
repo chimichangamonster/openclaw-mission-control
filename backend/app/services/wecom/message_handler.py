@@ -110,7 +110,7 @@ async def handle_message(
                     len(response_text),
                     elapsed,
                 )
-                return response_text
+                return response_text  # type: ignore[no-any-return]
 
     logger.info(
         "wecom.message.sync_timeout from_user=%s elapsed=%.1fs",

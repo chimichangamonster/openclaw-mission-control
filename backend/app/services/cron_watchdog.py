@@ -36,7 +36,7 @@ async def _get_first_gateway_config() -> GatewayConfig | None:
     """Get the first available gateway config for sending alerts."""
     async with async_session_maker() as session:
         result = await session.execute(
-            select(Gateway).where(Gateway.url.isnot(None)).limit(1)  # type: ignore[union-attr]
+            select(Gateway).where(Gateway.url.isnot(None)).limit(1)  # type: ignore[attr-defined]
         )
         gateway = result.scalars().first()
     if not gateway or not gateway.url:

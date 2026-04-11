@@ -108,7 +108,7 @@ async def upload_file(
         len(content),
         item.get("id"),
     )
-    return item
+    return item  # type: ignore[no-any-return]
 
 
 async def create_sharing_link(
@@ -140,7 +140,7 @@ async def create_sharing_link(
 
     link_url = data.get("link", {}).get("webUrl", "")
     logger.info("onedrive.share_link item_id=%s type=%s url=%s", item_id, link_type, link_url)
-    return link_url
+    return link_url  # type: ignore[no-any-return]
 
 
 async def list_files(
@@ -202,4 +202,4 @@ async def get_edit_url(
     async with httpx.AsyncClient() as client:
         resp = await client.get(url, headers=_headers(access_token))
         resp.raise_for_status()
-        return resp.json().get("webUrl", "")
+        return resp.json().get("webUrl", "")  # type: ignore[no-any-return]

@@ -115,7 +115,7 @@ async def accept_terms(auth: AuthContext = AUTH_CONTEXT_DEP) -> dict[str, Any]:
 
 
 @router.get("/providers", summary="List available auth providers")
-async def list_auth_providers() -> dict:
+async def list_auth_providers() -> dict[str, Any]:
     """Return which sign-in providers are enabled (no auth required)."""
     return {
         "primary": settings.auth_mode.value,

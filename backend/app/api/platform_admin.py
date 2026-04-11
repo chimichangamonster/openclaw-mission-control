@@ -10,7 +10,7 @@ Role separation:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -52,7 +52,7 @@ OWNER_DEP = Depends(require_platform_owner)
 async def list_all_orgs(
     admin: User = ADMIN_DEP,
     session: AsyncSession = SESSION_DEP,
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """List all organizations with basic metadata. No sensitive data."""
     result = await session.execute(select(Organization))
     orgs = result.scalars().all()
@@ -98,7 +98,7 @@ async def org_gateway_health(
     org_id: UUID,
     admin: User = ADMIN_DEP,
     session: AsyncSession = SESSION_DEP,
-) -> dict:
+) -> dict[str, Any]:
     """Check gateway connectivity for an organization. No client data exposed."""
     org = await _get_org_or_404(org_id, session)
 
@@ -135,7 +135,7 @@ async def list_org_members(
     org_id: UUID,
     admin: User = ADMIN_DEP,
     session: AsyncSession = SESSION_DEP,
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """List members of an organization. Names and roles only — no credentials."""
     await _get_org_or_404(org_id, session)
 
@@ -180,7 +180,7 @@ async def get_org_settings(
     org_id: UUID,
     owner: User = OWNER_DEP,
     session: AsyncSession = SESSION_DEP,
-) -> dict:
+) -> dict[str, Any]:
     """View full org settings including encrypted key status. Owner only.
 
     Returns key presence (has_key: true/false) but NOT decrypted values.
@@ -224,7 +224,7 @@ async def get_org_audit_trail(
     limit: int = 50,
     owner: User = OWNER_DEP,
     session: AsyncSession = SESSION_DEP,
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """View audit trail for an organization. Owner only."""
     from app.models.audit_log import AuditLog
 
@@ -233,7 +233,7 @@ async def get_org_audit_trail(
     result = await session.execute(
         select(AuditLog)
         .where(AuditLog.organization_id == org_id)
-        .order_by(AuditLog.created_at.desc())
+        .order_by(AuditLog.created_at.desc())  # type: ignore[attr-defined]
         .limit(min(limit, 200))
     )
     entries = result.scalars().all()
@@ -269,7 +269,7 @@ async def org_readiness_check(
     org_id: UUID,
     admin: User = ADMIN_DEP,
     session: AsyncSession = SESSION_DEP,
-) -> dict:
+) -> dict[str, Any]:
     """Run automated readiness checks for a client org before onboarding.
 
     Validates: org exists, settings configured, feature flags set, gateway
@@ -280,7 +280,7 @@ async def org_readiness_check(
 
     org = await _get_org_or_404(org_id, session)
 
-    checks: list[dict] = []
+    checks: list[dict[str, Any]] = []
 
     def add(name: str, passed: bool, detail: str = "") -> None:
         checks.append({"check": name, "passed": passed, "detail": detail})
@@ -415,4 +415,4 @@ async def _get_org_or_404(org_id: UUID, session: AsyncSession) -> Organization:
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Organization not found",
         )
-    return org
+    return org  # type: ignore[no-any-return]

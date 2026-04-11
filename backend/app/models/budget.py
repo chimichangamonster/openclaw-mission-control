@@ -36,15 +36,15 @@ class BudgetConfig(QueryModel, table=True):
 
     @property
     def alert_thresholds(self) -> list[int]:
-        return json.loads(self.alert_thresholds_json)
+        return json.loads(self.alert_thresholds_json)  # type: ignore[no-any-return]
 
     @property
     def agent_daily_limits(self) -> dict[str, float]:
-        return json.loads(self.agent_daily_limits_json)
+        return json.loads(self.agent_daily_limits_json)  # type: ignore[no-any-return]
 
     @property
     def last_alert_thresholds_hit(self) -> list[int]:
-        return json.loads(self.last_alert_thresholds_hit_json)
+        return json.loads(self.last_alert_thresholds_hit_json)  # type: ignore[no-any-return]
 
 
 class DailyAgentSpend(QueryModel, table=True):
@@ -68,4 +68,4 @@ class DailyAgentSpend(QueryModel, table=True):
 
     @property
     def model_breakdown(self) -> dict[str, float]:
-        return json.loads(self.model_breakdown_json)
+        return json.loads(self.model_breakdown_json)  # type: ignore[no-any-return]

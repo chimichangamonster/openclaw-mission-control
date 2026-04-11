@@ -508,8 +508,8 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         while True:
             try:
                 pool = async_engine.pool
-                db_pool_size.set(pool.size())
-                db_pool_checked_out.set(pool.checkedout())
+                db_pool_size.set(pool.size())  # type: ignore[attr-defined]
+                db_pool_checked_out.set(pool.checkedout())  # type: ignore[attr-defined]
             except Exception:  # noqa: BLE001
                 pass
             await asyncio.sleep(15)
@@ -689,12 +689,12 @@ def readyz() -> HealthStatusResponse:
 
 
 @app.get("/status", tags=["health"], summary="Dependency Health Status")
-async def dependency_status():
+async def dependency_status() -> Any:
     """Check health of all external dependencies with circuit breaker state."""
     from app.core.prometheus import gateway_listener_connected
     from app.core.resilience import gateway_rpc_breaker, openrouter_breaker
 
-    checks: dict[str, dict] = {}
+    checks: dict[str, dict[str, Any]] = {}
 
     # PostgreSQL
     try:
@@ -720,7 +720,7 @@ async def dependency_status():
 
     # Gateway WebSocket listener
     try:
-        gw_connected = gateway_listener_connected._value.get()  # type: ignore[union-attr]
+        gw_connected = gateway_listener_connected._value.get()
         checks["gateway_listener"] = {
             "status": "ok" if gw_connected == 1 else "disconnected",
         }
@@ -745,7 +745,7 @@ async def dependency_status():
 
 
 @app.get("/api/v1/system/health", tags=["health"], summary="Aggregated System Health")
-async def system_health():
+async def system_health() -> Any:
     """Aggregate platform health into a single status: healthy / degraded / down.
 
     Checks: PostgreSQL, Redis, gateway listener, circuit breakers, recent errors,
@@ -756,7 +756,7 @@ async def system_health():
     from app.services.error_tracker import ERROR_PREFIX
 
     issues: list[str] = []
-    components: dict[str, dict] = {}
+    components: dict[str, dict[str, Any]] = {}
 
     # ── PostgreSQL ─────────────────────────────────────────────────────────
     try:
@@ -785,7 +785,7 @@ async def system_health():
 
     # ── Gateway Listener ───────────────────────────────────────────────────
     try:
-        gw_connected = gateway_listener_connected._value.get()  # type: ignore[union-attr]
+        gw_connected = gateway_listener_connected._value.get()
         if gw_connected == 1:
             components["gateway_listener"] = {"status": "ok"}
         else:
@@ -818,7 +818,7 @@ async def system_health():
             one_hour_ago = utcnow() - timedelta(hours=1)
             result = await session.execute(
                 __import__("sqlalchemy")
-                .select(func.count(ActivityEvent.id))
+                .select(func.count(ActivityEvent.id))  # type: ignore[arg-type]
                 .where(
                     ActivityEvent.event_type.startswith(ERROR_PREFIX),
                     ActivityEvent.created_at >= one_hour_ago,
@@ -870,8 +870,13 @@ async def system_health():
                 cron_gateways_scanned += 1
                 cron_total += len(jobs)
                 for job in jobs:
-                    state = job.get("state") or {}
-                    last_status = state.get("lastRunStatus") or job.get("last_status")
+                    raw_state = job.get("state") if isinstance(job, dict) else None
+                    job_state: dict[str, Any] = (
+                        raw_state if isinstance(raw_state, dict) else {}
+                    )
+                    last_status = job_state.get("lastRunStatus") or (
+                        job.get("last_status") if isinstance(job, dict) else None
+                    )
                     if last_status in ("error", "failed"):
                         cron_failed += 1
             except (json.JSONDecodeError, OSError):

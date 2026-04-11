@@ -1,6 +1,9 @@
 """Budget monitoring — periodic check of per-agent spend against limits."""
 
+
 from __future__ import annotations
+
+from typing import Any
 
 import json
 from datetime import UTC, date, datetime
@@ -76,7 +79,7 @@ async def _get_or_create_budget_config(org_id: UUID) -> BudgetConfig:
         )
         config = result.scalars().first()
         if config:
-            return config
+            return config  # type: ignore[no-any-return]
         config = BudgetConfig(id=uuid4(), organization_id=org_id, updated_at=utcnow())
         session.add(config)
         await session.commit()
@@ -85,7 +88,7 @@ async def _get_or_create_budget_config(org_id: UUID) -> BudgetConfig:
 
 
 async def _proactive_compaction(
-    raw_sessions: list[dict],
+    raw_sessions: list[dict[str, Any]],
     gw_config: GatewayConfig,
 ) -> None:
     """Check session token usage and compact sessions approaching context limits.
@@ -175,8 +178,8 @@ async def _proactive_compaction(
 async def _aggregate_agent_spend(
     config: GatewayConfig,
     *,
-    _raw_sessions_out: list | None = None,
-) -> dict[str, dict]:
+    _raw_sessions_out: list[Any] | None = None,
+) -> dict[str, dict[str, Any]]:
     """Fetch gateway sessions and aggregate tokens per agent.
 
     If *_raw_sessions_out* is provided (an empty list), the raw session dicts
@@ -211,7 +214,7 @@ async def _aggregate_agent_spend(
     if _raw_sessions_out is not None:
         _raw_sessions_out.extend(raw_sessions)
 
-    agent_agg: dict[str, dict] = {}
+    agent_agg: dict[str, dict[str, Any]] = {}
 
     for s in raw_sessions:
         key = s.get("key", "")
@@ -256,7 +259,7 @@ async def _aggregate_agent_spend(
     return agent_agg
 
 
-async def _upsert_daily_spend(org_id: UUID, agent_agg: dict[str, dict]) -> None:
+async def _upsert_daily_spend(org_id: UUID, agent_agg: dict[str, dict[str, Any]]) -> None:
     """Persist per-agent daily spend snapshots for an organization."""
     today = date.today()
     async with async_session_maker() as session:
@@ -310,7 +313,7 @@ async def _send_discord_alert(gw_config: GatewayConfig, message: str) -> None:
 
 async def _check_thresholds(
     org_id: UUID,
-    agent_agg: dict[str, dict],
+    agent_agg: dict[str, dict[str, Any]],
     budget_config: BudgetConfig,
     gw_config: GatewayConfig,
 ) -> None:
@@ -393,7 +396,7 @@ async def _check_thresholds(
 
 
 async def _update_prometheus_gauges(
-    agent_agg: dict[str, dict], monthly_total: float, monthly_budget: float
+    agent_agg: dict[str, dict[str, Any]], monthly_total: float, monthly_budget: float
 ) -> None:
     """Update Prometheus gauges for budget metrics."""
     try:
@@ -419,7 +422,7 @@ async def check_budgets() -> None:
     # Get all orgs that have a gateway configured
     async with async_session_maker() as session:
         result = await session.execute(
-            select(Gateway.organization_id).where(Gateway.url.isnot(None)).distinct()  # type: ignore[union-attr]
+            select(Gateway.organization_id).where(Gateway.url.isnot(None)).distinct()  # type: ignore[attr-defined]
         )
         org_ids = [row[0] for row in result.all()]
 
@@ -435,7 +438,7 @@ async def check_budgets() -> None:
             continue
 
         budget_config = await _get_or_create_budget_config(org_id)
-        raw_sessions: list[dict] = []
+        raw_sessions: list[dict[str, Any]] = []
         agent_agg = await _aggregate_agent_spend(gw_config, _raw_sessions_out=raw_sessions)
 
         # Proactive context compaction — runs every cycle

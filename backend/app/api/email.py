@@ -97,15 +97,15 @@ async def list_email_accounts(
 
     stmt = (
         select(EmailAccount)
-        .where(EmailAccount.organization_id == ctx.organization.id)
-        .order_by(EmailAccount.created_at.desc())
+        .where(EmailAccount.organization_id == ctx.organization.id)  # type: ignore[arg-type]
+        .order_by(EmailAccount.created_at.desc())  # type: ignore[attr-defined]
     )
     # Non-admin users only see shared accounts + their own private accounts
     if not is_org_admin(ctx.member):
         stmt = stmt.where(
             or_(
-                EmailAccount.visibility == "shared",
-                EmailAccount.user_id == ctx.member.user_id,
+                EmailAccount.visibility == "shared",  # type: ignore[arg-type]
+                EmailAccount.user_id == ctx.member.user_id,  # type: ignore[arg-type]
             )
         )
     result = await session.execute(stmt)
@@ -169,10 +169,10 @@ async def delete_email_account(
     from sqlalchemy import delete as sa_delete
 
     await session.execute(
-        sa_delete(EmailAttachment).where(EmailAttachment.email_message_id.in_(msg_ids_stmt))
+        sa_delete(EmailAttachment).where(EmailAttachment.email_message_id.in_(msg_ids_stmt))  # type: ignore[attr-defined]
     )
     await session.execute(
-        sa_delete(EmailMessage).where(EmailMessage.email_account_id == account.id)
+        sa_delete(EmailMessage).where(EmailMessage.email_account_id == account.id)  # type: ignore[arg-type]
     )
     await session.delete(account)
     await session.commit()
@@ -215,17 +215,17 @@ async def list_email_messages(
     account = await _get_account_or_404(account_id, ctx, session)
     stmt = (
         select(EmailMessage)
-        .where(EmailMessage.email_account_id == account.id)
-        .order_by(EmailMessage.received_at.desc())
+        .where(EmailMessage.email_account_id == account.id)  # type: ignore[arg-type]
+        .order_by(EmailMessage.received_at.desc())  # type: ignore[attr-defined]
         .offset(offset)
         .limit(limit)
     )
     if folder:
-        stmt = stmt.where(EmailMessage.folder == folder)
+        stmt = stmt.where(EmailMessage.folder == folder)  # type: ignore[arg-type]
     if triage_status:
-        stmt = stmt.where(EmailMessage.triage_status == triage_status)
+        stmt = stmt.where(EmailMessage.triage_status == triage_status)  # type: ignore[arg-type]
     if is_read is not None:
-        stmt = stmt.where(EmailMessage.is_read == is_read)
+        stmt = stmt.where(EmailMessage.is_read == is_read)  # type: ignore[arg-type]
 
     result = await session.execute(stmt)
     messages = list(result.scalars().all())
@@ -258,7 +258,7 @@ async def get_email_message(
         from app.core.file_tokens import create_file_token
 
         att_stmt = select(EmailAttachment).where(
-            EmailAttachment.email_message_id == msg.id,
+            EmailAttachment.email_message_id == msg.id,  # type: ignore[arg-type]
             EmailAttachment.content_id.isnot(None),  # type: ignore[union-attr]
         )
         att_result = await session.execute(att_stmt)
@@ -346,9 +346,9 @@ async def reply_to_email(
     access_token = await get_valid_access_token(session, account)
 
     if account.provider == "zoho":
-        from app.services.email.providers.zoho import send_message
+        from app.services.email.providers.zoho import send_message as zoho_send_message
 
-        await send_message(
+        await zoho_send_message(
             access_token,
             account.provider_account_id or "",
             to=msg.sender_email,
@@ -357,9 +357,9 @@ async def reply_to_email(
             in_reply_to=msg.provider_message_id,
         )
     elif account.provider == "microsoft":
-        from app.services.email.providers.microsoft import send_message
+        from app.services.email.providers.microsoft import send_message as msft_send_message
 
-        await send_message(
+        await msft_send_message(
             access_token,
             to=msg.sender_email,
             subject=f"Re: {msg.subject or ''}",
@@ -390,9 +390,9 @@ async def forward_email(
         body = f"{body}\n\n--- Forwarded message ---\n{msg.body_text}"
 
     if account.provider == "zoho":
-        from app.services.email.providers.zoho import send_message
+        from app.services.email.providers.zoho import send_message as zoho_send_message
 
-        await send_message(
+        await zoho_send_message(
             access_token,
             account.provider_account_id or "",
             to=payload.to,
@@ -400,9 +400,9 @@ async def forward_email(
             body=body,
         )
     elif account.provider == "microsoft":
-        from app.services.email.providers.microsoft import send_message
+        from app.services.email.providers.microsoft import send_message as msft_send_message
 
-        await send_message(
+        await msft_send_message(
             access_token,
             to=payload.to,
             subject=f"Fwd: {msg.subject or ''}",
@@ -452,18 +452,20 @@ async def archive_email(
     access_token = await get_valid_access_token(session, account)
 
     if account.provider == "zoho":
-        from app.services.email.providers.zoho import move_message
+        from app.services.email.providers.zoho import move_message as zoho_move_message
 
-        await move_message(
+        await zoho_move_message(
             access_token,
             account.provider_account_id or "",
             msg.provider_message_id,
             target_folder="archive",
         )
     elif account.provider == "microsoft":
-        from app.services.email.providers.microsoft import move_message
+        from app.services.email.providers.microsoft import move_message as msft_move_message
 
-        await move_message(access_token, msg.provider_message_id, target_folder="archive")
+        await msft_move_message(
+            access_token, msg.provider_message_id, target_folder="archive"
+        )
 
     msg.folder = "archive"
     msg.updated_at = utcnow()
@@ -492,8 +494,8 @@ async def list_email_attachments(
     msg = await _get_message_or_404(message_id, account, session)
     stmt = (
         select(EmailAttachment)
-        .where(EmailAttachment.email_message_id == msg.id)
-        .order_by(EmailAttachment.created_at)
+        .where(EmailAttachment.email_message_id == msg.id)  # type: ignore[arg-type]
+        .order_by(EmailAttachment.created_at)  # type: ignore[arg-type]
     )
     result = await session.execute(stmt)
     attachments = list(result.scalars().all())
@@ -549,18 +551,22 @@ async def download_email_attachment(
     access_token = await get_valid_access_token(session, account)
 
     if account.provider == "zoho":
-        from app.services.email.providers.zoho import download_attachment
+        from app.services.email.providers.zoho import (
+            download_attachment as zoho_download_attachment,
+        )
 
-        content, filename, content_type = await download_attachment(
+        content, filename, content_type = await zoho_download_attachment(
             access_token,
             account.provider_account_id or "",
             msg.provider_message_id,
             att.provider_attachment_id or "",
         )
     elif account.provider == "microsoft":
-        from app.services.email.providers.microsoft import download_attachment
+        from app.services.email.providers.microsoft import (
+            download_attachment as msft_download_attachment,
+        )
 
-        content, filename, content_type = await download_attachment(
+        content, filename, content_type = await msft_download_attachment(
             access_token,
             msg.provider_message_id,
             att.provider_attachment_id or "",
@@ -627,18 +633,22 @@ async def get_inline_attachment(
     access_token = await get_valid_access_token(session, account)
 
     if account.provider == "zoho":
-        from app.services.email.providers.zoho import download_attachment
+        from app.services.email.providers.zoho import (
+            download_attachment as zoho_download_attachment,
+        )
 
-        content, filename, content_type = await download_attachment(
+        content, filename, content_type = await zoho_download_attachment(
             access_token,
             account.provider_account_id or "",
             msg.provider_message_id,
             att.provider_attachment_id or "",
         )
     elif account.provider == "microsoft":
-        from app.services.email.providers.microsoft import download_attachment
+        from app.services.email.providers.microsoft import (
+            download_attachment as msft_download_attachment,
+        )
 
-        content, filename, content_type = await download_attachment(
+        content, filename, content_type = await msft_download_attachment(
             access_token,
             msg.provider_message_id,
             att.provider_attachment_id or "",

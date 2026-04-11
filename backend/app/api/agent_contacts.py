@@ -112,7 +112,7 @@ async def agent_search_contacts(
     contact_stmt = (
         select(OrgContact)
         .where(
-            OrgContact.organization_id == org_id,
+            OrgContact.organization_id == org_id,  # type: ignore[arg-type]
             or_(
                 func.lower(OrgContact.name).like(search),
                 func.lower(OrgContact.email).like(search),
@@ -145,7 +145,7 @@ async def agent_search_contacts(
         )
         .where(
             EmailMessage.organization_id == org_id,
-            EmailMessage.email_account_id.in_(shared_account_ids),
+            EmailMessage.email_account_id.in_(shared_account_ids),  # type: ignore[attr-defined]
             or_(
                 func.lower(EmailMessage.sender_email).like(search),
                 func.lower(EmailMessage.sender_name).like(search),

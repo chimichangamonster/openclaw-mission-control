@@ -1,6 +1,9 @@
 """Paper trading API — portfolios, positions, trades, and performance."""
 
+
 from __future__ import annotations
+
+from typing import Any
 
 from collections import defaultdict
 from uuid import UUID
@@ -34,8 +37,8 @@ router = APIRouter(
 async def list_portfolios(
     session: AsyncSession = Depends(get_session),
     org_ctx: OrganizationContext = Depends(require_org_member),
-) -> list[dict]:
-    stmt = select(PaperPortfolio).where(PaperPortfolio.organization_id == org_ctx.organization.id)
+) -> list[dict[str, Any]]:
+    stmt = select(PaperPortfolio).where(PaperPortfolio.organization_id == org_ctx.organization.id)  # type: ignore[arg-type]
     result = await session.execute(stmt)
     portfolios = result.scalars().all()
     out = []
@@ -43,7 +46,7 @@ async def list_portfolios(
         # Count open positions
         pos_stmt = select(func.count()).where(
             PaperPosition.portfolio_id == p.id,
-            PaperPosition.status == "open",
+            PaperPosition.status == "open",  # type: ignore[arg-type]
         )
         pos_count = (await session.execute(pos_stmt)).scalar() or 0
         out.append(
@@ -66,7 +69,7 @@ async def create_portfolio(
     org_ctx: OrganizationContext = Depends(require_org_member),
     name: str = "Default Portfolio",
     starting_balance: float = 10000.0,
-) -> dict:
+) -> dict[str, Any]:
     portfolio = PaperPortfolio(
         organization_id=org_ctx.organization.id,
         user_id=org_ctx.member.user_id,
@@ -90,10 +93,10 @@ async def get_portfolio(
     portfolio_id: UUID,
     session: AsyncSession = Depends(get_session),
     org_ctx: OrganizationContext = Depends(require_org_member),
-) -> dict:
+) -> dict[str, Any]:
     stmt = select(PaperPortfolio).where(
-        PaperPortfolio.id == portfolio_id,
-        PaperPortfolio.organization_id == org_ctx.organization.id,
+        PaperPortfolio.id == portfolio_id,  # type: ignore[arg-type]
+        PaperPortfolio.organization_id == org_ctx.organization.id,  # type: ignore[arg-type]
     )
     portfolio = (await session.execute(stmt)).scalar_one_or_none()
     if not portfolio:
@@ -101,8 +104,8 @@ async def get_portfolio(
 
     # Get open positions
     pos_stmt = select(PaperPosition).where(
-        PaperPosition.portfolio_id == portfolio_id,
-        PaperPosition.status == "open",
+        PaperPosition.portfolio_id == portfolio_id,  # type: ignore[arg-type]
+        PaperPosition.status == "open",  # type: ignore[arg-type]
     )
     positions = (await session.execute(pos_stmt)).scalars().all()
 
@@ -143,11 +146,11 @@ async def toggle_auto_trade(
     enabled: bool = True,
     session: AsyncSession = Depends(get_session),
     org_ctx: OrganizationContext = Depends(require_org_member),
-) -> dict:
+) -> dict[str, Any]:
     """Toggle auto-trade on/off for a portfolio."""
     stmt = select(PaperPortfolio).where(
-        PaperPortfolio.id == portfolio_id,
-        PaperPortfolio.organization_id == org_ctx.organization.id,
+        PaperPortfolio.id == portfolio_id,  # type: ignore[arg-type]
+        PaperPortfolio.organization_id == org_ctx.organization.id,  # type: ignore[arg-type]
     )
     portfolio = (await session.execute(stmt)).scalar_one_or_none()
     if not portfolio:
@@ -164,13 +167,13 @@ async def list_positions(
     session: AsyncSession = Depends(get_session),
     portfolio: PaperPortfolio = PORTFOLIO_DEP,
     status_filter: str = Query("open", alias="status"),
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     stmt = select(PaperPosition).where(
-        PaperPosition.portfolio_id == portfolio.id,
+        PaperPosition.portfolio_id == portfolio.id,  # type: ignore[arg-type]
     )
     if status_filter != "all":
-        stmt = stmt.where(PaperPosition.status == status_filter)
-    stmt = stmt.order_by(PaperPosition.entry_date.desc())
+        stmt = stmt.where(PaperPosition.status == status_filter)  # type: ignore[arg-type]
+    stmt = stmt.order_by(PaperPosition.entry_date.desc())  # type: ignore[attr-defined]
 
     positions = (await session.execute(stmt)).scalars().all()
     out = []
@@ -245,11 +248,11 @@ async def execute_trade(
     exchange: str | None = None,
     sector: str | None = None,
     source_report: str | None = None,
-) -> dict:
+) -> dict[str, Any]:
     # Get portfolio
     stmt = select(PaperPortfolio).where(
-        PaperPortfolio.id == portfolio_id,
-        PaperPortfolio.organization_id == org_ctx.organization.id,
+        PaperPortfolio.id == portfolio_id,  # type: ignore[arg-type]
+        PaperPortfolio.organization_id == org_ctx.organization.id,  # type: ignore[arg-type]
     )
     portfolio = (await session.execute(stmt)).scalar_one_or_none()
     if not portfolio:
@@ -265,11 +268,11 @@ async def execute_trade(
 
         # Find existing open position or create new
         pos_stmt = select(PaperPosition).where(
-            PaperPosition.portfolio_id == portfolio_id,
-            PaperPosition.symbol == symbol,
-            PaperPosition.asset_type == asset_type,
-            PaperPosition.side == "long",
-            PaperPosition.status == "open",
+            PaperPosition.portfolio_id == portfolio_id,  # type: ignore[arg-type]
+            PaperPosition.symbol == symbol,  # type: ignore[arg-type]
+            PaperPosition.asset_type == asset_type,  # type: ignore[arg-type]
+            PaperPosition.side == "long",  # type: ignore[arg-type]
+            PaperPosition.status == "open",  # type: ignore[arg-type]
         )
         position = (await session.execute(pos_stmt)).scalar_one_or_none()
 
@@ -322,11 +325,11 @@ async def execute_trade(
     elif trade_type == "sell":
         # Find open long position
         pos_stmt = select(PaperPosition).where(
-            PaperPosition.portfolio_id == portfolio_id,
-            PaperPosition.symbol == symbol,
-            PaperPosition.asset_type == asset_type,
-            PaperPosition.side == "long",
-            PaperPosition.status == "open",
+            PaperPosition.portfolio_id == portfolio_id,  # type: ignore[arg-type]
+            PaperPosition.symbol == symbol,  # type: ignore[arg-type]
+            PaperPosition.asset_type == asset_type,  # type: ignore[arg-type]
+            PaperPosition.side == "long",  # type: ignore[arg-type]
+            PaperPosition.status == "open",  # type: ignore[arg-type]
         )
         position = (await session.execute(pos_stmt)).scalar_one_or_none()
         if not position:
@@ -403,11 +406,11 @@ async def list_trades(
     session: AsyncSession = Depends(get_session),
     portfolio: PaperPortfolio = PORTFOLIO_DEP,
     limit: int = Query(50, le=200),
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     stmt = (
         select(PaperTrade)
-        .where(PaperTrade.portfolio_id == portfolio.id)
-        .order_by(PaperTrade.executed_at.desc())
+        .where(PaperTrade.portfolio_id == portfolio.id)  # type: ignore[arg-type]
+        .order_by(PaperTrade.executed_at.desc())  # type: ignore[attr-defined]
         .limit(limit)
     )
     trades = (await session.execute(stmt)).scalars().all()
@@ -435,11 +438,11 @@ async def portfolio_summary(
     portfolio_id: UUID,
     session: AsyncSession = Depends(get_session),
     org_ctx: OrganizationContext = Depends(require_org_member),
-) -> dict:
+) -> dict[str, Any]:
     # Get portfolio
     stmt = select(PaperPortfolio).where(
-        PaperPortfolio.id == portfolio_id,
-        PaperPortfolio.organization_id == org_ctx.organization.id,
+        PaperPortfolio.id == portfolio_id,  # type: ignore[arg-type]
+        PaperPortfolio.organization_id == org_ctx.organization.id,  # type: ignore[arg-type]
     )
     portfolio = (await session.execute(stmt)).scalar_one_or_none()
     if not portfolio:
@@ -447,8 +450,8 @@ async def portfolio_summary(
 
     # Closed positions for win rate
     closed_stmt = select(PaperPosition).where(
-        PaperPosition.portfolio_id == portfolio_id,
-        PaperPosition.status == "closed",
+        PaperPosition.portfolio_id == portfolio_id,  # type: ignore[arg-type]
+        PaperPosition.status == "closed",  # type: ignore[arg-type]
     )
     closed = (await session.execute(closed_stmt)).scalars().all()
 
@@ -460,13 +463,13 @@ async def portfolio_summary(
 
     # Trade count
     trade_count = (
-        await session.execute(select(func.count()).where(PaperTrade.portfolio_id == portfolio_id))
+        await session.execute(select(func.count()).where(PaperTrade.portfolio_id == portfolio_id))  # type: ignore[arg-type]
     ).scalar() or 0
 
     # Open positions unrealized
     open_stmt = select(PaperPosition).where(
-        PaperPosition.portfolio_id == portfolio_id,
-        PaperPosition.status == "open",
+        PaperPosition.portfolio_id == portfolio_id,  # type: ignore[arg-type]
+        PaperPosition.status == "open",  # type: ignore[arg-type]
     )
     open_positions = (await session.execute(open_stmt)).scalars().all()
     positions_value = sum((p.current_price or p.entry_price) * p.quantity for p in open_positions)
@@ -559,11 +562,11 @@ async def update_position(
     exchange: str | None = None,
     sector: str | None = None,
     source_report: str | None = None,
-) -> dict:
+) -> dict[str, Any]:
     """Update position metadata — price, risk levels, or ticker info."""
     stmt = select(PaperPosition).where(
-        PaperPosition.id == position_id,
-        PaperPosition.portfolio_id == portfolio.id,
+        PaperPosition.id == position_id,  # type: ignore[arg-type]
+        PaperPosition.portfolio_id == portfolio.id,  # type: ignore[arg-type]
     )
     position = (await session.execute(stmt)).scalar_one_or_none()
     if not position:
@@ -609,12 +612,12 @@ async def equity_curve(
     portfolio_id: UUID,
     session: AsyncSession = Depends(get_session),
     org_ctx: OrganizationContext = Depends(require_org_member),
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """Daily equity curve: starting balance + cumulative realized P&L from trades."""
     # Verify portfolio
     stmt = select(PaperPortfolio).where(
-        PaperPortfolio.id == portfolio_id,
-        PaperPortfolio.organization_id == org_ctx.organization.id,
+        PaperPortfolio.id == portfolio_id,  # type: ignore[arg-type]
+        PaperPortfolio.organization_id == org_ctx.organization.id,  # type: ignore[arg-type]
     )
     portfolio = (await session.execute(stmt)).scalar_one_or_none()
     if not portfolio:
@@ -623,8 +626,8 @@ async def equity_curve(
     # Get all trades ordered by date
     trade_stmt = (
         select(PaperTrade)
-        .where(PaperTrade.portfolio_id == portfolio_id)
-        .order_by(PaperTrade.executed_at.asc())
+        .where(PaperTrade.portfolio_id == portfolio_id)  # type: ignore[arg-type]
+        .order_by(PaperTrade.executed_at.asc())  # type: ignore[attr-defined]
     )
     trades = (await session.execute(trade_stmt)).scalars().all()
 

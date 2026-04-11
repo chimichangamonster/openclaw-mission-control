@@ -83,7 +83,7 @@ async def get_wallet(
     session: AsyncSession = SESSION_DEP,
 ) -> PolymarketWallet | None:
     """Get wallet status (no secrets exposed)."""
-    stmt = select(PolymarketWallet).where(PolymarketWallet.organization_id == ctx.organization.id)
+    stmt = select(PolymarketWallet).where(PolymarketWallet.organization_id == ctx.organization.id)  # type: ignore[arg-type]
     return (await session.execute(stmt)).scalar_one_or_none()
 
 
@@ -93,7 +93,7 @@ async def disconnect_wallet(
     session: AsyncSession = SESSION_DEP,
 ) -> None:
     """Remove the Polymarket wallet."""
-    stmt = select(PolymarketWallet).where(PolymarketWallet.organization_id == ctx.organization.id)
+    stmt = select(PolymarketWallet).where(PolymarketWallet.organization_id == ctx.organization.id)  # type: ignore[arg-type]
     wallet = (await session.execute(stmt)).scalar_one_or_none()
     if wallet:
         await session.delete(wallet)
@@ -106,14 +106,14 @@ async def re_derive_credentials(
     session: AsyncSession = SESSION_DEP,
 ) -> PolymarketWallet:
     """Re-derive Polymarket API credentials from stored private key."""
-    stmt = select(PolymarketWallet).where(PolymarketWallet.organization_id == ctx.organization.id)
+    stmt = select(PolymarketWallet).where(PolymarketWallet.organization_id == ctx.organization.id)  # type: ignore[arg-type]
     wallet = (await session.execute(stmt)).scalar_one_or_none()
     if wallet is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No wallet configured.")
     await derive_api_credentials(session, wallet)
     await session.commit()
     await session.refresh(wallet)
-    return wallet
+    return wallet  # type: ignore[no-any-return]
 
 
 # ---------------------------------------------------------------------------
@@ -128,7 +128,7 @@ async def get_risk_config(
 ) -> PolymarketRiskConfig | None:
     """Get current risk configuration."""
     stmt = select(PolymarketRiskConfig).where(
-        PolymarketRiskConfig.organization_id == ctx.organization.id
+        PolymarketRiskConfig.organization_id == ctx.organization.id  # type: ignore[arg-type]
     )
     return (await session.execute(stmt)).scalar_one_or_none()
 
@@ -143,7 +143,7 @@ async def update_risk_config(
     from uuid import uuid4
 
     stmt = select(PolymarketRiskConfig).where(
-        PolymarketRiskConfig.organization_id == ctx.organization.id
+        PolymarketRiskConfig.organization_id == ctx.organization.id  # type: ignore[arg-type]
     )
     config = (await session.execute(stmt)).scalar_one_or_none()
     now = utcnow()
@@ -221,13 +221,13 @@ async def list_trade_proposals(
     """List trade proposals for the organization."""
     stmt = (
         select(TradeProposal)
-        .where(TradeProposal.organization_id == ctx.organization.id)
-        .order_by(TradeProposal.created_at.desc())
+        .where(TradeProposal.organization_id == ctx.organization.id)  # type: ignore[arg-type]
+        .order_by(TradeProposal.created_at.desc())  # type: ignore[attr-defined]
         .offset(offset)
         .limit(limit)
     )
     if proposal_status:
-        stmt = stmt.where(TradeProposal.status == proposal_status)
+        stmt = stmt.where(TradeProposal.status == proposal_status)  # type: ignore[arg-type]
     result = await session.execute(stmt)
     return list(result.scalars().all())
 
@@ -258,8 +258,8 @@ async def list_positions(
     """List current Polymarket positions."""
     stmt = (
         select(PolymarketPosition)
-        .where(PolymarketPosition.organization_id == ctx.organization.id)
-        .order_by(PolymarketPosition.created_at.desc())
+        .where(PolymarketPosition.organization_id == ctx.organization.id)  # type: ignore[arg-type]
+        .order_by(PolymarketPosition.created_at.desc())  # type: ignore[attr-defined]
     )
     result = await session.execute(stmt)
     return list(result.scalars().all())
@@ -280,8 +280,8 @@ async def list_trade_history(
     """List executed trade history."""
     stmt = (
         select(TradeHistory)
-        .where(TradeHistory.organization_id == ctx.organization.id)
-        .order_by(TradeHistory.executed_at.desc())
+        .where(TradeHistory.organization_id == ctx.organization.id)  # type: ignore[arg-type]
+        .order_by(TradeHistory.executed_at.desc())  # type: ignore[attr-defined]
         .offset(offset)
         .limit(limit)
     )

@@ -1,6 +1,9 @@
 """Bookkeeping transactions — general ledger, cashflow, GST/HST summaries."""
 
+
 from __future__ import annotations
+
+from typing import Any
 
 from datetime import date
 from uuid import uuid4
@@ -33,7 +36,7 @@ class TransactionCreate(BaseModel):
 @router.post("", status_code=201)
 async def create_transaction(
     payload: TransactionCreate, org_ctx: OrganizationContext = ORG_ACTOR_DEP
-):
+) -> Any:
     if payload.type not in ("income", "expense"):
         raise HTTPException(status_code=400, detail="type must be 'income' or 'expense'")
     async with async_session_maker() as session:
@@ -65,7 +68,7 @@ async def list_transactions(
     from_date: date | None = Query(default=None, alias="from"),
     to_date: date | None = Query(default=None, alias="to"),
     org_ctx: OrganizationContext = ORG_ACTOR_DEP,
-):
+) -> Any:
     async with async_session_maker() as session:
         stmt = select(BkTransaction).where(BkTransaction.organization_id == org_ctx.organization.id)
         if type:
@@ -75,10 +78,10 @@ async def list_transactions(
         if job_id:
             stmt = stmt.where(BkTransaction.job_id == job_id)
         if from_date:
-            stmt = stmt.where(BkTransaction.txn_date >= from_date)  # type: ignore[operator]
+            stmt = stmt.where(BkTransaction.txn_date >= from_date)
         if to_date:
-            stmt = stmt.where(BkTransaction.txn_date <= to_date)  # type: ignore[operator]
-        stmt = stmt.order_by(BkTransaction.txn_date.desc())  # type: ignore[union-attr]
+            stmt = stmt.where(BkTransaction.txn_date <= to_date)
+        stmt = stmt.order_by(BkTransaction.txn_date.desc())  # type: ignore[attr-defined]
         result = await session.execute(stmt)
         return [_serialize(t) for t in result.scalars().all()]
 
@@ -87,7 +90,7 @@ async def list_transactions(
 async def cashflow_summary(
     period: str = Query(default="month"),  # week, month, quarter
     org_ctx: OrganizationContext = ORG_ACTOR_DEP,
-):
+) -> Any:
     """Cashflow summary for a period: total income, expenses, net, GST."""
     from datetime import timedelta
 
@@ -103,7 +106,7 @@ async def cashflow_summary(
         result = await session.execute(
             select(BkTransaction).where(
                 BkTransaction.organization_id == org_ctx.organization.id,
-                BkTransaction.txn_date >= start,  # type: ignore[operator]
+                BkTransaction.txn_date >= start,
             )
         )
         transactions = result.scalars().all()
@@ -131,7 +134,7 @@ async def hst_summary(
     quarter: str = Query(default="Q1"),  # Q1, Q2, Q3, Q4
     year: int = Query(default=2026),
     org_ctx: OrganizationContext = ORG_ACTOR_DEP,
-):
+) -> Any:
     """Quarterly GST summary for CRA filing."""
     quarter_starts = {"Q1": 1, "Q2": 4, "Q3": 7, "Q4": 10}
     start_month = quarter_starts.get(quarter, 1)
@@ -151,8 +154,8 @@ async def hst_summary(
         result = await session.execute(
             select(BkTransaction).where(
                 BkTransaction.organization_id == org_ctx.organization.id,
-                BkTransaction.txn_date >= start,  # type: ignore[operator]
-                BkTransaction.txn_date <= end,  # type: ignore[operator]
+                BkTransaction.txn_date >= start,
+                BkTransaction.txn_date <= end,
             )
         )
         transactions = result.scalars().all()
@@ -173,7 +176,7 @@ async def hst_summary(
         }
 
 
-def _serialize(t: BkTransaction) -> dict:
+def _serialize(t: BkTransaction) -> dict[str, Any]:
     return {
         "id": str(t.id),
         "type": t.type,

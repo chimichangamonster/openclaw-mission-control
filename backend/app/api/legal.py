@@ -1,6 +1,9 @@
 """Legal document endpoints — terms of service, privacy policy, data trust page."""
 
+
 from __future__ import annotations
+
+from typing import Any
 
 from pathlib import Path
 
@@ -84,7 +87,7 @@ async def get_onboarding_checklist_pdf(industry: str | None = None) -> Response:
         title = f"{template.name} — Onboarding Preparation Checklist"
 
     # --- Generic sections (all verticals) ---
-    sections: list[dict] = [
+    sections: list[dict[str, Any]] = [
         {
             "heading": "1. Team & Access",
             "content": (

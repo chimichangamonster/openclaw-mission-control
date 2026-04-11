@@ -1,6 +1,9 @@
 """Microsoft Graph Mail API client for message fetching and actions."""
 
+
 from __future__ import annotations
+
+from typing import Any
 
 from datetime import datetime
 
@@ -26,7 +29,7 @@ def _parse_graph_date(date_str: str) -> datetime:
     return datetime.fromisoformat(date_str.replace("Z", "+00:00")).replace(tzinfo=None)
 
 
-def _extract_recipients(recipients: list[dict] | None) -> list[dict[str, str]]:
+def _extract_recipients(recipients: list[dict[str, Any]] | None) -> list[dict[str, str]]:
     if not recipients:
         return []
     return [
@@ -113,7 +116,7 @@ async def fetch_messages(
 async def fetch_attachments(
     access_token: str,
     message_id: str,
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """Fetch attachment metadata for a message from Graph API."""
     url = f"{GRAPH_URL}/me/messages/{message_id}/attachments"
     async with httpx.AsyncClient() as client:
@@ -163,8 +166,8 @@ async def send_message(
     body: str,
     content_type: str = "Text",
     reply_to_message_id: str | None = None,
-    attachments: list[dict] | None = None,
-) -> dict:
+    attachments: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
     """Send or reply to an email via Graph API.
 
     Args:
@@ -178,7 +181,7 @@ async def send_message(
         import base64
 
         url = f"{GRAPH_URL}/me/sendMail"
-        message: dict = {
+        message: dict[str, Any] = {
             "subject": subject,
             "body": {"contentType": content_type, "content": body},
             "toRecipients": [{"emailAddress": {"address": to}}],
@@ -200,7 +203,7 @@ async def send_message(
         resp.raise_for_status()
         if resp.status_code == 202 or not resp.content:
             return {"ok": True}
-        return resp.json()
+        return resp.json()  # type: ignore[no-any-return]
 
 
 async def move_message(

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 from uuid import UUID, uuid4
 
 from sqlalchemy import select
@@ -34,9 +34,9 @@ async def create_crypto_trade_proposal(
     """Create a crypto trade proposal with an associated Approval."""
     # Verify exchange account exists
     stmt = select(ExchangeAccount).where(
-        ExchangeAccount.organization_id == org_id,
-        ExchangeAccount.exchange == "binance",
-        ExchangeAccount.is_active == True,  # noqa: E712
+        ExchangeAccount.organization_id == org_id,  # type: ignore[arg-type]
+        ExchangeAccount.exchange == "binance",  # type: ignore[arg-type]
+        ExchangeAccount.is_active == True,  # noqa: E712  # type: ignore[arg-type]
     )
     exchange_account = (await session.execute(stmt)).scalar_one_or_none()
     if exchange_account is None:
@@ -85,7 +85,7 @@ async def create_crypto_trade_proposal(
     await session.flush()
 
     # Check if auto-execution is allowed (uses shared Polymarket risk config)
-    stmt_risk = select(PolymarketRiskConfig).where(PolymarketRiskConfig.organization_id == org_id)
+    stmt_risk = select(PolymarketRiskConfig).where(PolymarketRiskConfig.organization_id == org_id)  # type: ignore[arg-type]
     risk_config = (await session.execute(stmt_risk)).scalar_one_or_none()
 
     # Determine trade size for auto-execute check
@@ -192,7 +192,7 @@ async def execute_approved_crypto_trade(
     try:
         client = get_binance_client(exchange_account)
 
-        order_params: dict = {
+        order_params: dict[str, Any] = {
             "symbol": proposal.symbol,
             "side": proposal.side,
             "type": proposal.order_type,

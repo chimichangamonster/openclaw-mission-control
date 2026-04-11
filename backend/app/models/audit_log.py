@@ -1,6 +1,9 @@
 """Audit log for security-sensitive operations."""
 
+
 from __future__ import annotations
+
+from typing import Any
 
 import json
 from datetime import datetime
@@ -28,5 +31,5 @@ class AuditLog(QueryModel, table=True):
     created_at: datetime = Field(default_factory=utcnow, index=True)
 
     @property
-    def details(self) -> dict:
-        return json.loads(self.details_json)
+    def details(self) -> dict[str, Any]:
+        return json.loads(self.details_json)  # type: ignore[no-any-return]

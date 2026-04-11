@@ -1,6 +1,9 @@
 """Document intake API — upload, extract text, classify."""
 
+
 from __future__ import annotations
+
+from typing import Any
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
@@ -32,7 +35,7 @@ ALLOWED_TYPES = {
 async def intake_document(
     file: UploadFile = File(...),
     org_ctx: OrganizationContext = ORG_ACTOR_DEP,
-):
+) -> Any:
     """Upload a document for text extraction and classification."""
     content_type = file.content_type or "application/octet-stream"
     if content_type not in ALLOWED_TYPES:
@@ -60,7 +63,7 @@ async def intake_document(
 async def agent_intake_document(
     file: UploadFile = File(...),
     org_ctx: OrganizationContext = ORG_ACTOR_DEP,
-):
+) -> Any:
     """Agent-accessible document intake — same as user endpoint."""
     content_type = file.content_type or "application/octet-stream"
     if content_type not in ALLOWED_TYPES:

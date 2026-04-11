@@ -1,6 +1,9 @@
 """Paper sports betting API — place, list, resolve, and summarize bets."""
 
+
 from __future__ import annotations
+
+from typing import Any
 
 from uuid import UUID
 
@@ -63,12 +66,12 @@ async def place_bet(
     proposed_by: str = "manual",
     reasoning: str = "",
     book: str = "",
-) -> dict:
+) -> dict[str, Any]:
     """Place a paper sports bet. Deducts stake from portfolio cash balance."""
     # Verify portfolio
     stmt = select(PaperPortfolio).where(
-        PaperPortfolio.id == portfolio_id,
-        PaperPortfolio.organization_id == org_ctx.organization.id,
+        PaperPortfolio.id == portfolio_id,  # type: ignore[arg-type]
+        PaperPortfolio.organization_id == org_ctx.organization.id,  # type: ignore[arg-type]
     )
     portfolio = (await session.execute(stmt)).scalar_one_or_none()
     if not portfolio:
@@ -144,12 +147,12 @@ async def list_bets(
     portfolio: PaperPortfolio = PORTFOLIO_DEP,
     status_filter: str = Query("all", alias="status"),
     limit: int = Query(50, le=200),
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """List paper bets for a portfolio."""
-    stmt = select(PaperBet).where(PaperBet.portfolio_id == portfolio.id)
+    stmt = select(PaperBet).where(PaperBet.portfolio_id == portfolio.id)  # type: ignore[arg-type]
     if status_filter != "all":
-        stmt = stmt.where(PaperBet.status == status_filter)
-    stmt = stmt.order_by(PaperBet.created_at.desc()).limit(limit)
+        stmt = stmt.where(PaperBet.status == status_filter)  # type: ignore[arg-type]
+    stmt = stmt.order_by(PaperBet.created_at.desc()).limit(limit)  # type: ignore[attr-defined]
 
     bets = (await session.execute(stmt)).scalars().all()
     return [
@@ -186,11 +189,11 @@ async def resolve_bet(
     session: AsyncSession = Depends(get_session),
     portfolio: PaperPortfolio = PORTFOLIO_DEP,
     result: str = "won",  # won, lost, push, void
-) -> dict:
+) -> dict[str, Any]:
     """Resolve a pending bet. Updates bankroll accordingly."""
     stmt = select(PaperBet).where(
-        PaperBet.id == bet_id,
-        PaperBet.portfolio_id == portfolio.id,
+        PaperBet.id == bet_id,  # type: ignore[arg-type]
+        PaperBet.portfolio_id == portfolio.id,  # type: ignore[arg-type]
     )
     bet = (await session.execute(stmt)).scalar_one_or_none()
     if not bet:
@@ -246,19 +249,19 @@ async def resolve_bet(
 async def bet_summary(
     session: AsyncSession = Depends(get_session),
     portfolio: PaperPortfolio = PORTFOLIO_DEP,
-) -> dict:
+) -> dict[str, Any]:
     """Performance summary for sports betting."""
     # All resolved bets
     stmt = select(PaperBet).where(
-        PaperBet.portfolio_id == portfolio.id,
-        PaperBet.status.in_(["won", "lost", "push"]),
+        PaperBet.portfolio_id == portfolio.id,  # type: ignore[arg-type]
+        PaperBet.status.in_(["won", "lost", "push"]),  # type: ignore[attr-defined]
     )
     resolved = (await session.execute(stmt)).scalars().all()
 
     # Pending bets
     pending_stmt = select(PaperBet).where(
-        PaperBet.portfolio_id == portfolio.id,
-        PaperBet.status == "pending",
+        PaperBet.portfolio_id == portfolio.id,  # type: ignore[arg-type]
+        PaperBet.status == "pending",  # type: ignore[arg-type]
     )
     pending = (await session.execute(pending_stmt)).scalars().all()
 
@@ -277,7 +280,7 @@ async def bet_summary(
     roi = round(total_pnl / total_staked * 100, 2) if total_staked > 0 else 0
 
     # By sport breakdown
-    by_sport: dict[str, dict] = {}
+    by_sport: dict[str, dict[str, Any]] = {}
     for b in resolved:
         if b.sport not in by_sport:
             by_sport[b.sport] = {"wins": 0, "losses": 0, "pushes": 0, "pnl": 0.0, "staked": 0.0}
@@ -292,7 +295,7 @@ async def bet_summary(
             s["pushes"] += 1
 
     # By bet type breakdown
-    by_type: dict[str, dict] = {}
+    by_type: dict[str, dict[str, Any]] = {}
     for b in resolved:
         if b.bet_type not in by_type:
             by_type[b.bet_type] = {"wins": 0, "losses": 0, "pnl": 0.0}

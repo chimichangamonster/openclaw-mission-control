@@ -1,6 +1,9 @@
 """Bookkeeping workers CRUD + safety cert tracking."""
 
+
 from __future__ import annotations
+
+from typing import Any
 
 import json
 from datetime import date, timedelta
@@ -25,7 +28,7 @@ class WorkerCreate(BaseModel):
     email: str | None = None
     role: str | None = None
     hourly_rate: float | None = None
-    safety_certs: list[dict] | None = None
+    safety_certs: list[dict[str, Any]] | None = None
     csts_expiry: date | None = None
     ossa_expiry: date | None = None
     first_aid_expiry: date | None = None
@@ -40,7 +43,7 @@ class WorkerUpdate(BaseModel):
     email: str | None = None
     role: str | None = None
     hourly_rate: float | None = None
-    safety_certs: list[dict] | None = None
+    safety_certs: list[dict[str, Any]] | None = None
     csts_expiry: date | None = None
     ossa_expiry: date | None = None
     first_aid_expiry: date | None = None
@@ -50,7 +53,7 @@ class WorkerUpdate(BaseModel):
 
 
 @router.post("", status_code=201)
-async def create_worker(payload: WorkerCreate, org_ctx: OrganizationContext = ORG_ACTOR_DEP):
+async def create_worker(payload: WorkerCreate, org_ctx: OrganizationContext = ORG_ACTOR_DEP) -> Any:
     async with async_session_maker() as session:
         worker = BkWorker(
             id=uuid4(),
@@ -77,7 +80,7 @@ async def create_worker(payload: WorkerCreate, org_ctx: OrganizationContext = OR
 
 
 @router.get("")
-async def list_workers(status: str | None = None, org_ctx: OrganizationContext = ORG_ACTOR_DEP):
+async def list_workers(status: str | None = None, org_ctx: OrganizationContext = ORG_ACTOR_DEP) -> Any:
     async with async_session_maker() as session:
         stmt = select(BkWorker).where(BkWorker.organization_id == org_ctx.organization.id)
         if status:
@@ -88,7 +91,7 @@ async def list_workers(status: str | None = None, org_ctx: OrganizationContext =
 
 
 @router.get("/available")
-async def available_workers(org_ctx: OrganizationContext = ORG_ACTOR_DEP):
+async def available_workers(org_ctx: OrganizationContext = ORG_ACTOR_DEP) -> Any:
     async with async_session_maker() as session:
         # Workers with status "available" who don't have active placements
         active_placed = select(BkPlacement.worker_id).where(
@@ -100,7 +103,7 @@ async def available_workers(org_ctx: OrganizationContext = ORG_ACTOR_DEP):
             .where(
                 BkWorker.organization_id == org_ctx.organization.id,
                 BkWorker.status == "available",
-                ~BkWorker.id.in_(active_placed),  # type: ignore[union-attr]
+                ~BkWorker.id.in_(active_placed),  # type: ignore[attr-defined]
             )
             .order_by(BkWorker.name)
         )
@@ -111,7 +114,7 @@ async def available_workers(org_ctx: OrganizationContext = ORG_ACTOR_DEP):
 @router.get("/expiring-certs")
 async def expiring_certs(
     days: int = Query(default=30), org_ctx: OrganizationContext = ORG_ACTOR_DEP
-):
+) -> Any:
     cutoff = date.today() + timedelta(days=days)
     async with async_session_maker() as session:
         stmt = (
@@ -132,7 +135,7 @@ async def expiring_certs(
 
 
 @router.get("/{worker_id}")
-async def get_worker(worker_id: str, org_ctx: OrganizationContext = ORG_ACTOR_DEP):
+async def get_worker(worker_id: str, org_ctx: OrganizationContext = ORG_ACTOR_DEP) -> Any:
     async with async_session_maker() as session:
         result = await session.execute(
             select(BkWorker).where(
@@ -148,7 +151,7 @@ async def get_worker(worker_id: str, org_ctx: OrganizationContext = ORG_ACTOR_DE
 @router.put("/{worker_id}")
 async def update_worker(
     worker_id: str, payload: WorkerUpdate, org_ctx: OrganizationContext = ORG_ACTOR_DEP
-):
+) -> Any:
     async with async_session_maker() as session:
         result = await session.execute(
             select(BkWorker).where(
@@ -170,7 +173,7 @@ async def update_worker(
         return _serialize(worker)
 
 
-def _serialize(w: BkWorker) -> dict:
+def _serialize(w: BkWorker) -> dict[str, Any]:
     return {
         "id": str(w.id),
         "name": w.name,

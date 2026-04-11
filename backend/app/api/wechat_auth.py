@@ -18,7 +18,7 @@ import hashlib
 import hmac
 import json
 import time
-from typing import TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
 from fastapi import APIRouter, HTTPException, status
 
@@ -41,7 +41,7 @@ router = APIRouter(prefix="/auth/wechat", tags=["auth"])
 _TOKEN_TTL_SECONDS = 86400
 
 
-def _sign_token(payload: dict) -> str:
+def _sign_token(payload: dict[str, Any]) -> str:
     """Create a signed session token from claims."""
     import base64
 
@@ -56,7 +56,7 @@ def _sign_token(payload: dict) -> str:
     return f"{encoded}.{sig}"
 
 
-def _verify_token(token: str) -> dict | None:
+def _verify_token(token: str) -> dict[str, Any] | None:
     """Verify and decode a signed session token. Returns None if invalid."""
     import base64
 
@@ -83,11 +83,11 @@ def _verify_token(token: str) -> dict | None:
     if payload.get("exp", 0) < time.time():
         return None
 
-    return payload
+    return payload  # type: ignore[no-any-return]
 
 
 @router.get("/authorize")
-async def wechat_authorize(redirect_uri: str) -> dict:
+async def wechat_authorize(redirect_uri: str) -> dict[str, Any]:
     """Return the WeCom OAuth authorize URL for frontend redirect."""
     url = build_authorize_url(
         corp_id=settings.wechat_corp_id,
@@ -98,7 +98,7 @@ async def wechat_authorize(redirect_uri: str) -> dict:
 
 
 @router.post("/callback")
-async def wechat_callback(code: str) -> dict:
+async def wechat_callback(code: str) -> dict[str, Any]:
     """Exchange a WeCom OAuth code for a session token.
 
     The frontend redirects here after WeCom authorization.

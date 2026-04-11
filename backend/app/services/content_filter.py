@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import re
 from enum import Enum
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
 from app.core.logging import get_logger
 
@@ -205,7 +205,7 @@ def filter_content(
     )
 
 
-def get_org_filter_region(data_policy: dict) -> str:
+def get_org_filter_region(data_policy: dict[str, Any]) -> str:
     """Extract the content filter region from an org's data policy.
 
     data_policy_json supports:
@@ -213,4 +213,4 @@ def get_org_filter_region(data_policy: dict) -> str:
 
     Defaults to "none" if not set.
     """
-    return data_policy.get("content_filter_region", "none")
+    return data_policy.get("content_filter_region", "none")  # type: ignore[no-any-return]

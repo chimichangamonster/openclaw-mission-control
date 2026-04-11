@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import time
-from typing import TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
 import httpx
 
@@ -141,7 +141,7 @@ async def send_news_message(
         logger.error("wecom.news.token_error error=%s", str(exc)[:200])
         return False
 
-    article: dict = {
+    article: dict[str, Any] = {
         "title": title,
         "description": description,
         "url": url,

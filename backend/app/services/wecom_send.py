@@ -36,17 +36,17 @@ async def get_org_wecom_connection(
     stmt = (
         select(WeComConnection)
         .where(
-            WeComConnection.organization_id == organization_id,
-            WeComConnection.is_active == True,  # noqa: E712
+            WeComConnection.organization_id == organization_id,  # type: ignore[arg-type]
+            WeComConnection.is_active == True,  # noqa: E712  # type: ignore[arg-type]
         )
-        .order_by(WeComConnection.created_at)
+        .order_by(WeComConnection.created_at)  # type: ignore[arg-type]
         .limit(1)
     )
     result = await session.execute(stmt)
     connection = result.scalars().first()
     if connection is None:
         raise NoWeComConnectionError("No active WeCom connection for this organization.")
-    return connection
+    return connection  # type: ignore[no-any-return]
 
 
 async def send_wecom_text(

@@ -1,6 +1,9 @@
 """Organization settings API — BYOK keys, feature flags, branding, logo upload."""
 
+
 from __future__ import annotations
+
+from typing import Any
 
 import json
 from pathlib import Path
@@ -49,7 +52,7 @@ def _mask_key(key: str | None) -> str | None:
 @router.get("/feature-flags")
 async def get_feature_flags(
     org_ctx: OrganizationContext = Depends(require_org_member),
-):
+) -> Any:
     """Get feature flags for the current organization (lightweight)."""
     org_id = org_ctx.organization.id
 
@@ -68,7 +71,7 @@ async def get_feature_flags(
 @router.get("")
 async def get_settings(
     org_ctx: OrganizationContext = Depends(require_org_member),
-):
+) -> Any:
     """Get organization settings. API keys are masked."""
     org_id = org_ctx.organization.id
 
@@ -155,8 +158,8 @@ class SettingsUpdate(BaseModel):
     default_model_tier_max: int | None = None
     configured_models: list[str] | None = None
     feature_flags: dict[str, bool] | None = None
-    agent_defaults: dict | None = None
-    branding: dict | None = None
+    agent_defaults: dict[str, Any] | None = None
+    branding: dict[str, Any] | None = None
     data_policy: DataPolicyUpdate | None = None
     timezone: str | None = None
     location: str | None = None
@@ -166,7 +169,7 @@ class SettingsUpdate(BaseModel):
 async def update_settings(
     payload: SettingsUpdate,
     org_ctx: OrganizationContext = _ADMIN_DEP,
-):
+) -> Any:
     """Update organization settings (non-key fields). Requires admin role."""
     org_id = org_ctx.organization.id
 
@@ -265,7 +268,7 @@ _OAUTH_PREFIXES = ("sk-ant-sid", "sess-", "eyJhbG")
 async def set_openrouter_key(
     payload: KeyPayload,
     org_ctx: OrganizationContext = _ADMIN_DEP,
-):
+) -> Any:
     """Store a BYOK OpenRouter API key (Fernet-encrypted). Requires admin role."""
     key = payload.key.strip()
 
@@ -314,7 +317,7 @@ async def set_openrouter_key(
 @router.delete("/openrouter-key")
 async def remove_openrouter_key(
     org_ctx: OrganizationContext = _ADMIN_DEP,
-):
+) -> Any:
     """Remove BYOK OpenRouter key. Requires admin role."""
     org_id = org_ctx.organization.id
 
@@ -344,7 +347,7 @@ async def remove_openrouter_key(
 async def set_management_key(
     payload: KeyPayload,
     org_ctx: OrganizationContext = _ADMIN_DEP,
-):
+) -> Any:
     """Store a BYOK OpenRouter management key. Requires admin role."""
     org_id = org_ctx.organization.id
 
@@ -378,7 +381,7 @@ async def set_management_key(
 @router.delete("/management-key")
 async def remove_management_key(
     org_ctx: OrganizationContext = _ADMIN_DEP,
-):
+) -> Any:
     """Remove BYOK management key. Requires admin role."""
     org_id = org_ctx.organization.id
 
@@ -413,7 +416,7 @@ class AdobeKeyPayload(BaseModel):
 async def set_adobe_pdf_key(
     payload: AdobeKeyPayload,
     org_ctx: OrganizationContext = _ADMIN_DEP,
-):
+) -> Any:
     """Store BYOK Adobe PDF Services credentials. Requires admin role."""
     org_id = org_ctx.organization.id
 
@@ -448,7 +451,7 @@ async def set_adobe_pdf_key(
 @router.delete("/adobe-pdf-key")
 async def remove_adobe_pdf_key(
     org_ctx: OrganizationContext = _ADMIN_DEP,
-):
+) -> Any:
     """Remove BYOK Adobe PDF Services credentials. Requires admin role."""
     org_id = org_ctx.organization.id
 
@@ -479,7 +482,7 @@ async def remove_adobe_pdf_key(
 async def upload_logo(
     file: UploadFile,
     org_ctx: OrganizationContext = _ADMIN_DEP,
-):
+) -> Any:
     """Upload an organization logo. Requires admin role."""
     org_id = org_ctx.organization.id
 
@@ -547,7 +550,7 @@ async def upload_logo(
 @router.delete("/logo")
 async def remove_logo(
     org_ctx: OrganizationContext = _ADMIN_DEP,
-):
+) -> Any:
     """Remove the organization logo. Requires admin role."""
     org_id = org_ctx.organization.id
 
@@ -592,7 +595,7 @@ class CustomLLMEndpointPayload(BaseModel):
 async def set_custom_llm_endpoint(
     payload: CustomLLMEndpointPayload,
     org_ctx: OrganizationContext = _ADMIN_DEP,
-):
+) -> Any:
     """Configure a custom LLM endpoint (enterprise self-hosted). Requires admin role."""
     org_id = org_ctx.organization.id
 
@@ -640,7 +643,7 @@ async def set_custom_llm_endpoint(
 @router.delete("/custom-llm-endpoint")
 async def remove_custom_llm_endpoint(
     org_ctx: OrganizationContext = _ADMIN_DEP,
-):
+) -> Any:
     """Remove custom LLM endpoint, reverting to OpenRouter. Requires admin role."""
     org_id = org_ctx.organization.id
 
@@ -670,7 +673,7 @@ async def remove_custom_llm_endpoint(
 @router.post("/custom-llm-endpoint/health")
 async def check_custom_llm_health(
     org_ctx: OrganizationContext = _ADMIN_DEP,
-):
+) -> Any:
     """Health check the configured custom LLM endpoint. Requires admin role."""
     org_id = org_ctx.organization.id
 
@@ -707,7 +710,7 @@ async def check_custom_llm_health(
 @router.get("/llm-routing")
 async def get_llm_routing_info(
     org_ctx: OrganizationContext = Depends(require_org_member),
-):
+) -> Any:
     """Get the current LLM routing configuration for this org."""
     org_id = org_ctx.organization.id
 
@@ -741,7 +744,7 @@ async def get_audit_log(
     offset: int = 0,
     action: str | None = None,
     user_id: str | None = None,
-):
+) -> Any:
     """Get audit log entries for the organization with optional filtering."""
     from app.models.audit_log import AuditLog
 
@@ -765,7 +768,7 @@ async def get_audit_log(
         count_stmt = select(func.count()).select_from(stmt.subquery())
         total = (await session.execute(count_stmt)).scalar_one()
 
-        stmt = stmt.order_by(AuditLog.created_at.desc()).offset(offset).limit(limit)  # type: ignore[union-attr]
+        stmt = stmt.order_by(AuditLog.created_at.desc()).offset(offset).limit(limit)  # type: ignore[attr-defined]
         result = await session.execute(stmt)
         rows = result.scalars().all()
 
@@ -776,7 +779,7 @@ async def get_audit_log(
             from app.models.users import User
 
             users_result = await session.execute(
-                select(User.id, User.name).where(User.id.in_(user_ids))  # type: ignore[union-attr]
+                select(User.id, User.name).where(User.id.in_(user_ids))  # type: ignore[attr-defined]
             )
             user_names = {str(uid): uname or "" for uid, uname in users_result.all()}
 

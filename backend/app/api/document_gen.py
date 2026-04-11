@@ -73,7 +73,7 @@ class DocumentResponse(BaseModel):
     onedrive_edit_url: str | None = None
 
 
-async def _get_adobe_credentials(org_id) -> tuple[str, str] | None:
+async def _get_adobe_credentials(org_id: UUID) -> tuple[str, str] | None:
     """Retrieve Adobe PDF Services credentials for the org, falling back to platform env."""
     async with async_session_maker() as session:
         result = await session.execute(
@@ -288,7 +288,7 @@ def _infer_doc_type(template: str | None, title: str) -> str:
 async def generate_simple(
     body: SimpleDocRequest,
     token: str = Query(..., description="Auth token"),
-):
+) -> Any:
     """Generate a simple PDF using reportlab (tables, text, basic formatting).
 
     When ``org_id`` is provided in the request body, the endpoint auto-resolves
@@ -361,7 +361,7 @@ async def generate_simple(
 async def generate_complex(
     body: ComplexDocRequest,
     token: str = Query(..., description="Auth token"),
-):
+) -> Any:
     """Generate a complex PDF using Adobe PDF Services (styled HTML, charts, multi-page)."""
     if token != settings.local_auth_token:
         raise HTTPException(status_code=401, detail="Invalid token")
@@ -472,7 +472,7 @@ class RedactForReviewResponse(BaseModel):
     """Redacted data for human review before sending to LLM."""
 
     redacted_template_data: dict[str, Any]
-    vault: dict
+    vault: dict[str, Any]
     redacted_entries: list[RedactedEntry]
     entry_count: int
 
@@ -484,7 +484,7 @@ class GenerateWithRehydrationRequest(BaseModel):
     template_data: dict[str, Any] = Field(
         ..., description="Template data (may contain LLM-generated text with placeholders)"
     )
-    vault: dict = Field(..., description="Vault from redact-for-review response")
+    vault: dict[str, Any] = Field(..., description="Vault from redact-for-review response")
     filename: str = Field(default="security-assessment.pdf")
     page_width: float = Field(default=8.5)
     page_height: float = Field(default=11.0)
@@ -520,7 +520,7 @@ def _rehydrate_recursive(obj: Any, vault: RedactionVault) -> Any:
 async def redact_for_review(
     body: RedactForReviewRequest,
     token: str = Query(..., description="Auth token"),
-):
+) -> Any:
     """Phase 1: Redact sensitive data (IPs, hostnames, credentials, paths) from
     raw pentest findings. Returns the redacted data and a vault for the user to
     review. Nothing is sent to any LLM at this stage.
@@ -555,7 +555,7 @@ async def redact_for_review(
 async def generate_complex_with_rehydration(
     body: GenerateWithRehydrationRequest,
     token: str = Query(..., description="Auth token"),
-):
+) -> Any:
     """Phase 2: After the user has reviewed and approved the redacted data,
     generate the final report. Template data (which may contain LLM-generated
     text with placeholder tags) is rehydrated with original values from the
@@ -688,8 +688,8 @@ class GeneratedDocumentRead(BaseModel):
 async def list_generated_documents(
     doc_type: str | None = Query(default=None, description="Filter by doc_type"),
     ctx: OrganizationContext = _ORG_DEP,
-    session=_SESSION_DEP,
-):
+    session: Any = _SESSION_DEP,
+) -> Any:
     """List all tracked generated documents for the current organization."""
     from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -746,8 +746,8 @@ async def list_generated_documents(
 async def delete_generated_document(
     doc_id: UUID,
     ctx: OrganizationContext = _ORG_DEP,
-    session=_SESSION_DEP,
-):
+    session: Any = _SESSION_DEP,
+) -> None:
     """Delete a generated document record (and optionally the file on disk)."""
     from sqlmodel.ext.asyncio.session import AsyncSession
 

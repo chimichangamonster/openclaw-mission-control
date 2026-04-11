@@ -1,6 +1,9 @@
 """Bookkeeping expenses — CRUD + receipt upload + summaries."""
 
+
 from __future__ import annotations
+
+from typing import Any
 
 from datetime import date
 from uuid import uuid4
@@ -41,7 +44,7 @@ class ExpenseUpdate(BaseModel):
 
 
 @router.post("", status_code=201)
-async def create_expense(payload: ExpenseCreate, org_ctx: OrganizationContext = ORG_ACTOR_DEP):
+async def create_expense(payload: ExpenseCreate, org_ctx: OrganizationContext = ORG_ACTOR_DEP) -> Any:
     async with async_session_maker() as session:
         expense = BkExpense(
             id=uuid4(),
@@ -71,7 +74,7 @@ async def list_expenses(
     from_date: date | None = Query(default=None, alias="from"),
     to_date: date | None = Query(default=None, alias="to"),
     org_ctx: OrganizationContext = ORG_ACTOR_DEP,
-):
+) -> Any:
     async with async_session_maker() as session:
         stmt = select(BkExpense).where(BkExpense.organization_id == org_ctx.organization.id)
         if job_id:
@@ -81,16 +84,16 @@ async def list_expenses(
         if category:
             stmt = stmt.where(BkExpense.category == category)
         if from_date:
-            stmt = stmt.where(BkExpense.expense_date >= from_date)  # type: ignore[operator]
+            stmt = stmt.where(BkExpense.expense_date >= from_date)
         if to_date:
-            stmt = stmt.where(BkExpense.expense_date <= to_date)  # type: ignore[operator]
-        stmt = stmt.order_by(BkExpense.expense_date.desc())  # type: ignore[union-attr]
+            stmt = stmt.where(BkExpense.expense_date <= to_date)
+        stmt = stmt.order_by(BkExpense.expense_date.desc())  # type: ignore[attr-defined]
         result = await session.execute(stmt)
         return [_serialize(e) for e in result.scalars().all()]
 
 
 @router.get("/summary")
-async def expense_summary(org_ctx: OrganizationContext = ORG_ACTOR_DEP):
+async def expense_summary(org_ctx: OrganizationContext = ORG_ACTOR_DEP) -> Any:
     async with async_session_maker() as session:
         result = await session.execute(
             select(BkExpense).where(BkExpense.organization_id == org_ctx.organization.id)
@@ -108,7 +111,7 @@ async def expense_summary(org_ctx: OrganizationContext = ORG_ACTOR_DEP):
 
 
 @router.get("/{expense_id}")
-async def get_expense(expense_id: str, org_ctx: OrganizationContext = ORG_ACTOR_DEP):
+async def get_expense(expense_id: str, org_ctx: OrganizationContext = ORG_ACTOR_DEP) -> Any:
     async with async_session_maker() as session:
         result = await session.execute(
             select(BkExpense).where(
@@ -124,7 +127,7 @@ async def get_expense(expense_id: str, org_ctx: OrganizationContext = ORG_ACTOR_
 @router.put("/{expense_id}")
 async def update_expense(
     expense_id: str, payload: ExpenseUpdate, org_ctx: OrganizationContext = ORG_ACTOR_DEP
-):
+) -> Any:
     async with async_session_maker() as session:
         result = await session.execute(
             select(BkExpense).where(
@@ -149,7 +152,7 @@ async def upload_receipt(
     job_id: str | None = Query(default=None),
     worker_id: str | None = Query(default=None),
     org_ctx: OrganizationContext = ORG_ACTOR_DEP,
-):
+) -> Any:
     """Upload a receipt image → OCR extraction → auto-categorize → create expense."""
     import json as json_mod
 
@@ -202,7 +205,7 @@ async def upload_receipt(
         return _serialize(expense)
 
 
-def _serialize(e: BkExpense) -> dict:
+def _serialize(e: BkExpense) -> dict[str, Any]:
     return {
         "id": str(e.id),
         "worker_id": str(e.worker_id) if e.worker_id else None,

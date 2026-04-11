@@ -4,7 +4,10 @@ Dual-write: persists to PostgreSQL (primary) and emits structured JSON to
 stdout (picked up by Promtail → Loki as a tamper-independent second copy).
 """
 
+
 from __future__ import annotations
+
+from typing import Any
 
 import json
 from uuid import UUID, uuid4
@@ -27,7 +30,7 @@ def _emit_audit_to_log(
     user_id: UUID | None,
     resource_type: str,
     resource_id: UUID | None,
-    details: dict | None,
+    details: dict[str, Any] | None,
     ip_address: str | None,
 ) -> None:
     """Emit audit event as structured log for Loki ingestion."""
@@ -56,7 +59,7 @@ async def log_audit(
     user_id: UUID | None = None,
     resource_type: str = "",
     resource_id: UUID | None = None,
-    details: dict | None = None,
+    details: dict[str, Any] | None = None,
     ip_address: str | None = None,
 ) -> None:
     """Persist an audit log entry. Fire-and-forget — never raises.

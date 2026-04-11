@@ -4,7 +4,10 @@ Agents call GET /{category} at runtime to fetch org-specific config.
 Admins manage config via POST/PUT/DELETE.
 """
 
+
 from __future__ import annotations
+
+from typing import Any
 
 import json
 from uuid import uuid4
@@ -27,13 +30,13 @@ _ADMIN_DEP = Depends(require_org_role("admin"))
 class ConfigItemCreate(BaseModel):
     key: str
     label: str
-    value: dict = {}
+    value: dict[str, Any] = {}
     sort_order: int = 0
 
 
 class ConfigItemUpdate(BaseModel):
     label: str | None = None
-    value: dict | None = None
+    value: dict[str, Any] | None = None
     sort_order: int | None = None
     is_active: bool | None = None
 
@@ -44,7 +47,7 @@ class BulkUpsert(BaseModel):
 
 
 @router.get("/{category}")
-async def list_config(category: str, org_ctx: OrganizationContext = ORG_ACTOR_DEP):
+async def list_config(category: str, org_ctx: OrganizationContext = ORG_ACTOR_DEP) -> Any:
     """List all active config items for a category. This is what skills call at runtime."""
     async with async_session_maker() as session:
         result = await session.execute(
@@ -54,13 +57,13 @@ async def list_config(category: str, org_ctx: OrganizationContext = ORG_ACTOR_DE
                 OrgConfigData.category == category,
                 OrgConfigData.is_active == True,  # noqa: E712
             )
-            .order_by(OrgConfigData.sort_order)
+            .order_by(OrgConfigData.sort_order)  # type: ignore[arg-type]
         )
         return [_serialize(item) for item in result.scalars().all()]
 
 
 @router.get("/{category}/{key}")
-async def get_config_item(category: str, key: str, org_ctx: OrganizationContext = ORG_ACTOR_DEP):
+async def get_config_item(category: str, key: str, org_ctx: OrganizationContext = ORG_ACTOR_DEP) -> Any:
     """Get a single config item."""
     async with async_session_maker() as session:
         result = await session.execute(
@@ -81,7 +84,7 @@ async def create_config_item(
     category: str,
     payload: ConfigItemCreate,
     org_ctx: OrganizationContext = _ADMIN_DEP,
-):
+) -> Any:
     """Create a config item. Requires admin role."""
     async with async_session_maker() as session:
         # Check for duplicate
@@ -120,7 +123,7 @@ async def update_config_item(
     key: str,
     payload: ConfigItemUpdate,
     org_ctx: OrganizationContext = _ADMIN_DEP,
-):
+) -> Any:
     """Update a config item. Requires admin role."""
     async with async_session_maker() as session:
         result = await session.execute(
@@ -153,7 +156,7 @@ async def deactivate_config_item(
     category: str,
     key: str,
     org_ctx: OrganizationContext = _ADMIN_DEP,
-):
+) -> Any:
     """Deactivate a config item (soft delete). Requires admin role."""
     async with async_session_maker() as session:
         result = await session.execute(
@@ -177,7 +180,7 @@ async def deactivate_config_item(
 async def bulk_upsert(
     payload: BulkUpsert,
     org_ctx: OrganizationContext = _ADMIN_DEP,
-):
+) -> Any:
     """Bulk upsert config items for a category. Skips existing keys. Used during template application."""
     org_id = org_ctx.organization.id
     created = 0
@@ -214,7 +217,7 @@ async def bulk_upsert(
     return {"ok": True, "created": created, "skipped": len(payload.items) - created}
 
 
-def _serialize(item: OrgConfigData) -> dict:
+def _serialize(item: OrgConfigData) -> dict[str, Any]:
     return {
         "id": str(item.id),
         "category": item.category,

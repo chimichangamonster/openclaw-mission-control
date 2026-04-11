@@ -85,4 +85,4 @@ async def get_access_token(
         expires_in,
     )
 
-    return access_token
+    return access_token  # type: ignore[no-any-return]

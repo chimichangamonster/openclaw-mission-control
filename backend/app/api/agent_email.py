@@ -105,11 +105,11 @@ async def agent_list_email_accounts(
     stmt = (
         select(EmailAccount)
         .where(
-            EmailAccount.organization_id == board.organization_id,
-            EmailAccount.sync_enabled == True,  # noqa: E712
-            EmailAccount.visibility == "shared",
+            EmailAccount.organization_id == board.organization_id,  # type: ignore[arg-type]
+            EmailAccount.sync_enabled == True,  # noqa: E712  # type: ignore[arg-type]
+            EmailAccount.visibility == "shared",  # type: ignore[arg-type]
         )
-        .order_by(EmailAccount.created_at.desc())
+        .order_by(EmailAccount.created_at.desc())  # type: ignore[attr-defined]
     )
     result = await session.execute(stmt)
     return list(result.scalars().all())
@@ -143,17 +143,17 @@ async def agent_list_email_messages(
     stmt = (
         select(EmailMessage)
         .where(
-            EmailMessage.organization_id == board.organization_id,
-            EmailMessage.email_account_id.in_(shared_account_ids),
+            EmailMessage.organization_id == board.organization_id,  # type: ignore[arg-type]
+            EmailMessage.email_account_id.in_(shared_account_ids),  # type: ignore[attr-defined]
         )
-        .order_by(EmailMessage.received_at.desc())
+        .order_by(EmailMessage.received_at.desc())  # type: ignore[attr-defined]
         .offset(offset)
         .limit(limit)
     )
     if triage_status:
-        stmt = stmt.where(EmailMessage.triage_status == triage_status)
+        stmt = stmt.where(EmailMessage.triage_status == triage_status)  # type: ignore[arg-type]
     if folder:
-        stmt = stmt.where(EmailMessage.folder == folder)
+        stmt = stmt.where(EmailMessage.folder == folder)  # type: ignore[arg-type]
 
     result = await session.execute(stmt)
     messages = list(result.scalars().all())
@@ -373,18 +373,20 @@ async def agent_archive_email(
     access_token = await get_valid_access_token(session, account)
 
     if account.provider == "zoho":
-        from app.services.email.providers.zoho import move_message
+        from app.services.email.providers.zoho import move_message as zoho_move_message
 
-        await move_message(
+        await zoho_move_message(
             access_token,
             account.provider_account_id or "",
             msg.provider_message_id,
             target_folder="archive",
         )
     elif account.provider == "microsoft":
-        from app.services.email.providers.microsoft import move_message
+        from app.services.email.providers.microsoft import move_message as msft_move_message
 
-        await move_message(access_token, msg.provider_message_id, target_folder="archive")
+        await msft_move_message(
+            access_token, msg.provider_message_id, target_folder="archive"
+        )
 
     msg.folder = "archive"
     msg.updated_at = utcnow()

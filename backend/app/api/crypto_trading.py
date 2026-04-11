@@ -72,8 +72,8 @@ async def list_exchange_accounts(
     """List connected exchange accounts."""
     stmt = (
         select(ExchangeAccount)
-        .where(ExchangeAccount.organization_id == ctx.organization.id)
-        .order_by(ExchangeAccount.created_at.desc())
+        .where(ExchangeAccount.organization_id == ctx.organization.id)  # type: ignore[arg-type]
+        .order_by(ExchangeAccount.created_at.desc())  # type: ignore[attr-defined]
     )
     result = await session.execute(stmt)
     return list(result.scalars().all())
@@ -107,13 +107,13 @@ async def list_crypto_trades(
     """List crypto trade proposals."""
     stmt = (
         select(CryptoTradeProposal)
-        .where(CryptoTradeProposal.organization_id == ctx.organization.id)
-        .order_by(CryptoTradeProposal.created_at.desc())
+        .where(CryptoTradeProposal.organization_id == ctx.organization.id)  # type: ignore[arg-type]
+        .order_by(CryptoTradeProposal.created_at.desc())  # type: ignore[attr-defined]
         .offset(offset)
         .limit(limit)
     )
     if proposal_status:
-        stmt = stmt.where(CryptoTradeProposal.status == proposal_status)
+        stmt = stmt.where(CryptoTradeProposal.status == proposal_status)  # type: ignore[arg-type]
     result = await session.execute(stmt)
     return list(result.scalars().all())
 
@@ -142,7 +142,7 @@ async def list_crypto_positions(
     """List crypto positions from connected exchanges."""
     stmt = (
         select(CryptoPosition)
-        .where(CryptoPosition.organization_id == ctx.organization.id)
+        .where(CryptoPosition.organization_id == ctx.organization.id)  # type: ignore[arg-type]
         .order_by(CryptoPosition.symbol)
     )
     result = await session.execute(stmt)

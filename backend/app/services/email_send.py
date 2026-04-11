@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
 from sqlalchemy import select
 
@@ -33,18 +33,18 @@ async def get_org_shared_email_account(
     stmt = (
         select(EmailAccount)
         .where(
-            EmailAccount.organization_id == organization_id,
-            EmailAccount.sync_enabled == True,  # noqa: E712
-            EmailAccount.visibility == "shared",
+            EmailAccount.organization_id == organization_id,  # type: ignore[arg-type]
+            EmailAccount.sync_enabled == True,  # noqa: E712  # type: ignore[arg-type]
+            EmailAccount.visibility == "shared",  # type: ignore[arg-type]
         )
-        .order_by(EmailAccount.created_at)
+        .order_by(EmailAccount.created_at)  # type: ignore[arg-type]
         .limit(1)
     )
     result = await session.execute(stmt)
     account = result.scalars().first()
     if account is None:
         raise NoEmailAccountError("No shared email account connected for this organization.")
-    return account
+    return account  # type: ignore[no-any-return]
 
 
 async def send_email(
@@ -55,8 +55,8 @@ async def send_email(
     subject: str,
     body: str,
     body_html: str | None = None,
-    attachments: list[dict] | None = None,
-) -> dict:
+    attachments: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
     """Send an email using the given account's provider.
 
     Args:
@@ -74,11 +74,11 @@ async def send_email(
     access_token = await get_valid_access_token(session, account)
 
     if account.provider == "zoho":
-        from app.services.email.providers.zoho import send_message
+        from app.services.email.providers.zoho import send_message as zoho_send_message
 
         mail_format = "html" if body_html else "plaintext"
         content = body_html or body
-        return await send_message(
+        return await zoho_send_message(
             access_token,
             account.provider_account_id or "",
             to=to,
@@ -88,11 +88,11 @@ async def send_email(
             attachments=attachments,
         )
     elif account.provider == "microsoft":
-        from app.services.email.providers.microsoft import send_message
+        from app.services.email.providers.microsoft import send_message as msft_send_message
 
         content_type = "HTML" if body_html else "Text"
         content = body_html or body
-        return await send_message(
+        return await msft_send_message(
             access_token,
             to=to,
             subject=subject,

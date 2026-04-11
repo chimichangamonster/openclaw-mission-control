@@ -27,8 +27,8 @@ async def _save_message(
 ) -> EmailMessage | None:
     """Persist a raw email message, deduplicating by provider_message_id."""
     stmt = select(EmailMessage).where(
-        EmailMessage.email_account_id == account.id,
-        EmailMessage.provider_message_id == raw.provider_message_id,
+        EmailMessage.email_account_id == account.id,  # type: ignore[arg-type]
+        EmailMessage.provider_message_id == raw.provider_message_id,  # type: ignore[arg-type]
     )
     existing = (await session.execute(stmt)).scalar_one_or_none()
     if existing:
@@ -142,17 +142,19 @@ async def _fetch_from_provider(
 ) -> list[RawEmailMessage]:
     """Dispatch to the correct provider's fetch function."""
     if account.provider == "zoho":
-        from app.services.email.providers.zoho import fetch_messages
+        from app.services.email.providers.zoho import fetch_messages as zoho_fetch_messages
 
-        return await fetch_messages(
+        return await zoho_fetch_messages(
             access_token,
             account.provider_account_id or "",
             from_message_id=account.sync_cursor,
         )
     elif account.provider == "microsoft":
-        from app.services.email.providers.microsoft import fetch_messages
+        from app.services.email.providers.microsoft import (
+            fetch_messages as msft_fetch_messages,
+        )
 
-        messages, next_delta = await fetch_messages(
+        messages, next_delta = await msft_fetch_messages(
             access_token,
             delta_link=account.sync_cursor,
         )
@@ -166,7 +168,7 @@ async def _fetch_from_provider(
 async def sync_all_active_accounts() -> int:
     """Enqueue sync jobs for all active email accounts."""
     async with async_session_maker() as session:
-        stmt = select(EmailAccount).where(EmailAccount.sync_enabled == True)  # noqa: E712
+        stmt = select(EmailAccount).where(EmailAccount.sync_enabled == True)  # noqa: E712  # type: ignore[arg-type]
         result = await session.execute(stmt)
         accounts = result.scalars().all()
 

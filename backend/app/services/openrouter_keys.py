@@ -20,7 +20,7 @@ from app.models.organizations import Organization
 async def _is_platform_owner(session: AsyncSession, org_id: UUID) -> bool:
     """Check if this org is the first (platform owner) org."""
     result = await session.execute(
-        select(Organization.id).order_by(Organization.created_at).limit(1)  # type: ignore[union-attr]
+        select(Organization.id).order_by(Organization.created_at).limit(1)  # type: ignore[arg-type]
     )
     first_org = result.scalar()
     return first_org == org_id
@@ -68,6 +68,6 @@ async def get_management_key_for_org(session: AsyncSession, org_id: UUID) -> str
     # Only fall back to platform key for the owner org
     mgmt_key = getattr(settings, "openrouter_management_key", None)
     if mgmt_key and await _is_platform_owner(session, org_id):
-        return mgmt_key
+        return mgmt_key  # type: ignore[no-any-return]
 
     return None

@@ -1,11 +1,14 @@
 """Expense categorization — regex-based rules for vendor and item matching."""
 
+
 from __future__ import annotations
+
+from typing import Any
 
 import re
 
 # Vendor-based category rules (case-insensitive partial match)
-_VENDOR_RULES: list[tuple[re.Pattern, str]] = [
+_VENDOR_RULES: list[tuple[re.Pattern[str], str]] = [
     (
         re.compile(r"home\s*depot|lowes|rona|totem|building\s*supplies|lumber", re.IGNORECASE),
         "materials",
@@ -31,7 +34,7 @@ _VENDOR_RULES: list[tuple[re.Pattern, str]] = [
 ]
 
 # Item description-based rules (fallback when vendor doesn't match)
-_ITEM_RULES: list[tuple[re.Pattern, str]] = [
+_ITEM_RULES: list[tuple[re.Pattern[str], str]] = [
     (
         re.compile(
             r"lumber|plywood|drywall|concrete|cement|rebar|insulation|shingle|roofing|siding|nail|screw|bolt",
@@ -48,7 +51,7 @@ _ITEM_RULES: list[tuple[re.Pattern, str]] = [
 ]
 
 
-def categorize_expense(vendor: str | None, items: list[dict] | None = None) -> str:
+def categorize_expense(vendor: str | None, items: list[dict[str, Any]] | None = None) -> str:
     """Categorize an expense based on vendor name and line items.
 
     Args:

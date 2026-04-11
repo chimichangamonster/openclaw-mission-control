@@ -7,7 +7,10 @@ OrgOnboardingStep records with sensible defaults the client can then customize.
 Templates are defined in code (not DB) — they're platform operator knowledge.
 """
 
+
 from __future__ import annotations
+
+from typing import Any
 
 from dataclasses import dataclass, field
 
@@ -16,7 +19,7 @@ from dataclasses import dataclass, field
 class ConfigItem:
     key: str
     label: str
-    value: dict
+    value: dict[str, Any]
 
 
 @dataclass
@@ -712,7 +715,7 @@ CATEGORY_LABELS: dict[str, str] = {
 }
 
 
-def list_templates() -> list[dict]:
+def list_templates() -> list[dict[str, Any]]:
     return [
         {
             "id": t.id,
@@ -857,7 +860,7 @@ def detect_industry(
     org_name: str,
     org_description: str = "",
     domain: str = "",
-) -> dict:
+) -> dict[str, Any]:
     """Detect the most likely industry template from org context.
 
     Returns ``{"template_id": str | None, "confidence": float, "all_scores": dict}``.

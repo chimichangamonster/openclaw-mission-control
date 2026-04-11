@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 from uuid import UUID, uuid4
 
 from sqlalchemy import UniqueConstraint
@@ -38,8 +38,8 @@ class OrgConfigData(TenantScoped, table=True):
     updated_at: datetime = Field(default_factory=utcnow)
 
     @property
-    def value(self) -> dict:
-        return json.loads(self.value_json)
+    def value(self) -> dict[str, Any]:
+        return json.loads(self.value_json)  # type: ignore[no-any-return]
 
 
 class OrgOnboardingStep(TenantScoped, table=True):

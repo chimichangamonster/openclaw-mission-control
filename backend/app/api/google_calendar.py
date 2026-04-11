@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import secrets
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal, overload
 from uuid import uuid4
 
 import redis
@@ -444,6 +444,28 @@ async def delete_event(
 # ---------------------------------------------------------------------------
 
 
+@overload
+async def _get_connection(
+    session: AsyncSession,
+    org_id: Any,
+    *,
+    require: Literal[True],
+    connection_id: str | None = ...,
+    ctx: OrganizationContext | None = ...,
+) -> GoogleCalendarConnection: ...
+
+
+@overload
+async def _get_connection(
+    session: AsyncSession,
+    org_id: Any,
+    *,
+    require: bool = ...,
+    connection_id: str | None = ...,
+    ctx: OrganizationContext | None = ...,
+) -> GoogleCalendarConnection | None: ...
+
+
 async def _get_connection(
     session: AsyncSession,
     org_id: Any,
@@ -487,11 +509,11 @@ async def _get_connection(
     if ctx and not is_org_admin(ctx.member):
         stmt = stmt.where(
             or_(
-                GoogleCalendarConnection.visibility == "shared",
-                GoogleCalendarConnection.user_id == ctx.member.user_id,
+                GoogleCalendarConnection.visibility == "shared",  # type: ignore[arg-type]
+                GoogleCalendarConnection.user_id == ctx.member.user_id,  # type: ignore[arg-type]
             )
         )
-    stmt = stmt.order_by(GoogleCalendarConnection.created_at)
+    stmt = stmt.order_by(GoogleCalendarConnection.created_at)  # type: ignore[arg-type]
     conn = (await session.execute(stmt)).scalars().first()
     if require and not conn:
         raise HTTPException(
@@ -515,10 +537,10 @@ async def _list_connections(
     if not is_org_admin(ctx.member):
         stmt = stmt.where(
             or_(
-                GoogleCalendarConnection.visibility == "shared",
-                GoogleCalendarConnection.user_id == ctx.member.user_id,
+                GoogleCalendarConnection.visibility == "shared",  # type: ignore[arg-type]
+                GoogleCalendarConnection.user_id == ctx.member.user_id,  # type: ignore[arg-type]
             )
         )
-    stmt = stmt.order_by(GoogleCalendarConnection.created_at)
+    stmt = stmt.order_by(GoogleCalendarConnection.created_at)  # type: ignore[arg-type]
     result = await session.execute(stmt)
     return list(result.scalars().all())

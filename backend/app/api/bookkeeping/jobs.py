@@ -1,6 +1,9 @@
 """Bookkeeping jobs CRUD + cost breakdown."""
 
+
 from __future__ import annotations
+
+from typing import Any
 
 from datetime import date
 from uuid import uuid4
@@ -42,7 +45,7 @@ class JobUpdate(BaseModel):
 
 
 @router.post("", status_code=201)
-async def create_job(payload: JobCreate, org_ctx: OrganizationContext = ORG_ACTOR_DEP):
+async def create_job(payload: JobCreate, org_ctx: OrganizationContext = ORG_ACTOR_DEP) -> Any:
     async with async_session_maker() as session:
         job = BkJob(
             id=uuid4(),
@@ -70,20 +73,20 @@ async def list_jobs(
     status: str | None = None,
     client_id: str | None = None,
     org_ctx: OrganizationContext = ORG_ACTOR_DEP,
-):
+) -> Any:
     async with async_session_maker() as session:
         stmt = select(BkJob).where(BkJob.organization_id == org_ctx.organization.id)
         if status:
             stmt = stmt.where(BkJob.status == status)
         if client_id:
             stmt = stmt.where(BkJob.client_id == client_id)
-        stmt = stmt.order_by(BkJob.created_at.desc())  # type: ignore[union-attr]
+        stmt = stmt.order_by(BkJob.created_at.desc())  # type: ignore[attr-defined]
         result = await session.execute(stmt)
         return [_serialize(j) for j in result.scalars().all()]
 
 
 @router.get("/{job_id}")
-async def get_job(job_id: str, org_ctx: OrganizationContext = ORG_ACTOR_DEP):
+async def get_job(job_id: str, org_ctx: OrganizationContext = ORG_ACTOR_DEP) -> Any:
     async with async_session_maker() as session:
         result = await session.execute(
             select(BkJob).where(
@@ -97,7 +100,7 @@ async def get_job(job_id: str, org_ctx: OrganizationContext = ORG_ACTOR_DEP):
 
 
 @router.get("/{job_id}/costs")
-async def get_job_costs(job_id: str, org_ctx: OrganizationContext = ORG_ACTOR_DEP):
+async def get_job_costs(job_id: str, org_ctx: OrganizationContext = ORG_ACTOR_DEP) -> Any:
     """Cost breakdown for a job: expenses by category + labour costs by placement."""
     org_id = org_ctx.organization.id
     async with async_session_maker() as session:
@@ -150,7 +153,7 @@ async def get_job_costs(job_id: str, org_ctx: OrganizationContext = ORG_ACTOR_DE
 
 
 @router.put("/{job_id}")
-async def update_job(job_id: str, payload: JobUpdate, org_ctx: OrganizationContext = ORG_ACTOR_DEP):
+async def update_job(job_id: str, payload: JobUpdate, org_ctx: OrganizationContext = ORG_ACTOR_DEP) -> Any:
     async with async_session_maker() as session:
         result = await session.execute(
             select(BkJob).where(
@@ -169,7 +172,7 @@ async def update_job(job_id: str, payload: JobUpdate, org_ctx: OrganizationConte
         return _serialize(job)
 
 
-def _serialize(j: BkJob) -> dict:
+def _serialize(j: BkJob) -> dict[str, Any]:
     return {
         "id": str(j.id),
         "client_id": str(j.client_id) if j.client_id else None,

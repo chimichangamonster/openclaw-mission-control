@@ -1,6 +1,9 @@
 """Bookkeeping invoices — CRUD, generate from timesheets, status updates, email send."""
 
+
 from __future__ import annotations
+
+from typing import Any
 
 from datetime import date, timedelta
 from uuid import uuid4
@@ -61,7 +64,7 @@ class InvoiceSendRequest(BaseModel):
 
 
 @router.post("", status_code=201)
-async def create_invoice(payload: InvoiceCreate, org_ctx: OrganizationContext = ORG_ACTOR_DEP):
+async def create_invoice(payload: InvoiceCreate, org_ctx: OrganizationContext = ORG_ACTOR_DEP) -> Any:
     async with async_session_maker() as session:
         invoice = BkInvoice(
             id=uuid4(),
@@ -85,7 +88,7 @@ async def create_invoice(payload: InvoiceCreate, org_ctx: OrganizationContext = 
 @router.post("/from-timesheets", status_code=201)
 async def create_from_timesheets(
     payload: InvoiceFromTimesheets, org_ctx: OrganizationContext = ORG_ACTOR_DEP
-):
+) -> Any:
     """Generate an invoice from approved timesheets for a job/client.
 
     Calculates line items from timesheet hours x placement bill rates.
@@ -104,12 +107,12 @@ async def create_from_timesheets(
                 BkTimesheet.organization_id == org_id,
                 BkTimesheet.job_id == payload.job_id,
                 BkTimesheet.status == "approved",
-                BkTimesheet.work_date <= to_dt,  # type: ignore[operator]
+                BkTimesheet.work_date <= to_dt,
             )
         )
         if payload.from_date:
-            stmt = stmt.where(BkTimesheet.work_date >= payload.from_date)  # type: ignore[operator]
-        stmt = stmt.order_by(BkTimesheet.work_date)  # type: ignore[union-attr]
+            stmt = stmt.where(BkTimesheet.work_date >= payload.from_date)
+        stmt = stmt.order_by(BkTimesheet.work_date)  # type: ignore[arg-type]
 
         result = await session.execute(stmt)
         rows = result.all()
@@ -197,7 +200,7 @@ async def list_invoices(
     status: str | None = None,
     client_id: str | None = None,
     org_ctx: OrganizationContext = ORG_ACTOR_DEP,
-):
+) -> Any:
     async with async_session_maker() as session:
         stmt = (
             select(BkInvoice, BkClient.name)
@@ -208,13 +211,13 @@ async def list_invoices(
             stmt = stmt.where(BkInvoice.status == status)
         if client_id:
             stmt = stmt.where(BkInvoice.client_id == client_id)
-        stmt = stmt.order_by(BkInvoice.created_at.desc())  # type: ignore[union-attr]
+        stmt = stmt.order_by(BkInvoice.created_at.desc())  # type: ignore[attr-defined]
         result = await session.execute(stmt)
         return [{**_serialize_invoice(inv), "client_name": name} for inv, name in result.all()]
 
 
 @router.get("/{invoice_id}")
-async def get_invoice(invoice_id: str, org_ctx: OrganizationContext = ORG_ACTOR_DEP):
+async def get_invoice(invoice_id: str, org_ctx: OrganizationContext = ORG_ACTOR_DEP) -> Any:
     async with async_session_maker() as session:
         inv_result = await session.execute(
             select(BkInvoice, BkClient.name)
@@ -229,7 +232,7 @@ async def get_invoice(invoice_id: str, org_ctx: OrganizationContext = ORG_ACTOR_
         lines_result = await session.execute(
             select(BkInvoiceLine)
             .where(BkInvoiceLine.invoice_id == invoice_id)
-            .order_by(BkInvoiceLine.created_at)
+            .order_by(BkInvoiceLine.created_at)  # type: ignore[arg-type]
         )
         lines = [
             {
@@ -249,7 +252,7 @@ async def get_invoice(invoice_id: str, org_ctx: OrganizationContext = ORG_ACTOR_
 @router.put("/{invoice_id}/status")
 async def update_invoice_status(
     invoice_id: str, payload: StatusUpdate, org_ctx: OrganizationContext = ORG_ACTOR_DEP
-):
+) -> Any:
     async with async_session_maker() as session:
         result = await session.execute(
             select(BkInvoice).where(
@@ -276,7 +279,7 @@ async def send_invoice_email(
     invoice_id: str,
     payload: InvoiceSendRequest | None = None,
     org_ctx: OrganizationContext = ORG_ACTOR_DEP,
-):
+) -> Any:
     """Generate the invoice PDF and email it to the client's contact email.
 
     Optionally customize the email subject and message body.  Updates the
@@ -309,7 +312,7 @@ async def send_invoice_email(
         lines_result = await session.execute(
             select(BkInvoiceLine)
             .where(BkInvoiceLine.invoice_id == invoice.id)
-            .order_by(BkInvoiceLine.created_at)
+            .order_by(BkInvoiceLine.created_at)  # type: ignore[arg-type]
         )
         lines = lines_result.scalars().all()
 
@@ -503,7 +506,7 @@ async def send_invoice_email(
         }
 
 
-def _serialize_invoice(inv: BkInvoice) -> dict:
+def _serialize_invoice(inv: BkInvoice) -> dict[str, Any]:
     return {
         "id": str(inv.id),
         "client_id": str(inv.client_id),

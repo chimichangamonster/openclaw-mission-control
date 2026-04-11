@@ -210,7 +210,7 @@ class GatewaySessionService(OpenClawDBService):
         row = result.first()
         if row:
             try:
-                return json.loads(row.value_json)
+                return json.loads(row.value_json)  # type: ignore[no-any-return]
             except (json.JSONDecodeError, TypeError):
                 return {}
         return {}

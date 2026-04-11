@@ -1,6 +1,9 @@
 """Zoho Mail API client for message fetching and actions."""
 
+
 from __future__ import annotations
+
+from typing import Any
 
 from datetime import datetime
 
@@ -135,8 +138,8 @@ async def send_message(
     body: str,
     mail_format: str = "plaintext",
     in_reply_to: str | None = None,
-    attachments: list[dict] | None = None,
-) -> dict:
+    attachments: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
     """Send or reply to an email via Zoho Mail API.
 
     Args:
@@ -158,7 +161,7 @@ async def send_message(
             if accounts:
                 from_address = accounts[0].get("primaryEmailAddress")
 
-    payload: dict = {
+    payload: dict[str, Any] = {
         "fromAddress": from_address or to,  # fallback to recipient if can't find
         "toAddress": to,
         "subject": subject,
@@ -195,7 +198,7 @@ async def send_message(
             json=payload,
         )
         resp.raise_for_status()
-        return resp.json()
+        return resp.json()  # type: ignore[no-any-return]
 
 
 async def move_message(

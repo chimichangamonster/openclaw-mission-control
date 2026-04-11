@@ -89,7 +89,7 @@ async def create_event(
     location: str = "",
     attendees: list[str] | None = None,
     time_zone: str = "America/Edmonton",
-    reminders: list[dict] | None = None,
+    reminders: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Create a calendar event.
 

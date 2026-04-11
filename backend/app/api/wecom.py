@@ -93,7 +93,7 @@ async def _get_connection_or_404(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="WeCom connection not found"
         )
-    return conn
+    return conn  # type: ignore[no-any-return]
 
 
 # ---------------------------------------------------------------------------
@@ -268,7 +268,7 @@ async def send_wecom_message(
 
     Supports text messages and news (rich link card) messages.
     """
-    if not is_org_admin(ctx):
+    if not is_org_admin(ctx.member):
         raise HTTPException(status_code=403, detail="Admin access required.")
 
     org_id = ctx.organization.id
@@ -282,9 +282,15 @@ async def send_wecom_message(
             detail="No active WeCom connection for this organization.",
         )
 
-    # Apply content filtering
-    filter_region = await get_org_filter_region(session, org_id)
-    filtered_content = filter_content(payload.content, region=filter_region)
+    # Apply content filtering — load org settings to resolve filter region
+    settings_result = await session.execute(
+        select(OrganizationSettings).where(OrganizationSettings.organization_id == org_id)
+    )
+    org_settings = settings_result.scalars().first()
+    filter_region = (
+        get_org_filter_region(org_settings.data_policy) if org_settings else "none"
+    )
+    filtered_content = filter_content(payload.content, region=filter_region).text
 
     if payload.msg_type == "news":
         if not payload.title or not payload.url:
@@ -296,7 +302,7 @@ async def send_wecom_message(
 
         success = await send_news_message(
             to_user=payload.to_user,
-            title=filter_content(payload.title, region=filter_region),
+            title=filter_content(payload.title, region=filter_region).text,
             description=filtered_content,
             url=payload.url,
             pic_url=payload.pic_url or "",
@@ -333,7 +339,7 @@ async def wecom_url_verification(
 ) -> PlainTextResponse:
     """WeCom URL verification — returns decrypted echostr to prove ownership."""
     org, conn, org_settings = await _resolve_callback_context(org_slug, session)
-    if not conn:
+    if not org or not conn:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
 
     try:
@@ -367,7 +373,7 @@ async def wecom_callback(
 ) -> Response:
     """Handle inbound WeCom messages."""
     org, conn, org_settings = await _resolve_callback_context(org_slug, session)
-    if not conn:
+    if not org or not conn:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
 
     # Read XML body
