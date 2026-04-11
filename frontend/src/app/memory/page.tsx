@@ -106,9 +106,9 @@ export default function MemoryPage() {
       title="Agent Memory"
       description="View and edit The Claw's memory files. Changes take effect on next session."
     >
-      <div className="flex gap-6">
+      <div className="flex flex-col gap-6 md:flex-row">
         {/* File list */}
-        <div className="w-64 shrink-0">
+        <div className="w-full md:w-64 md:shrink-0">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-slate-700">Memory Files</h3>
             <button onClick={loadFiles} className="text-slate-400 hover:text-slate-600">

@@ -223,7 +223,7 @@ export default function HelpPage() {
       description="Guides, answers, and support for your VantageClaw platform."
     >
       {/* Tab navigation */}
-      <div className="flex gap-1 rounded-lg bg-[color:var(--surface-muted)] p-1 mb-6 w-fit">
+      <div className="flex gap-1 overflow-x-auto rounded-lg bg-[color:var(--surface-muted)] p-1 mb-6 w-fit max-w-full">
         {tabs.map((tab) => (
           <button
             key={tab.id}
