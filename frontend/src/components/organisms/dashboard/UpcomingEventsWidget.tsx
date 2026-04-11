@@ -134,7 +134,7 @@ export function UpcomingEventsWidget() {
               <p className="truncate text-sm font-medium text-slate-800">
                 {event.summary || "Untitled"}
               </p>
-              <p className="mt-0.5 text-xs text-slate-500">
+              <p className="mt-0.5 truncate text-xs text-slate-500">
                 {formatEventTime(event.start)}
                 {event.location ? ` · ${event.location}` : ""}
               </p>

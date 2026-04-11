@@ -537,13 +537,13 @@ export default function LivePage() {
                   </div>
 
                   <div className="relative mt-3 grid grid-cols-2 gap-y-1.5 text-xs text-slate-500">
-                    <div className="flex items-center gap-1">
-                      <MessageSquare className="h-3 w-3" />
-                      {session.channel}
+                    <div className="flex min-w-0 items-center gap-1">
+                      <MessageSquare className="h-3 w-3 shrink-0" />
+                      <span className="truncate">{session.channel}</span>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <Cpu className="h-3 w-3" />
-                      <span className="font-mono">{session.model}</span>
+                    <div className="flex min-w-0 items-center gap-1">
+                      <Cpu className="h-3 w-3 shrink-0" />
+                      <span className="truncate font-mono">{session.model}</span>
                     </div>
                     <div className="col-span-2 flex items-center gap-1">
                       <DollarSign className="h-3 w-3 shrink-0" />
@@ -590,9 +590,9 @@ export default function LivePage() {
                           </h4>
                           <div className="space-y-1.5">
                             {usage.map((m) => (
-                              <div key={m.model} className="flex items-center justify-between rounded-lg bg-white px-3 py-2 text-xs border border-slate-100">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-mono font-medium text-slate-700">{m.model}</span>
+                              <div key={m.model} className="flex items-center justify-between gap-2 rounded-lg bg-white px-3 py-2 text-xs border border-slate-100">
+                                <div className="flex min-w-0 items-center gap-2">
+                                  <span className="truncate font-mono font-medium text-slate-700">{m.model}</span>
                                   <span className={cn("rounded px-1.5 py-0.5 text-[9px] font-medium",
                                     m.tier.includes("4") ? "bg-red-100 text-red-700" :
                                     m.tier.includes("3") ? "bg-purple-100 text-purple-700" :
