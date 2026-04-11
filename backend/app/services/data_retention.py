@@ -82,7 +82,7 @@ async def _cleanup_table(
                 ),
                 {**params, "batch_size": BATCH_SIZE},
             )
-            deleted = result.rowcount
+            deleted = result.rowcount  # type: ignore[attr-defined]
             total += deleted
             await session.commit()
             if deleted < BATCH_SIZE:

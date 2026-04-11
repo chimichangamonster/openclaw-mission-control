@@ -36,7 +36,7 @@ async def create_crypto_trade_proposal(
     stmt = select(ExchangeAccount).where(
         ExchangeAccount.organization_id == org_id,  # type: ignore[arg-type]
         ExchangeAccount.exchange == "binance",  # type: ignore[arg-type]
-        ExchangeAccount.is_active == True,  # noqa: E712  # type: ignore[arg-type]
+        ExchangeAccount.is_active.is_(True),  # type: ignore[attr-defined]
     )
     exchange_account = (await session.execute(stmt)).scalar_one_or_none()
     if exchange_account is None:

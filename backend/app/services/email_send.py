@@ -34,7 +34,7 @@ async def get_org_shared_email_account(
         select(EmailAccount)
         .where(
             EmailAccount.organization_id == organization_id,  # type: ignore[arg-type]
-            EmailAccount.sync_enabled == True,  # noqa: E712  # type: ignore[arg-type]
+            EmailAccount.sync_enabled.is_(True),  # type: ignore[attr-defined]
             EmailAccount.visibility == "shared",  # type: ignore[arg-type]
         )
         .order_by(EmailAccount.created_at)  # type: ignore[arg-type]

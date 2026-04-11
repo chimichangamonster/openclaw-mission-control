@@ -17,6 +17,7 @@ from app.core.time import utcnow
 from app.models.polymarket_wallets import PolymarketWallet
 
 if TYPE_CHECKING:
+    from py_clob_client.client import ClobClient
     from sqlmodel.ext.asyncio.session import AsyncSession
 
 logger = get_logger(__name__)

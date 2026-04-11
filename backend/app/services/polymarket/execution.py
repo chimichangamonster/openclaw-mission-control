@@ -64,7 +64,7 @@ async def create_trade_proposal(
     # Verify wallet exists
     stmt = select(PolymarketWallet).where(
         PolymarketWallet.organization_id == org_id,  # type: ignore[arg-type]
-        PolymarketWallet.is_active == True,  # noqa: E712  # type: ignore[arg-type]
+        PolymarketWallet.is_active.is_(True),  # type: ignore[attr-defined]
     )
     wallet = (await session.execute(stmt)).scalar_one_or_none()
     if wallet is None:
@@ -206,7 +206,7 @@ async def execute_approved_trade(
     # Load wallet
     stmt = select(PolymarketWallet).where(
         PolymarketWallet.organization_id == proposal.organization_id,  # type: ignore[arg-type]
-        PolymarketWallet.is_active == True,  # noqa: E712  # type: ignore[arg-type]
+        PolymarketWallet.is_active.is_(True),  # type: ignore[attr-defined]
     )
     wallet = (await session.execute(stmt)).scalar_one_or_none()
     if wallet is None:

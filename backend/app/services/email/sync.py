@@ -168,7 +168,7 @@ async def _fetch_from_provider(
 async def sync_all_active_accounts() -> int:
     """Enqueue sync jobs for all active email accounts."""
     async with async_session_maker() as session:
-        stmt = select(EmailAccount).where(EmailAccount.sync_enabled == True)  # noqa: E712  # type: ignore[arg-type]
+        stmt = select(EmailAccount).where(EmailAccount.sync_enabled.is_(True))  # type: ignore[attr-defined]
         result = await session.execute(stmt)
         accounts = result.scalars().all()
 

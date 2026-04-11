@@ -28,7 +28,7 @@ async def handle_crypto_trade_approval_resolution(
         return
 
     trade_proposal_id_str = payload.get("trade_proposal_id")
-    if not trade_proposal_id_str:
+    if not trade_proposal_id_str or not isinstance(trade_proposal_id_str, str):
         return
 
     try:

@@ -174,6 +174,7 @@ async def send_message(
         attachments: Optional list of dicts with keys ``filename``, ``content_bytes``
             (raw bytes), and ``content_type`` (MIME type string).
     """
+    payload: dict[str, Any]
     if reply_to_message_id:
         url = f"{GRAPH_URL}/me/messages/{reply_to_message_id}/reply"
         payload = {"comment": body}

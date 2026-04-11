@@ -160,8 +160,9 @@ async def check_endpoint_health(
             # 2. Simple inference test
             import time
 
+            models_list = result["models"] if isinstance(result["models"], list) else []
             test_payload = {
-                "model": result["models"][0] if result["models"] else "test",
+                "model": models_list[0] if models_list else "test",
                 "messages": [{"role": "user", "content": "Reply with exactly: OK"}],
                 "max_tokens": 5,
             }

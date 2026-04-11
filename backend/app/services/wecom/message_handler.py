@@ -53,7 +53,7 @@ async def handle_message(
     signaling the caller to use async reply instead.
     """
     sanitized = sanitize_text(content)
-    if not sanitized.strip():
+    if not sanitized or not sanitized.strip():
         return None
 
     config = gateway_client_config(gateway)

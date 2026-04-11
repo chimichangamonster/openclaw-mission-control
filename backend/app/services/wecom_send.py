@@ -37,7 +37,7 @@ async def get_org_wecom_connection(
         select(WeComConnection)
         .where(
             WeComConnection.organization_id == organization_id,  # type: ignore[arg-type]
-            WeComConnection.is_active == True,  # noqa: E712  # type: ignore[arg-type]
+            WeComConnection.is_active.is_(True),  # type: ignore[attr-defined]
         )
         .order_by(WeComConnection.created_at)  # type: ignore[arg-type]
         .limit(1)

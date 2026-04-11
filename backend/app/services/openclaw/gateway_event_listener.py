@@ -346,7 +346,8 @@ async def _listen(
 
         # Wait for connect response
         while True:
-            raw = await ws.recv()
+            raw_msg = await ws.recv()
+            raw = raw_msg.decode("utf-8") if isinstance(raw_msg, bytes) else raw_msg
             resp = json.loads(raw)
             if resp.get("id") == connect_id:
                 if resp.get("ok") is False or resp.get("error"):
@@ -419,9 +420,9 @@ async def _listen(
                     broadcast.publish(_tag(activity))
                 continue
 
-            activity = _normalise_event(event_name, payload)
-            if activity:
-                broadcast.publish(_tag(activity))
+            normalized = _normalise_event(event_name, payload)
+            if normalized:
+                broadcast.publish(_tag(normalized))
 
 
 async def run_event_listener(
