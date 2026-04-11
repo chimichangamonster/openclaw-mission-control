@@ -144,7 +144,7 @@ export function CronJobDialog({ open, onOpenChange, mode, job, onSubmit }: CronJ
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl">
+      <DialogContent className="w-[95vw] max-w-xl sm:w-auto">
         <DialogHeader>
           <DialogTitle>{mode === "create" ? "Create Scheduled Task" : "Edit Scheduled Task"}</DialogTitle>
           <DialogDescription>
@@ -156,7 +156,7 @@ export function CronJobDialog({ open, onOpenChange, mode, job, onSubmit }: CronJ
 
         <div className="space-y-4 py-2">
           {/* Name + Agent row */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="text-xs font-medium text-slate-600 mb-1 block">Name</label>
               <input
@@ -208,7 +208,7 @@ export function CronJobDialog({ open, onOpenChange, mode, job, onSubmit }: CronJ
                 </button>
               ))}
             </div>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3">
               <select
                 value={scheduleType}
                 onChange={(e) => setScheduleType(e.target.value as "cron" | "every" | "at")}
@@ -223,7 +223,7 @@ export function CronJobDialog({ open, onOpenChange, mode, job, onSubmit }: CronJ
                 value={scheduleExpr}
                 onChange={(e) => setScheduleExpr(e.target.value)}
                 placeholder={scheduleType === "cron" ? "0 9 * * 1-5" : scheduleType === "every" ? "6h" : "+30m"}
-                className="col-span-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-mono focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                className="sm:col-span-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-mono focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
               />
             </div>
             <div className="mt-2">
@@ -250,7 +250,7 @@ export function CronJobDialog({ open, onOpenChange, mode, job, onSubmit }: CronJ
           </div>
 
           {/* Options row */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3">
             <div>
               <label className="text-xs font-medium text-slate-600 mb-1 block">Thinking</label>
               <select

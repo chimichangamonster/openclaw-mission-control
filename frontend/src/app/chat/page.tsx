@@ -789,10 +789,10 @@ export default function ChatPage() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="rounded-md p-1.5 text-[color:var(--text-quiet)] hover:bg-[color:var(--surface-muted)] hover:text-[color:var(--text)] transition"
+              className="rounded-md p-2.5 sm:p-1.5 text-[color:var(--text-quiet)] hover:bg-[color:var(--surface-muted)] hover:text-[color:var(--text)] transition"
               title={sidebarOpen ? "Hide conversations" : "Show conversations"}
             >
-              <PanelLeft className="h-4 w-4" />
+              <PanelLeft className="h-5 w-5 sm:h-4 sm:w-4" />
             </button>
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-500">
               <Bot className="h-4.5 w-4.5 text-white" />
@@ -817,7 +817,7 @@ export default function ChatPage() {
                   onClick={() => void compactChat()}
                   disabled={commandLoading !== null}
                   title="Compact — summarise and trim history to save tokens"
-                  className="rounded-md p-1.5 text-[color:var(--text-quiet)] hover:bg-[color:var(--surface-muted)] hover:text-[color:var(--text)] transition disabled:opacity-40"
+                  className="rounded-md p-2.5 sm:p-1.5 text-[color:var(--text-quiet)] hover:bg-[color:var(--surface-muted)] hover:text-[color:var(--text)] transition disabled:opacity-40"
                 >
                   {commandLoading === "compact" ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -829,7 +829,7 @@ export default function ChatPage() {
                   onClick={() => void clearChat()}
                   disabled={commandLoading !== null}
                   title="Clear — reset the entire conversation"
-                  className="rounded-md p-1.5 text-[color:var(--text-quiet)] hover:bg-[color:var(--surface-muted)] hover:text-rose-500 transition disabled:opacity-40"
+                  className="rounded-md p-2.5 sm:p-1.5 text-[color:var(--text-quiet)] hover:bg-[color:var(--surface-muted)] hover:text-rose-500 transition disabled:opacity-40"
                 >
                   {commandLoading === "clear" ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -844,7 +844,7 @@ export default function ChatPage() {
               const pct = sessionTokens.total / maxTokens;
               const maxLabel = maxTokens >= 1_000_000 ? `${maxTokens / 1_000_000}M` : `${maxTokens / 1000}K`;
               return (
-                <div className="flex items-center gap-2 ml-1" title={`${sessionTokens.total.toLocaleString()} / ${maxTokens.toLocaleString()} tokens (${sessionTokens.input.toLocaleString()} in / ${sessionTokens.output.toLocaleString()} out)`}>
+                <div className="hidden sm:flex items-center gap-2 ml-1" title={`${sessionTokens.total.toLocaleString()} / ${maxTokens.toLocaleString()} tokens (${sessionTokens.input.toLocaleString()} in / ${sessionTokens.output.toLocaleString()} out)`}>
                   <div className="flex items-center gap-1.5">
                     <div className="h-1.5 w-16 rounded-full bg-[color:var(--surface-muted)] overflow-hidden">
                       <div
@@ -880,7 +880,7 @@ export default function ChatPage() {
         </div>
 
         {/* ─── Messages ────────────────────────────────────────────────── */}
-        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-4 space-y-4 sm:px-4">
           {resolving || messagesLoading ? (
             <div className="flex items-center justify-center py-20">
               <Loader2 className="h-6 w-6 animate-spin text-[color:var(--text-muted)]" />
@@ -998,7 +998,7 @@ export default function ChatPage() {
 
         {/* ─── Input area ──────────────────────────────────────────────── */}
         {!resolving && !resolveError ? (
-          <div className="border-t border-[color:var(--border)] bg-[color:var(--surface)] p-4">
+          <div className="border-t border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-3 sm:p-4">
             <div className="mx-auto max-w-3xl">
               {/* Pending file chips */}
               {pendingFiles.length > 0 ? (

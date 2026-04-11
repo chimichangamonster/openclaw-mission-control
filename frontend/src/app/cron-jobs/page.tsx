@@ -184,7 +184,7 @@ export default function CronJobsPage() {
     >
       {/* Toast notification */}
       {toast && (
-        <div className="fixed top-4 right-4 z-50 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 shadow-lg animate-in fade-in slide-in-from-top-2">
+        <div className="fixed top-4 left-4 right-4 z-50 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-700 shadow-lg animate-in fade-in slide-in-from-top-2 sm:left-auto sm:px-4 sm:text-sm">
           {toast}
         </div>
       )}
@@ -196,8 +196,8 @@ export default function CronJobsPage() {
       ) : (
         <div className="space-y-4">
           {/* Summary bar + Create button */}
-          <div className="flex items-center justify-between">
-            <div className="flex gap-4 text-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap gap-2 text-xs sm:gap-4 sm:text-sm">
               <span className="flex items-center gap-1.5 text-slate-600">
                 <Timer className="h-4 w-4" /> {jobs.length} total
               </span>
@@ -241,7 +241,7 @@ export default function CronJobsPage() {
                   <div key={job.id} className={cn("rounded-xl border bg-white transition", job.enabled ? "border-slate-200" : "border-slate-100 opacity-60")}>
                     <button
                       onClick={() => setExpandedJob(isExpanded ? null : job.id)}
-                      className="flex w-full items-center gap-4 px-5 py-4 text-left hover:bg-slate-50/50 transition"
+                      className="flex w-full flex-col gap-2 px-3 py-3 text-left hover:bg-slate-50/50 transition sm:flex-row sm:items-center sm:gap-4 sm:px-5 sm:py-4"
                     >
                       {/* Status indicator */}
                       <div className={cn("h-2.5 w-2.5 rounded-full shrink-0", job.enabled ? "bg-emerald-500" : "bg-slate-300")} />
@@ -260,13 +260,13 @@ export default function CronJobsPage() {
                       </div>
 
                       {/* Schedule */}
-                      <div className="text-right shrink-0">
+                      <div className="hidden text-right shrink-0 sm:block">
                         <div className="text-xs font-mono text-slate-600">{job.schedule_expr}</div>
                         <div className="text-xs text-slate-400">{job.timezone}</div>
                       </div>
 
                       {/* Next run */}
-                      <div className="text-right shrink-0 min-w-[100px]">
+                      <div className="hidden text-right shrink-0 sm:block sm:min-w-[100px]">
                         <div className="text-xs text-slate-600">{formatTime(job.next_run)}</div>
                         <div className="text-xs text-slate-400">{timeUntil(job.next_run)}</div>
                       </div>
@@ -274,9 +274,9 @@ export default function CronJobsPage() {
 
                     {/* Expanded details */}
                     {isExpanded && (
-                      <div className="border-t border-slate-100 px-5 py-4 bg-slate-50/50">
+                      <div className="border-t border-slate-100 px-3 py-3 bg-slate-50/50 sm:px-5 sm:py-4">
                         {/* Action buttons */}
-                        <div className="flex items-center gap-2 mb-4">
+                        <div className="flex flex-wrap items-center gap-2 mb-4">
                           <button
                             onClick={() => handleToggleEnabled(job)}
                             className={cn(
@@ -321,7 +321,7 @@ export default function CronJobsPage() {
                         </div>
 
                         {/* Detail grid */}
-                        <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-xs sm:grid-cols-4">
+                        <div className="grid grid-cols-2 gap-x-3 gap-y-3 text-xs sm:gap-x-8 md:grid-cols-4">
                           <div>
                             <span className="text-slate-400">Schedule Type</span>
                             <div className="font-medium text-slate-700">{job.schedule_type}</div>
@@ -361,7 +361,7 @@ export default function CronJobsPage() {
                         {job.message && (
                           <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3">
                             <div className="text-xs font-semibold text-slate-500 mb-1">Agent Message</div>
-                            <p className="text-xs text-slate-700 whitespace-pre-wrap font-mono">{job.message.substring(0, 500)}{job.message.length > 500 ? "..." : ""}</p>
+                            <p className="text-xs text-slate-700 whitespace-pre-wrap break-words font-mono">{job.message.substring(0, 500)}{job.message.length > 500 ? "..." : ""}</p>
                           </div>
                         )}
 
@@ -378,12 +378,12 @@ export default function CronJobsPage() {
                             ) : (
                               <div className="space-y-1.5">
                                 {runHistory.slice(0, 20).map((run, i) => (
-                                  <div key={run.run_id || i} className="flex items-center gap-3 text-xs">
+                                  <div key={run.run_id || i} className="flex flex-wrap items-center gap-2 text-xs sm:gap-3">
                                     <div className={cn(
                                       "h-1.5 w-1.5 rounded-full shrink-0",
                                       run.status === "success" ? "bg-emerald-500" : run.status === "error" ? "bg-red-500" : "bg-amber-500"
                                     )} />
-                                    <span className="text-slate-500 min-w-[120px]">{formatTime(run.started_at)}</span>
+                                    <span className="text-slate-500 sm:min-w-[120px]">{formatTime(run.started_at)}</span>
                                     <span className={cn(
                                       "font-medium",
                                       run.status === "success" ? "text-emerald-600" : run.status === "error" ? "text-red-600" : "text-amber-600"

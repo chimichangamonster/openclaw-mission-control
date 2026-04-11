@@ -75,7 +75,7 @@ export function DashboardPageLayout({
               headerClassName,
             )}
           >
-            <div className="px-4 py-4 md:px-8 md:py-6">
+            <div className="px-3 py-3 sm:px-4 sm:py-4 md:px-8 md:py-6">
               {headerActions ? (
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div>
@@ -103,7 +103,7 @@ export function DashboardPageLayout({
             </div>
           </div>
 
-          <div className={cn("p-4 md:p-8", contentClassName)}>
+          <div className={cn("p-3 sm:p-4 md:p-8", contentClassName)}>
             {showAdminOnlyNotice ? (
               <AdminOnlyNotice message={adminOnlyMessage ?? ""} />
             ) : (

@@ -222,7 +222,7 @@ export default function EmailPage() {
                     key={acct.id}
                     onClick={() => setSelectedAccountId(acct.id)}
                     className={cn(
-                      "shrink-0 rounded-full px-3 py-1.5 text-xs transition",
+                      "shrink-0 rounded-full px-3 py-2 text-xs transition",
                       selectedAccountId === acct.id
                         ? "bg-blue-100 font-medium text-blue-800"
                         : "bg-slate-100 text-slate-700",
@@ -241,7 +241,7 @@ export default function EmailPage() {
                     key={f.key}
                     onClick={() => setFolder(f.key)}
                     className={cn(
-                      "flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs transition",
+                      "flex shrink-0 items-center gap-1.5 rounded-full px-3 py-2 text-xs transition",
                       folder === f.key
                         ? "bg-blue-100 font-medium text-blue-800"
                         : "bg-slate-100 text-slate-700",
@@ -259,7 +259,7 @@ export default function EmailPage() {
                   key={t.key}
                   onClick={() => setTriageFilter(t.key)}
                   className={cn(
-                    "shrink-0 rounded-full px-3 py-1.5 text-xs transition",
+                    "shrink-0 rounded-full px-3 py-2 text-xs transition",
                     triageFilter === t.key
                       ? "bg-blue-100 font-medium text-blue-800"
                       : "bg-slate-100 text-slate-700",
@@ -353,7 +353,7 @@ export default function EmailPage() {
           <div className="min-w-0 flex-1 space-y-3">
             {/* Triage summary banner */}
             {triageCounts && messages.length > 0 && (
-              <div className="flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-2.5">
+              <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5 sm:gap-3 sm:px-4">
                 <span className="text-sm font-medium text-slate-700">
                   {messages.length} messages
                 </span>
@@ -405,7 +405,7 @@ export default function EmailPage() {
                   <div
                     key={msg.id}
                     className={cn(
-                      "flex items-start gap-3 px-4 py-3 transition hover:bg-slate-50",
+                      "flex items-start gap-2 px-3 py-3 transition hover:bg-slate-50 sm:gap-3 sm:px-4",
                       !msg.is_read && "bg-blue-50/50",
                     )}
                   >
@@ -425,7 +425,7 @@ export default function EmailPage() {
                         href={`/email/${msg.id}?account=${msg.email_account_id}`}
                         className="block"
                       >
-                        <div className="flex items-center gap-2">
+                        <div className="flex min-w-0 items-center gap-2">
                           <span
                             className={cn(
                               "truncate text-sm",
@@ -472,21 +472,21 @@ export default function EmailPage() {
                       <div className="flex gap-1">
                         <button
                           onClick={() => handleMarkRead(msg)}
-                          className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                          className="rounded p-2 sm:p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
                           title={msg.is_read ? "Mark unread" : "Mark read"}
                         >
                           {msg.is_read ? (
-                            <MailOpen className="h-3.5 w-3.5" />
+                            <MailOpen className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
                           ) : (
-                            <Mail className="h-3.5 w-3.5" />
+                            <Mail className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
                           )}
                         </button>
                         <button
                           onClick={() => handleArchive(msg)}
-                          className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                          className="rounded p-2 sm:p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
                           title="Archive"
                         >
-                          <Archive className="h-3.5 w-3.5" />
+                          <Archive className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
                         </button>
                       </div>
                     </div>

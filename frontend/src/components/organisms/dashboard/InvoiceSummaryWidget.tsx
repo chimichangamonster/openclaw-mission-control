@@ -110,7 +110,7 @@ function Shell({
   children?: React.ReactNode;
 }) {
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-4 md:p-5 shadow-sm">
+    <section className="rounded-xl border border-slate-200 bg-white p-3 sm:p-4 md:p-5 shadow-sm">
       <div className="mb-3 flex items-center justify-between gap-3">
         <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500">
           Invoices

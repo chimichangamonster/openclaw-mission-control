@@ -405,7 +405,7 @@ function TopMetricCard({
             ) : null}
           </div>
           <div className="mt-2 flex items-end gap-2">
-            <p className="font-heading text-3xl md:text-4xl font-bold text-slate-900">{value}</p>
+            <p className="font-heading text-2xl sm:text-3xl md:text-4xl font-bold text-slate-900">{value}</p>
             {secondary ? (
               <p className="pb-1 text-xs text-slate-500">{secondary}</p>
             ) : null}
@@ -911,7 +911,7 @@ export default function DashboardPage() {
         <DashboardSidebar />
         <WelcomeModal />
         <main className="flex-1 overflow-y-auto bg-slate-50">
-          <div className="p-4 md:p-8">
+          <div className="p-3 sm:p-4 md:p-8">
             {metricsQuery.error ? (
               <div className="mb-4 rounded-lg border border-rose-300 bg-rose-50 p-3 text-sm text-rose-700">
                 Load failed: {metricsQuery.error.message}
@@ -944,7 +944,7 @@ export default function DashboardPage() {
               </section>
             ) : null}
 
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
               <TopMetricCard
                 title="Online Agents"
                 value={formatCount(activeAgentsMetric)}
@@ -977,13 +977,13 @@ export default function DashboardPage() {
             </div>
 
             {(isFeatureEnabled("cost_tracker") || isFeatureEnabled("cron_jobs")) ? (
-              <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
                 {isFeatureEnabled("cost_tracker") ? <BudgetSpendWidget /> : null}
                 {isFeatureEnabled("cron_jobs") ? <CronJobsWidget /> : null}
               </div>
             ) : null}
 
-            <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-3">
               <InfoBlock
                 title="Workload"
                 rows={workloadRows}
@@ -1004,7 +1004,7 @@ export default function DashboardPage() {
             </div>
 
             {(isFeatureEnabled("google_calendar") || isFeatureEnabled("bookkeeping")) ? (
-              <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
                 {isFeatureEnabled("bookkeeping") ? <InvoiceSummaryWidget /> : null}
                 {isFeatureEnabled("google_calendar") ? <UpcomingEventsWidget /> : null}
               </div>
