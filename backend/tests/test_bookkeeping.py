@@ -8,7 +8,6 @@ from datetime import date
 
 import pytest
 
-
 # --- Model Tests ---
 
 

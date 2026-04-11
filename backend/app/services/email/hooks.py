@@ -55,18 +55,14 @@ async def _execute_email_reply(session: AsyncSession, payload: dict) -> None:
         return
 
     account = (
-        await session.execute(
-            select(EmailAccount).where(EmailAccount.id == account_id)
-        )
+        await session.execute(select(EmailAccount).where(EmailAccount.id == account_id))
     ).scalar_one_or_none()
     if not account:
         logger.error("email.approval.account_not_found", extra={"account_id": account_id})
         return
 
     msg = (
-        await session.execute(
-            select(EmailMessage).where(EmailMessage.id == message_id)
-        )
+        await session.execute(select(EmailMessage).where(EmailMessage.id == message_id))
     ).scalar_one_or_none()
     if not msg:
         logger.error("email.approval.message_not_found", extra={"message_id": message_id})

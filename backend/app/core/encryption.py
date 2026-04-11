@@ -51,7 +51,7 @@ def _get_master_key() -> bytes:
     if not raw:
         raise ValueError(
             "ENCRYPTION_KEY must be set. "
-            "Generate one with: python -c \"import secrets; print(secrets.token_urlsafe(32))\""
+            'Generate one with: python -c "import secrets; print(secrets.token_urlsafe(32))"'
         )
     return raw.encode()
 
@@ -125,8 +125,7 @@ def _decrypt_v1(ciphertext: str) -> str:
         plaintext = cipher.decrypt(nonce, ct_and_tag, None)
     except Exception:
         raise ValueError(
-            f"Failed to decrypt token (key version {version}) "
-            "— encryption key may have changed."
+            f"Failed to decrypt token (key version {version}) " "— encryption key may have changed."
         )
     return plaintext.decode()
 

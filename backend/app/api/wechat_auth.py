@@ -148,13 +148,15 @@ async def wechat_callback(code: str) -> dict:
         await ensure_member_for_user(session, user)
 
     # Create session token
-    token = _sign_token({
-        "sub": wechat_user_id,
-        "name": user_info.name,
-        "email": user_info.email,
-        "corp_id": user_info.corp_id,
-        "wechat_user_id": user_info.user_id,
-    })
+    token = _sign_token(
+        {
+            "sub": wechat_user_id,
+            "name": user_info.name,
+            "email": user_info.email,
+            "corp_id": user_info.corp_id,
+            "wechat_user_id": user_info.user_id,
+        }
+    )
 
     logger.info(
         "wechat_auth.login user_id=%s name=%s created=%s",

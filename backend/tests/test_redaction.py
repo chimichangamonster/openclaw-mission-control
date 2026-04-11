@@ -5,7 +5,13 @@ from __future__ import annotations
 
 import pytest
 
-from app.core.redact import RedactionLevel, RedactionResult, RedactionVault, redact_email_content, redact_sensitive
+from app.core.redact import (
+    RedactionLevel,
+    RedactionResult,
+    RedactionVault,
+    redact_email_content,
+    redact_sensitive,
+)
 
 
 class TestCredentialRedaction:
@@ -201,7 +207,9 @@ class TestPentestRedaction:
     """Pentest-specific patterns in RedactionVault (reversible redaction)."""
 
     def test_ntlm_hash_pair(self):
-        text = "Administrator:500:aad3b435b51404eeaad3b435b51404ee:fc525c9683e8fe067095ba2ddc971889:::"
+        text = (
+            "Administrator:500:aad3b435b51404eeaad3b435b51404ee:fc525c9683e8fe067095ba2ddc971889:::"
+        )
         vault = RedactionVault()
         redacted = vault.redact(text)
         assert "aad3b435b51404ee" not in redacted
@@ -500,6 +508,7 @@ class TestNestedTagCorruption:
         redacted = vault.redact(text)
         # No nested tags like [SSID_[MAC_ADDRESS_1]]
         import re as _re
+
         nested = _re.findall(r"\[[A-Z_]+\[", redacted)
         assert nested == [], f"Found nested tags: {nested}"
 
@@ -537,13 +546,16 @@ class TestJSONAwareRedaction:
     def test_json_string_input(self):
         """JSON string gets parsed, values redacted, re-serialized."""
         import json
-        data = json.dumps({
-            "target": "192.168.1.100",
-            "ssid": "SSID: CorpWiFi",
-            "mac": "AA:BB:CC:DD:EE:FF",
-            "port": 22,
-            "open": True,
-        })
+
+        data = json.dumps(
+            {
+                "target": "192.168.1.100",
+                "ssid": "SSID: CorpWiFi",
+                "mac": "AA:BB:CC:DD:EE:FF",
+                "port": 22,
+                "open": True,
+            }
+        )
         vault = RedactionVault()
         result = vault.redact_json(data)
         assert isinstance(result, str)
@@ -566,13 +578,14 @@ class TestJSONAwareRedaction:
     def test_json_nested_structure(self):
         """Deeply nested JSON structures get redacted recursively."""
         import json
+
         data = {
             "scan": {
                 "hosts": [
                     {"ip": "192.168.1.1", "mac": "AA:BB:CC:DD:EE:FF"},
                     {"ip": "192.168.1.2", "mac": "11:22:33:44:55:66"},
                 ],
-                "metadata": {"location": "53.5905, -113.5229"}
+                "metadata": {"location": "53.5905, -113.5229"},
             }
         }
         vault = RedactionVault()
@@ -604,6 +617,7 @@ class TestJSONAwareRedaction:
     def test_json_with_escaped_values(self):
         """JSON with escaped quotes in values still gets redacted."""
         import json
+
         data = json.dumps({"note": 'SSID: "CorpNet-5G" found'})
         vault = RedactionVault()
         result = vault.redact_json(data)
@@ -673,25 +687,28 @@ OS: Windows 10 Build 19041"""
     def test_json_scan_results(self):
         """JSON scan payload gets field-level redaction."""
         import json
-        data = json.dumps({
-            "scan_type": "wifi",
-            "results": [
-                {
-                    "bssid": "AA:BB:CC:DD:EE:FF",
-                    "ssid": "SSID: CorpWiFi-5G",
-                    "signal": -45,
-                    "channel": 36,
-                },
-                {
-                    "bssid": "11:22:33:44:55:66",
-                    "ssid": "ESSID: GuestNet",
-                    "signal": -72,
-                    "channel": 1,
-                },
-            ],
-            "gps": "53.590542, -113.522905",
-            "target_ip": "192.168.1.1",
-        })
+
+        data = json.dumps(
+            {
+                "scan_type": "wifi",
+                "results": [
+                    {
+                        "bssid": "AA:BB:CC:DD:EE:FF",
+                        "ssid": "SSID: CorpWiFi-5G",
+                        "signal": -45,
+                        "channel": 36,
+                    },
+                    {
+                        "bssid": "11:22:33:44:55:66",
+                        "ssid": "ESSID: GuestNet",
+                        "signal": -72,
+                        "channel": 1,
+                    },
+                ],
+                "gps": "53.590542, -113.522905",
+                "target_ip": "192.168.1.1",
+            }
+        )
         vault = RedactionVault()
         result = vault.redact_json(data)
         parsed = json.loads(result)

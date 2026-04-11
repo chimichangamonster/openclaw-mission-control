@@ -86,7 +86,10 @@ async def _call_vision_model(
                         "role": "user",
                         "content": [
                             {"type": "text", "text": OCR_PROMPT},
-                            {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{image_b64}"}},
+                            {
+                                "type": "image_url",
+                                "image_url": {"url": f"data:{mime_type};base64,{image_b64}"},
+                            },
                         ],
                     },
                 ],
@@ -102,7 +105,13 @@ async def _call_vision_model(
         raise ValueError("No content in LLM response")
 
     # Strip markdown fences if present
-    json_str = content.replace("```json\n", "").replace("```json", "").replace("```\n", "").replace("```", "").strip()
+    json_str = (
+        content.replace("```json\n", "")
+        .replace("```json", "")
+        .replace("```\n", "")
+        .replace("```", "")
+        .strip()
+    )
     parsed = json.loads(json_str)
 
     if parsed.get("total") is None:
@@ -130,23 +139,33 @@ async def process_receipt(image_bytes: bytes, org_id: UUID) -> dict[str, Any]:
         endpoint = await resolve_llm_endpoint(session, org_id)
 
     if endpoint is None:
-        raise ValueError("No LLM endpoint configured for this organization. Add an OpenRouter API key in org settings.")
+        raise ValueError(
+            "No LLM endpoint configured for this organization. Add an OpenRouter API key in org settings."
+        )
 
     image_b64 = base64.b64encode(image_bytes).decode("utf-8")
     mime_type = _detect_mime_type(image_bytes)
 
     # Try primary model
     try:
-        result = await _call_vision_model(endpoint.api_url, endpoint.api_key, OCR_PRIMARY_MODEL, image_b64, mime_type)
+        result = await _call_vision_model(
+            endpoint.api_url, endpoint.api_key, OCR_PRIMARY_MODEL, image_b64, mime_type
+        )
         logger.info("bookkeeping_ocr.success model=%s org_id=%s", OCR_PRIMARY_MODEL, org_id)
         return result
     except Exception as e:
-        logger.warning("bookkeeping_ocr.primary_failed model=%s error=%s", OCR_PRIMARY_MODEL, str(e)[:200])
+        logger.warning(
+            "bookkeeping_ocr.primary_failed model=%s error=%s", OCR_PRIMARY_MODEL, str(e)[:200]
+        )
 
     # Fallback
     try:
-        result = await _call_vision_model(endpoint.api_url, endpoint.api_key, OCR_FALLBACK_MODEL, image_b64, mime_type)
-        logger.info("bookkeeping_ocr.fallback_success model=%s org_id=%s", OCR_FALLBACK_MODEL, org_id)
+        result = await _call_vision_model(
+            endpoint.api_url, endpoint.api_key, OCR_FALLBACK_MODEL, image_b64, mime_type
+        )
+        logger.info(
+            "bookkeeping_ocr.fallback_success model=%s org_id=%s", OCR_FALLBACK_MODEL, org_id
+        )
         return result
     except Exception as e:
         logger.error("bookkeeping_ocr.both_failed org_id=%s error=%s", org_id, str(e)[:200])

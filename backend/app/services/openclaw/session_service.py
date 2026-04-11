@@ -14,6 +14,7 @@ from sqlmodel import select
 from app.core.logging import TRACE_LEVEL
 from app.models.boards import Board
 from app.models.gateways import Gateway
+from app.models.org_config import OrgConfigData
 from app.schemas.gateway_api import (
     CreateSessionResponse,
     GatewayResolveQuery,
@@ -23,7 +24,6 @@ from app.schemas.gateway_api import (
     GatewaySessionsResponse,
     GatewaysStatusResponse,
 )
-from app.models.org_config import OrgConfigData
 from app.services.openclaw.db_service import OpenClawDBService
 from app.services.openclaw.error_messages import normalize_gateway_error_message
 from app.services.openclaw.gateway_compat import check_gateway_version_compatibility
@@ -232,18 +232,18 @@ class GatewaySessionService(OpenClawDBService):
         if row:
             row.value_json = json.dumps(labels)
         else:
-            self.session.add(OrgConfigData(
-                organization_id=organization_id,
-                category=self._SESSION_LABELS_CATEGORY,
-                key="labels",
-                label="Session Labels",
-                value_json=json.dumps(labels),
-            ))
+            self.session.add(
+                OrgConfigData(
+                    organization_id=organization_id,
+                    category=self._SESSION_LABELS_CATEGORY,
+                    key="labels",
+                    label="Session Labels",
+                    value_json=json.dumps(labels),
+                )
+            )
         await self.session.commit()
 
-    async def _remove_session_label(
-        self, organization_id: UUID, session_key: str
-    ) -> None:
+    async def _remove_session_label(self, organization_id: UUID, session_key: str) -> None:
         """Remove a persisted session label."""
         labels = await self._get_session_labels(organization_id)
         if session_key in labels:
@@ -305,7 +305,9 @@ class GatewaySessionService(OpenClawDBService):
         lines = ["[Attached files]"]
         for att in payload.attachments:
             agent_path = att.sanitized_workspace_path or att.workspace_path
-            lines.append(f"- {att.filename} ({att.content_type}, {att.size_bytes:,} bytes): {agent_path}")
+            lines.append(
+                f"- {att.filename} ({att.content_type}, {att.size_bytes:,} bytes): {agent_path}"
+            )
         lines.append("[/Attached files]")
         lines.append("")
         lines.append(payload.content)

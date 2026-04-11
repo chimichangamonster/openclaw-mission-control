@@ -20,7 +20,10 @@ class EmailAccount(TenantScoped, table=True):
     __tablename__ = "email_accounts"  # pyright: ignore[reportAssignmentType]
     __table_args__ = (
         UniqueConstraint(
-            "organization_id", "provider", "email_address", name="uq_email_accounts_org_provider_email"
+            "organization_id",
+            "provider",
+            "email_address",
+            name="uq_email_accounts_org_provider_email",
         ),
     )
 
@@ -39,7 +42,9 @@ class EmailAccount(TenantScoped, table=True):
     visibility: str = Field(default="shared", index=True)  # "shared" or "private"
     # Scope controls — restrict what agents can access
     allowed_folders_json: str = Field(default="[]")  # empty = all folders
-    blocked_senders_json: str = Field(default="[]")  # emails from these senders are hidden from agents
+    blocked_senders_json: str = Field(
+        default="[]"
+    )  # emails from these senders are hidden from agents
     last_sync_at: datetime | None = None
     last_sync_error: str | None = None
     sync_cursor: str | None = None

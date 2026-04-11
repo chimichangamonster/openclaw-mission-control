@@ -24,19 +24,19 @@ from sqlalchemy.pool import StaticPool
 from sqlmodel import SQLModel, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.api.bookkeeping import router as bookkeeping_router
 from app.api.deps import (
+    check_org_rate_limit,
     get_portfolio_for_org,
     get_session,
-    require_org_member,
     require_org_from_actor,
-    check_org_rate_limit,
+    require_org_member,
 )
-from app.api.paper_trading import router as paper_trading_router
-from app.api.paper_bets import router as paper_bets_router
-from app.api.watchlist import router as watchlist_router
-from app.api.organization_settings import router as org_settings_router
-from app.api.bookkeeping import router as bookkeeping_router
 from app.api.org_config import router as org_config_router
+from app.api.organization_settings import router as org_settings_router
+from app.api.paper_bets import router as paper_bets_router
+from app.api.paper_trading import router as paper_trading_router
+from app.api.watchlist import router as watchlist_router
 from app.core.auth import AuthContext
 from app.models.bookkeeping import BkClient
 from app.models.organization_members import OrganizationMember
@@ -46,7 +46,7 @@ from app.models.paper_bets import PaperBet
 from app.models.paper_trading import PaperPortfolio, PaperPosition, PaperTrade
 from app.models.users import User
 from app.models.watchlist import WatchlistItem
-from app.services.organizations import OrganizationContext, ROLE_RANK
+from app.services.organizations import ROLE_RANK, OrganizationContext
 
 # ---------------------------------------------------------------------------
 # Test IDs
@@ -99,44 +99,76 @@ async def _seed(session: AsyncSession) -> dict:
 
     # Users
     user_a = User(
-        id=USER_A_ID, clerk_user_id="user-a-clerk", email="a@test.com", name="User A",
+        id=USER_A_ID,
+        clerk_user_id="user-a-clerk",
+        email="a@test.com",
+        name="User A",
         active_organization_id=ORG_A_ID,
     )
     user_b = User(
-        id=USER_B_ID, clerk_user_id="user-b-clerk", email="b@test.com", name="User B",
+        id=USER_B_ID,
+        clerk_user_id="user-b-clerk",
+        email="b@test.com",
+        name="User B",
         active_organization_id=ORG_B_ID,
     )
     user_noflag = User(
-        id=USER_NOFLAG_ID, clerk_user_id="user-noflag-clerk", email="noflag@test.com",
-        name="User NoFlag", active_organization_id=ORG_NOFLAG_ID,
+        id=USER_NOFLAG_ID,
+        clerk_user_id="user-noflag-clerk",
+        email="noflag@test.com",
+        name="User NoFlag",
+        active_organization_id=ORG_NOFLAG_ID,
     )
     user_a_viewer = User(
-        id=USER_A_VIEWER_ID, clerk_user_id="user-a-viewer-clerk", email="a-viewer@test.com",
-        name="User A Viewer", active_organization_id=ORG_A_ID,
+        id=USER_A_VIEWER_ID,
+        clerk_user_id="user-a-viewer-clerk",
+        email="a-viewer@test.com",
+        name="User A Viewer",
+        active_organization_id=ORG_A_ID,
     )
     session.add_all([user_a, user_b, user_noflag, user_a_viewer])
 
     # Memberships (owner = full access)
     member_a = OrganizationMember(
-        id=uuid4(), organization_id=ORG_A_ID, user_id=USER_A_ID,
-        role="owner", all_boards_read=True, all_boards_write=True,
-        created_at=now, updated_at=now,
+        id=uuid4(),
+        organization_id=ORG_A_ID,
+        user_id=USER_A_ID,
+        role="owner",
+        all_boards_read=True,
+        all_boards_write=True,
+        created_at=now,
+        updated_at=now,
     )
     member_b = OrganizationMember(
-        id=uuid4(), organization_id=ORG_B_ID, user_id=USER_B_ID,
-        role="owner", all_boards_read=True, all_boards_write=True,
-        created_at=now, updated_at=now,
+        id=uuid4(),
+        organization_id=ORG_B_ID,
+        user_id=USER_B_ID,
+        role="owner",
+        all_boards_read=True,
+        all_boards_write=True,
+        created_at=now,
+        updated_at=now,
     )
     member_noflag = OrganizationMember(
-        id=uuid4(), organization_id=ORG_NOFLAG_ID, user_id=USER_NOFLAG_ID,
-        role="owner", all_boards_read=True, all_boards_write=True,
-        created_at=now, updated_at=now,
+        id=uuid4(),
+        organization_id=ORG_NOFLAG_ID,
+        user_id=USER_NOFLAG_ID,
+        role="owner",
+        all_boards_read=True,
+        all_boards_write=True,
+        created_at=now,
+        updated_at=now,
     )
     # Viewer member for RBAC tests (separate user to avoid unique constraint)
     member_a_viewer = OrganizationMember(
-        id=uuid4(), organization_id=ORG_A_ID, user_id=USER_A_VIEWER_ID,
-        role="viewer", all_boards_read=True, all_boards_write=False,
-        created_at=now, updated_at=now,
+        id=uuid4(),
+        organization_id=ORG_A_ID,
+        user_id=USER_A_VIEWER_ID,
+        role="viewer",
+        all_boards_read=True,
+        all_boards_write=False,
+        created_at=now,
+        updated_at=now,
     )
     session.add_all([member_a, member_b, member_noflag, member_a_viewer])
 
@@ -144,85 +176,142 @@ async def _seed(session: AsyncSession) -> dict:
     all_enabled = {k: True for k in DEFAULT_FEATURE_FLAGS}
     all_disabled = {k: False for k in DEFAULT_FEATURE_FLAGS}
     settings_a = OrganizationSettings(
-        id=uuid4(), organization_id=ORG_A_ID,
+        id=uuid4(),
+        organization_id=ORG_A_ID,
         feature_flags_json=json.dumps(all_enabled),
     )
     settings_b = OrganizationSettings(
-        id=uuid4(), organization_id=ORG_B_ID,
+        id=uuid4(),
+        organization_id=ORG_B_ID,
         feature_flags_json=json.dumps(all_enabled),
     )
     settings_noflag = OrganizationSettings(
-        id=uuid4(), organization_id=ORG_NOFLAG_ID,
+        id=uuid4(),
+        organization_id=ORG_NOFLAG_ID,
         feature_flags_json=json.dumps(all_disabled),
     )
     session.add_all([settings_a, settings_b, settings_noflag])
 
     # Portfolios
     pa = PaperPortfolio(
-        id=uuid4(), organization_id=ORG_A_ID, user_id=USER_A_ID,
-        name="Stocks A", starting_balance=10000, cash_balance=9000,
+        id=uuid4(),
+        organization_id=ORG_A_ID,
+        user_id=USER_A_ID,
+        name="Stocks A",
+        starting_balance=10000,
+        cash_balance=9000,
     )
     pb = PaperPortfolio(
-        id=uuid4(), organization_id=ORG_B_ID, user_id=USER_B_ID,
-        name="Stocks B", starting_balance=20000, cash_balance=18000,
+        id=uuid4(),
+        organization_id=ORG_B_ID,
+        user_id=USER_B_ID,
+        name="Stocks B",
+        starting_balance=20000,
+        cash_balance=18000,
     )
     p_noflag = PaperPortfolio(
-        id=uuid4(), organization_id=ORG_NOFLAG_ID, user_id=USER_NOFLAG_ID,
-        name="Stocks NoFlag", starting_balance=5000, cash_balance=5000,
+        id=uuid4(),
+        organization_id=ORG_NOFLAG_ID,
+        user_id=USER_NOFLAG_ID,
+        name="Stocks NoFlag",
+        starting_balance=5000,
+        cash_balance=5000,
     )
     session.add_all([pa, pb, p_noflag])
 
     # Position in A
     pos_a = PaperPosition(
-        id=uuid4(), portfolio_id=pa.id, symbol="AAPL", asset_type="stock",
-        side="long", quantity=10, entry_price=150, current_price=155, status="open",
+        id=uuid4(),
+        portfolio_id=pa.id,
+        symbol="AAPL",
+        asset_type="stock",
+        side="long",
+        quantity=10,
+        entry_price=150,
+        current_price=155,
+        status="open",
     )
     session.add(pos_a)
 
     # Trade in A
     trade_a = PaperTrade(
-        id=uuid4(), portfolio_id=pa.id, trade_type="buy", symbol="AAPL",
-        asset_type="stock", quantity=10, price=150, total=1500, fees=9.99,
-        proposed_by="test", approval_status="auto",
+        id=uuid4(),
+        portfolio_id=pa.id,
+        trade_type="buy",
+        symbol="AAPL",
+        asset_type="stock",
+        quantity=10,
+        price=150,
+        total=1500,
+        fees=9.99,
+        proposed_by="test",
+        approval_status="auto",
     )
     session.add(trade_a)
 
     # Bet in A
     bet_a = PaperBet(
-        id=uuid4(), portfolio_id=pa.id, sport="nhl", game="EDM vs CGY",
-        bet_type="moneyline", selection="EDM", odds=-150, stake=50, status="pending",
+        id=uuid4(),
+        portfolio_id=pa.id,
+        sport="nhl",
+        game="EDM vs CGY",
+        bet_type="moneyline",
+        selection="EDM",
+        odds=-150,
+        stake=50,
+        status="pending",
     )
     session.add(bet_a)
 
     # Watchlist in A
     watch_a = WatchlistItem(
-        id=uuid4(), portfolio_id=pa.id, symbol="TSLA", yahoo_ticker="TSLA",
+        id=uuid4(),
+        portfolio_id=pa.id,
+        symbol="TSLA",
+        yahoo_ticker="TSLA",
         status="watching",
     )
     session.add(watch_a)
 
     # Bookkeeping clients
     bk_client_a = BkClient(
-        id=uuid4(), organization_id=ORG_A_ID, name="Acme Corp",
-        created_at=now, updated_at=now,
+        id=uuid4(),
+        organization_id=ORG_A_ID,
+        name="Acme Corp",
+        created_at=now,
+        updated_at=now,
     )
     bk_client_b = BkClient(
-        id=uuid4(), organization_id=ORG_B_ID, name="Beta Inc",
-        created_at=now, updated_at=now,
+        id=uuid4(),
+        organization_id=ORG_B_ID,
+        name="Beta Inc",
+        created_at=now,
+        updated_at=now,
     )
     session.add_all([bk_client_a, bk_client_b])
 
     await session.commit()
     return {
-        "org_a": org_a, "org_b": org_b, "org_noflag": org_noflag,
-        "user_a": user_a, "user_b": user_b, "user_noflag": user_noflag,
+        "org_a": org_a,
+        "org_b": org_b,
+        "org_noflag": org_noflag,
+        "user_a": user_a,
+        "user_b": user_b,
+        "user_noflag": user_noflag,
         "user_a_viewer": user_a_viewer,
-        "member_a": member_a, "member_b": member_b,
-        "member_noflag": member_noflag, "member_a_viewer": member_a_viewer,
-        "pa": pa, "pb": pb, "p_noflag": p_noflag,
-        "pos_a": pos_a, "trade_a": trade_a,
-        "bet_a": bet_a, "watch_a": watch_a,
-        "bk_client_a": bk_client_a, "bk_client_b": bk_client_b,
+        "member_a": member_a,
+        "member_b": member_b,
+        "member_noflag": member_noflag,
+        "member_a_viewer": member_a_viewer,
+        "pa": pa,
+        "pb": pb,
+        "p_noflag": p_noflag,
+        "pos_a": pos_a,
+        "trade_a": trade_a,
+        "bet_a": bet_a,
+        "watch_a": watch_a,
+        "bk_client_a": bk_client_a,
+        "bk_client_b": bk_client_b,
     }
 
 
@@ -313,24 +402,32 @@ async def e2e_env():
     # Patch async_session_maker everywhere it's imported as a local name.
     # Bookkeeping endpoints and org_settings do `from app.db.session import async_session_maker`
     # which binds a local reference — we must replace each one.
-    import app.db.session as session_mod
     import app.api.bookkeeping.clients as bk_clients_mod
-    import app.api.bookkeeping.workers as bk_workers_mod
+    import app.api.bookkeeping.expenses as bk_expenses_mod
+    import app.api.bookkeeping.exports as bk_exports_mod
+    import app.api.bookkeeping.invoices as bk_invoices_mod
     import app.api.bookkeeping.jobs as bk_jobs_mod
     import app.api.bookkeeping.placements as bk_placements_mod
-    import app.api.bookkeeping.timesheets as bk_timesheets_mod
-    import app.api.bookkeeping.expenses as bk_expenses_mod
-    import app.api.bookkeeping.invoices as bk_invoices_mod
-    import app.api.bookkeeping.transactions as bk_transactions_mod
     import app.api.bookkeeping.reports as bk_reports_mod
-    import app.api.bookkeeping.exports as bk_exports_mod
+    import app.api.bookkeeping.timesheets as bk_timesheets_mod
+    import app.api.bookkeeping.transactions as bk_transactions_mod
+    import app.api.bookkeeping.workers as bk_workers_mod
     import app.api.organization_settings as org_settings_mod
+    import app.db.session as session_mod
 
     patched_modules = [
-        session_mod, bk_clients_mod, bk_workers_mod, bk_jobs_mod,
-        bk_placements_mod, bk_timesheets_mod, bk_expenses_mod,
-        bk_invoices_mod, bk_transactions_mod, bk_reports_mod,
-        bk_exports_mod, org_settings_mod,
+        session_mod,
+        bk_clients_mod,
+        bk_workers_mod,
+        bk_jobs_mod,
+        bk_placements_mod,
+        bk_timesheets_mod,
+        bk_expenses_mod,
+        bk_invoices_mod,
+        bk_transactions_mod,
+        bk_reports_mod,
+        bk_exports_mod,
+        org_settings_mod,
     ]
     originals = {mod: getattr(mod, "async_session_maker") for mod in patched_modules}
     for mod in patched_modules:
@@ -449,9 +546,14 @@ class TestPaperBetsIsolation:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
             resp = await c.post(
                 f"/api/v1/paper-bets/portfolios/{d['pb'].id}/bets",
-                params={"sport": "nhl", "game": "VAN vs SEA",
-                        "bet_type": "moneyline", "selection": "VAN",
-                        "odds": -120, "stake": 25},
+                params={
+                    "sport": "nhl",
+                    "game": "VAN vs SEA",
+                    "bet_type": "moneyline",
+                    "selection": "VAN",
+                    "odds": -120,
+                    "stake": 25,
+                },
             )
             assert resp.status_code == 404
 
@@ -742,9 +844,14 @@ class TestCrossOrgAttackPatterns:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
             resp = await c.post(
                 f"/api/v1/paper-bets/portfolios/{d['pa'].id}/bets",
-                params={"sport": "nhl", "game": "TOR vs MTL",
-                        "bet_type": "moneyline", "selection": "TOR",
-                        "odds": -110, "stake": 20},
+                params={
+                    "sport": "nhl",
+                    "game": "TOR vs MTL",
+                    "bet_type": "moneyline",
+                    "selection": "TOR",
+                    "odds": -110,
+                    "stake": 20,
+                },
             )
             assert resp.status_code == 404
 

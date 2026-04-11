@@ -15,16 +15,25 @@ import re
 # Patterns that attempt to override system/agent instructions
 _INJECTION_PATTERNS = [
     # Direct instruction overrides
-    re.compile(r"ignore\s+(all\s+)?(previous|above|prior)\s+(instructions|prompts|rules)", re.IGNORECASE),
-    re.compile(r"disregard\s+(all\s+)?(previous|above|prior)\s+(instructions|prompts|rules)", re.IGNORECASE),
-    re.compile(r"forget\s+(all\s+)?(previous|above|prior)\s+(instructions|prompts|rules)", re.IGNORECASE),
+    re.compile(
+        r"ignore\s+(all\s+)?(previous|above|prior)\s+(instructions|prompts|rules)", re.IGNORECASE
+    ),
+    re.compile(
+        r"disregard\s+(all\s+)?(previous|above|prior)\s+(instructions|prompts|rules)", re.IGNORECASE
+    ),
+    re.compile(
+        r"forget\s+(all\s+)?(previous|above|prior)\s+(instructions|prompts|rules)", re.IGNORECASE
+    ),
     # Role/identity hijacking
     re.compile(r"you\s+are\s+now\s+", re.IGNORECASE),
     re.compile(r"act\s+as\s+(if\s+you\s+are|a)\s+", re.IGNORECASE),
     re.compile(r"pretend\s+(you\s+are|to\s+be)\s+", re.IGNORECASE),
     re.compile(r"from\s+now\s+on\s+you\s+(are|will|must|should)\s+", re.IGNORECASE),
     # System prompt extraction
-    re.compile(r"(show|reveal|print|output|repeat|display)\s+(your|the)\s+(system\s+)?(prompt|instructions|rules)", re.IGNORECASE),
+    re.compile(
+        r"(show|reveal|print|output|repeat|display)\s+(your|the)\s+(system\s+)?(prompt|instructions|rules)",
+        re.IGNORECASE,
+    ),
     re.compile(r"what\s+(are|is)\s+your\s+(system\s+)?(prompt|instructions|rules)", re.IGNORECASE),
     # Delimiter injection (trying to break out of a quoted context)
     re.compile(r"```\s*(system|assistant|user)\s*\n", re.IGNORECASE),
@@ -82,6 +91,7 @@ def sanitize_extracted_document(text: str | None, source: str = "document") -> s
 
     if flagged:
         from app.core.logging import get_logger
+
         logger = get_logger(__name__)
         logger.warning(
             "sanitize.document_injection_detected source=%s length=%d",
@@ -112,7 +122,7 @@ def sanitize_filename(filename: str | None, max_length: int = 255) -> str | None
         parts = filename.rsplit(".", 1)
         if len(parts) == 2:
             ext = parts[1][:10]  # cap extension length
-            filename = parts[0][:max_length - len(ext) - 1] + "." + ext
+            filename = parts[0][: max_length - len(ext) - 1] + "." + ext
         else:
             filename = filename[:max_length]
 

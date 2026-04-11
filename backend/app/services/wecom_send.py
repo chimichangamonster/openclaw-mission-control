@@ -45,9 +45,7 @@ async def get_org_wecom_connection(
     result = await session.execute(stmt)
     connection = result.scalars().first()
     if connection is None:
-        raise NoWeComConnectionError(
-            "No active WeCom connection for this organization."
-        )
+        raise NoWeComConnectionError("No active WeCom connection for this organization.")
     return connection
 
 

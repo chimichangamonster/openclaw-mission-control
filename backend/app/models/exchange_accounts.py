@@ -19,9 +19,7 @@ class ExchangeAccount(TenantScoped, table=True):
 
     __tablename__ = "exchange_accounts"  # pyright: ignore[reportAssignmentType]
     __table_args__ = (
-        UniqueConstraint(
-            "organization_id", "exchange", name="uq_exchange_accounts_org_exchange"
-        ),
+        UniqueConstraint("organization_id", "exchange", name="uq_exchange_accounts_org_exchange"),
     )
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)

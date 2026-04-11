@@ -31,7 +31,11 @@ async def get_privacy() -> HTMLResponse:
     return HTMLResponse(content=html)
 
 
-@router.get("/compliance-checklist", summary="Pre-Onboarding Compliance Checklist", response_class=HTMLResponse)
+@router.get(
+    "/compliance-checklist",
+    summary="Pre-Onboarding Compliance Checklist",
+    response_class=HTMLResponse,
+)
 async def get_compliance_checklist() -> HTMLResponse:
     """Serve a standalone compliance checklist for prospective clients. No auth required."""
     # Extract the checklist section from the ToS
@@ -48,7 +52,11 @@ async def get_dpa() -> HTMLResponse:
     return HTMLResponse(content=html)
 
 
-@router.get("/onboarding-checklist", summary="Client Onboarding Preparation Checklist", response_class=HTMLResponse)
+@router.get(
+    "/onboarding-checklist",
+    summary="Client Onboarding Preparation Checklist",
+    response_class=HTMLResponse,
+)
 async def get_onboarding_checklist() -> HTMLResponse:
     """Serve the client onboarding preparation checklist. No auth required.
 
@@ -88,11 +96,31 @@ async def get_onboarding_checklist_pdf(industry: str | None = None) -> Response:
         {
             "heading": "2. Roles & Permissions",
             "content": [
-                {"Role": "Owner", "Access": "Full control — settings, billing, API keys", "Typical": "Business owner, CEO"},
-                {"Role": "Admin", "Access": "Settings, members, integrations", "Typical": "Office manager, ops lead"},
-                {"Role": "Operator", "Access": "Workflows, invoices, documents", "Typical": "Project manager, dispatcher"},
-                {"Role": "Member", "Access": "Chat, uploads, dashboards", "Typical": "Field crew, team members"},
-                {"Role": "Viewer", "Access": "Read-only dashboards and reports", "Typical": "Accountant, advisor"},
+                {
+                    "Role": "Owner",
+                    "Access": "Full control — settings, billing, API keys",
+                    "Typical": "Business owner, CEO",
+                },
+                {
+                    "Role": "Admin",
+                    "Access": "Settings, members, integrations",
+                    "Typical": "Office manager, ops lead",
+                },
+                {
+                    "Role": "Operator",
+                    "Access": "Workflows, invoices, documents",
+                    "Typical": "Project manager, dispatcher",
+                },
+                {
+                    "Role": "Member",
+                    "Access": "Chat, uploads, dashboards",
+                    "Typical": "Field crew, team members",
+                },
+                {
+                    "Role": "Viewer",
+                    "Access": "Read-only dashboards and reports",
+                    "Typical": "Accountant, advisor",
+                },
             ],
         },
         {
@@ -138,56 +166,63 @@ async def get_onboarding_checklist_pdf(industry: str | None = None) -> Response:
                     examples += f" (+{len(items) - 4} more)"
                 config_items.append(f"- {label}: review defaults ({examples})")
 
-            sections.append({
-                "heading": f"{step_num}. {template.name} — Review Default Configuration",
-                "content": (
-                    "We'll pre-load industry defaults. Review and adjust to match your business:\n\n"
-                    + "\n".join(config_items)
-                ),
-            })
+            sections.append(
+                {
+                    "heading": f"{step_num}. {template.name} — Review Default Configuration",
+                    "content": (
+                        "We'll pre-load industry defaults. Review and adjust to match your business:\n\n"
+                        + "\n".join(config_items)
+                    ),
+                }
+            )
             step_num += 1
 
         # Add onboarding steps as a checklist
         if template.onboarding_steps:
             step_lines = [
-                f"- {step.label}: {step.description}"
-                for step in template.onboarding_steps
+                f"- {step.label}: {step.description}" for step in template.onboarding_steps
             ]
-            sections.append({
-                "heading": f"{step_num}. {template.name} — Setup Steps",
-                "content": (
-                    "These will be completed during or after onboarding:\n\n"
-                    + "\n".join(step_lines)
-                ),
-            })
+            sections.append(
+                {
+                    "heading": f"{step_num}. {template.name} — Setup Steps",
+                    "content": (
+                        "These will be completed during or after onboarding:\n\n"
+                        + "\n".join(step_lines)
+                    ),
+                }
+            )
             step_num += 1
 
     # --- AI access (always last before onboarding session) ---
     ai_step = len(sections) + 1
-    sections.append({
-        "heading": f"{ai_step}. AI Access Setup",
-        "content": (
-            "The platform uses AI models to process documents, run agents, and generate reports.\n\n"
-            "- Create an OpenRouter account at openrouter.ai and add a $5-20 deposit\n"
-            "- Typical monthly cost: $5-50 depending on usage\n"
-            "- Personal AI subscriptions (Claude Max, ChatGPT Pro) do NOT cover platform use\n"
-            "- For compliance requirements: direct provider API key with BAA, or self-hosted model"
-        ),
-    })
+    sections.append(
+        {
+            "heading": f"{ai_step}. AI Access Setup",
+            "content": (
+                "The platform uses AI models to process documents, run agents, and generate reports.\n\n"
+                "- Create an OpenRouter account at openrouter.ai and add a $5-20 deposit\n"
+                "- Typical monthly cost: $5-50 depending on usage\n"
+                "- Personal AI subscriptions (Claude Max, ChatGPT Pro) do NOT cover platform use\n"
+                "- For compliance requirements: direct provider API key with BAA, or self-hosted model"
+            ),
+        }
+    )
 
     session_step = len(sections) + 1
-    sections.append({
-        "heading": f"{session_step}. What Happens at the Onboarding Session",
-        "content": (
-            "1. Review your sample documents and configure AI extraction templates\n"
-            "2. Set up your org configuration and industry-specific defaults\n"
-            "3. Configure integrations (email, calendar, messaging) if applicable\n"
-            "4. Set up user accounts with appropriate access levels\n"
-            "5. Run a test: upload a document and verify the AI processes it correctly\n"
-            "6. Walk through the dashboard and train your team\n\n"
-            "Typical onboarding: 1-2 sessions, 2-4 hours total."
-        ),
-    })
+    sections.append(
+        {
+            "heading": f"{session_step}. What Happens at the Onboarding Session",
+            "content": (
+                "1. Review your sample documents and configure AI extraction templates\n"
+                "2. Set up your org configuration and industry-specific defaults\n"
+                "3. Configure integrations (email, calendar, messaging) if applicable\n"
+                "4. Set up user accounts with appropriate access levels\n"
+                "5. Run a test: upload a document and verify the AI processes it correctly\n"
+                "6. Walk through the dashboard and train your team\n\n"
+                "Typical onboarding: 1-2 sessions, 2-4 hours total."
+            ),
+        }
+    )
 
     pdf_bytes = generate_simple_pdf(
         title=title,

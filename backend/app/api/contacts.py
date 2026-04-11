@@ -45,7 +45,7 @@ async def list_contacts(
     )
     if q:
         search = f"%{q.lower()}%"
-        from sqlalchemy import or_, func
+        from sqlalchemy import func, or_
 
         stmt = stmt.where(
             or_(

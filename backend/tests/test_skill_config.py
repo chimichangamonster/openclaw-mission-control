@@ -19,7 +19,7 @@ from sqlalchemy.pool import StaticPool
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.api.deps import get_session, require_org_from_actor, check_org_rate_limit
+from app.api.deps import check_org_rate_limit, get_session, require_org_from_actor
 from app.api.skill_config import router as skill_config_router
 from app.models.boards import Board
 from app.models.organization_members import OrganizationMember
@@ -67,32 +67,50 @@ async def test_app():
 
         # Portfolios for our org
         p_stocks = PaperPortfolio(
-            id=uuid4(), name="Stocks", organization_id=ORG_ID,
-            user_id=USER_ID, starting_balance=10000, cash_balance=10000,
+            id=uuid4(),
+            name="Stocks",
+            organization_id=ORG_ID,
+            user_id=USER_ID,
+            starting_balance=10000,
+            cash_balance=10000,
         )
         p_bets = PaperPortfolio(
-            id=uuid4(), name="Sports Betting", organization_id=ORG_ID,
-            user_id=USER_ID, starting_balance=1000, cash_balance=1000,
+            id=uuid4(),
+            name="Sports Betting",
+            organization_id=ORG_ID,
+            user_id=USER_ID,
+            starting_balance=1000,
+            cash_balance=1000,
         )
         # Portfolio for other org (should NOT be returned)
         p_other = PaperPortfolio(
-            id=uuid4(), name="Stocks", organization_id=OTHER_ORG_ID,
-            user_id=USER_ID, starting_balance=5000, cash_balance=5000,
+            id=uuid4(),
+            name="Stocks",
+            organization_id=OTHER_ORG_ID,
+            user_id=USER_ID,
+            starting_balance=5000,
+            cash_balance=5000,
         )
         session.add_all([p_stocks, p_bets, p_other])
 
         # Boards for our org
         b_watchlist = Board(
-            id=uuid4(), name="Stock Watchlist", slug="stock-watchlist",
+            id=uuid4(),
+            name="Stock Watchlist",
+            slug="stock-watchlist",
             organization_id=ORG_ID,
         )
         b_sports = Board(
-            id=uuid4(), name="Sports Betting", slug="sports-betting",
+            id=uuid4(),
+            name="Sports Betting",
+            slug="sports-betting",
             organization_id=ORG_ID,
         )
         # Board for other org (should NOT be returned)
         b_other = Board(
-            id=uuid4(), name="Stock Watchlist", slug="stock-watchlist",
+            id=uuid4(),
+            name="Stock Watchlist",
+            slug="stock-watchlist",
             organization_id=OTHER_ORG_ID,
         )
         session.add_all([b_watchlist, b_sports, b_other])
@@ -114,14 +132,17 @@ async def test_app():
             yield session
 
     member = OrganizationMember(
-        id=uuid4(), organization_id=ORG_ID, user_id=USER_ID, role="owner",
+        id=uuid4(),
+        organization_id=ORG_ID,
+        user_id=USER_ID,
+        role="owner",
     )
     org_ctx = OrganizationContext(
         organization=org,
         member=member,
     )
 
-    from fastapi import FastAPI, APIRouter
+    from fastapi import APIRouter, FastAPI
 
     @asynccontextmanager
     async def noop_lifespan(app):
@@ -138,6 +159,7 @@ async def test_app():
 
     # Monkeypatch async_session_maker so the endpoint uses our test DB
     import app.api.skill_config as sc_mod
+
     sc_mod.async_session_maker = session_maker
 
     yield app, test_data

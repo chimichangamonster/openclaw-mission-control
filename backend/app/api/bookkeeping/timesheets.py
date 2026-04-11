@@ -80,13 +80,18 @@ async def list_timesheets(
 async def approve_timesheet(timesheet_id: str, org_ctx: OrganizationContext = ORG_ACTOR_DEP):
     async with async_session_maker() as session:
         result = await session.execute(
-            select(BkTimesheet).where(BkTimesheet.id == timesheet_id, BkTimesheet.organization_id == org_ctx.organization.id)
+            select(BkTimesheet).where(
+                BkTimesheet.id == timesheet_id,
+                BkTimesheet.organization_id == org_ctx.organization.id,
+            )
         )
         ts = result.scalars().first()
         if not ts:
             raise HTTPException(status_code=404, detail="Timesheet not found")
         if ts.status != "pending":
-            raise HTTPException(status_code=400, detail=f"Cannot approve timesheet with status '{ts.status}'")
+            raise HTTPException(
+                status_code=400, detail=f"Cannot approve timesheet with status '{ts.status}'"
+            )
 
         ts.status = "approved"
         ts.approved_at = utcnow()
@@ -100,13 +105,18 @@ async def approve_timesheet(timesheet_id: str, org_ctx: OrganizationContext = OR
 async def reject_timesheet(timesheet_id: str, org_ctx: OrganizationContext = ORG_ACTOR_DEP):
     async with async_session_maker() as session:
         result = await session.execute(
-            select(BkTimesheet).where(BkTimesheet.id == timesheet_id, BkTimesheet.organization_id == org_ctx.organization.id)
+            select(BkTimesheet).where(
+                BkTimesheet.id == timesheet_id,
+                BkTimesheet.organization_id == org_ctx.organization.id,
+            )
         )
         ts = result.scalars().first()
         if not ts:
             raise HTTPException(status_code=404, detail="Timesheet not found")
         if ts.status != "pending":
-            raise HTTPException(status_code=400, detail=f"Cannot reject timesheet with status '{ts.status}'")
+            raise HTTPException(
+                status_code=400, detail=f"Cannot reject timesheet with status '{ts.status}'"
+            )
 
         ts.status = "rejected"
         ts.updated_at = utcnow()
@@ -123,13 +133,10 @@ async def weekly_summary(
 ):
     """Weekly summary: hours and worker count by job."""
     async with async_session_maker() as session:
-        stmt = (
-            select(BkTimesheet)
-            .where(
-                BkTimesheet.organization_id == org_ctx.organization.id,
-                BkTimesheet.work_date >= from_date,  # type: ignore[operator]
-                BkTimesheet.work_date <= to_date,  # type: ignore[operator]
-            )
+        stmt = select(BkTimesheet).where(
+            BkTimesheet.organization_id == org_ctx.organization.id,
+            BkTimesheet.work_date >= from_date,  # type: ignore[operator]
+            BkTimesheet.work_date <= to_date,  # type: ignore[operator]
         )
         result = await session.execute(stmt)
         timesheets = result.scalars().all()
@@ -138,7 +145,12 @@ async def weekly_summary(
         for ts in timesheets:
             jid = str(ts.job_id)
             if jid not in by_job:
-                by_job[jid] = {"job_id": jid, "workers": set(), "regular_hours": 0.0, "overtime_hours": 0.0}
+                by_job[jid] = {
+                    "job_id": jid,
+                    "workers": set(),
+                    "regular_hours": 0.0,
+                    "overtime_hours": 0.0,
+                }
             by_job[jid]["workers"].add(str(ts.worker_id))
             by_job[jid]["regular_hours"] += ts.regular_hours
             by_job[jid]["overtime_hours"] += ts.overtime_hours

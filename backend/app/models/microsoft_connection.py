@@ -17,9 +17,7 @@ class MicrosoftConnection(TenantScoped, table=True):
 
     __tablename__ = "microsoft_connections"  # pyright: ignore[reportAssignmentType]
     __table_args__ = (
-        UniqueConstraint(
-            "organization_id", "provider_account_id", name="uq_msconn_org_account"
-        ),
+        UniqueConstraint("organization_id", "provider_account_id", name="uq_msconn_org_account"),
     )
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)

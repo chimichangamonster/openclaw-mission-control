@@ -41,12 +41,20 @@ class TestLLMEndpoint:
     def test_data_sovereignty(self):
         """Custom endpoints keep data private (not OpenRouter)."""
         custom = LLMEndpoint(
-            api_url="https://llm.internal/v1", api_key="k",
-            source="custom", name="Private", models=[], is_openrouter=False,
+            api_url="https://llm.internal/v1",
+            api_key="k",
+            source="custom",
+            name="Private",
+            models=[],
+            is_openrouter=False,
         )
         openrouter = LLMEndpoint(
-            api_url=OPENROUTER_BASE_URL, api_key="k",
-            source="byok_openrouter", name="OR", models=[], is_openrouter=True,
+            api_url=OPENROUTER_BASE_URL,
+            api_key="k",
+            source="byok_openrouter",
+            name="OR",
+            models=[],
+            is_openrouter=True,
         )
         # Custom = data stays private
         assert not custom.is_openrouter
@@ -66,15 +74,18 @@ class TestCustomEndpointConfig:
 
     def test_endpoint_json_parsing(self):
         import json
+
         from app.models.organization_settings import OrganizationSettings
 
         settings = OrganizationSettings(
             organization_id="fake",
-            custom_llm_endpoint_json=json.dumps({
-                "api_url": "https://llm.corp.internal/v1",
-                "name": "Corp LLM",
-                "models": ["llama-3.1-70b"],
-            }),
+            custom_llm_endpoint_json=json.dumps(
+                {
+                    "api_url": "https://llm.corp.internal/v1",
+                    "name": "Corp LLM",
+                    "models": ["llama-3.1-70b"],
+                }
+            ),
         )
         ep = settings.custom_llm_endpoint
         assert ep["api_url"] == "https://llm.corp.internal/v1"
@@ -100,7 +111,14 @@ class TestHealthCheckResponse:
 
     def test_health_result_fields(self):
         """Health check returns expected fields."""
-        expected_fields = {"reachable", "authenticated", "models", "inference_ok", "latency_ms", "error"}
+        expected_fields = {
+            "reachable",
+            "authenticated",
+            "models",
+            "inference_ok",
+            "latency_ms",
+            "error",
+        }
         # These are the fields returned by check_endpoint_health
         result = {
             "reachable": False,
@@ -119,8 +137,12 @@ class TestDeploymentTiers:
     def test_saas_tier(self):
         """SaaS: data goes through OpenRouter to public LLMs."""
         ep = LLMEndpoint(
-            api_url=OPENROUTER_BASE_URL, api_key="k",
-            source="platform_openrouter", name="Platform", models=[], is_openrouter=True,
+            api_url=OPENROUTER_BASE_URL,
+            api_key="k",
+            source="platform_openrouter",
+            name="Platform",
+            models=[],
+            is_openrouter=True,
         )
         assert ep.is_openrouter
         assert ep.source == "platform_openrouter"
@@ -128,8 +150,12 @@ class TestDeploymentTiers:
     def test_dedicated_tier(self):
         """Dedicated: org's own OpenRouter key, can restrict providers."""
         ep = LLMEndpoint(
-            api_url=OPENROUTER_BASE_URL, api_key="org-key",
-            source="byok_openrouter", name="BYOK", models=[], is_openrouter=True,
+            api_url=OPENROUTER_BASE_URL,
+            api_key="org-key",
+            source="byok_openrouter",
+            name="BYOK",
+            models=[],
+            is_openrouter=True,
         )
         assert ep.is_openrouter
         assert ep.source == "byok_openrouter"
@@ -137,8 +163,12 @@ class TestDeploymentTiers:
     def test_enterprise_tier(self):
         """Enterprise: self-hosted, data never leaves client infra."""
         ep = LLMEndpoint(
-            api_url="https://ai.megacorp.internal/v1", api_key="internal",
-            source="custom", name="MegaCorp AI", models=["llama-3.1-405b"], is_openrouter=False,
+            api_url="https://ai.megacorp.internal/v1",
+            api_key="internal",
+            source="custom",
+            name="MegaCorp AI",
+            models=["llama-3.1-405b"],
+            is_openrouter=False,
         )
         assert not ep.is_openrouter
         assert ep.source == "custom"

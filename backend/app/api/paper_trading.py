@@ -6,14 +6,20 @@ from collections import defaultdict
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select, func, cast, Date
+from sqlalchemy import Date, cast, func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.api.deps import ORG_RATE_LIMIT_DEP, PORTFOLIO_DEP, get_session, require_feature, require_org_member
+from app.api.deps import (
+    ORG_RATE_LIMIT_DEP,
+    PORTFOLIO_DEP,
+    get_session,
+    require_feature,
+    require_org_member,
+)
 from app.core.logging import get_logger
 from app.core.time import utcnow
-from app.services.notifications import notify
 from app.models.paper_trading import PaperPortfolio, PaperPosition, PaperTrade
+from app.services.notifications import notify
 from app.services.organizations import OrganizationContext
 
 logger = get_logger(__name__)
@@ -29,9 +35,7 @@ async def list_portfolios(
     session: AsyncSession = Depends(get_session),
     org_ctx: OrganizationContext = Depends(require_org_member),
 ) -> list[dict]:
-    stmt = select(PaperPortfolio).where(
-        PaperPortfolio.organization_id == org_ctx.organization.id
-    )
+    stmt = select(PaperPortfolio).where(PaperPortfolio.organization_id == org_ctx.organization.id)
     result = await session.execute(stmt)
     portfolios = result.scalars().all()
     out = []
@@ -42,15 +46,17 @@ async def list_portfolios(
             PaperPosition.status == "open",
         )
         pos_count = (await session.execute(pos_stmt)).scalar() or 0
-        out.append({
-            "id": str(p.id),
-            "name": p.name,
-            "starting_balance": p.starting_balance,
-            "cash_balance": p.cash_balance,
-            "auto_trade": p.auto_trade,
-            "open_positions": pos_count,
-            "created_at": p.created_at.isoformat(),
-        })
+        out.append(
+            {
+                "id": str(p.id),
+                "name": p.name,
+                "starting_balance": p.starting_balance,
+                "cash_balance": p.cash_balance,
+                "auto_trade": p.auto_trade,
+                "open_positions": pos_count,
+                "created_at": p.created_at.isoformat(),
+            }
+        )
     return out
 
 
@@ -179,32 +185,45 @@ async def list_positions(
         cost_basis = pos.entry_price * pos.quantity + pos.total_fees
         pnl_pct = (raw_pnl - pos.total_fees) / cost_basis * 100 if cost_basis > 0 else 0
 
-        out.append({
-            "id": str(pos.id),
-            "symbol": pos.symbol,
-            "company_name": pos.company_name,
-            "exchange": pos.exchange,
-            "sector": pos.sector,
-            "asset_type": pos.asset_type,
-            "side": pos.side,
-            "quantity": pos.quantity,
-            "entry_price": pos.entry_price,
-            "current_price": price,
-            "unrealized_pnl": round(pnl, 2),
-            "pnl_pct": round(pnl_pct, 2),
-            "stop_loss": pos.stop_loss,
-            "take_profit": pos.take_profit,
-            "source_report": pos.source_report,
-            "status": pos.status,
-            "entry_date": pos.entry_date.isoformat(),
-            "exit_date": pos.exit_date.isoformat() if pos.exit_date else None,
-            "exit_price": pos.exit_price,
-            "pnl_realized": pos.pnl_realized,
-            "total_fees": pos.total_fees,
-            "trade_count": pos.trade_count,
-            "hold_days": (((pos.exit_date or utcnow()).replace(tzinfo=None) - pos.entry_date.replace(tzinfo=None)).days) if pos.entry_date else 0,
-            "price_updated_at": pos.price_updated_at.isoformat() if pos.price_updated_at else None,
-        })
+        out.append(
+            {
+                "id": str(pos.id),
+                "symbol": pos.symbol,
+                "company_name": pos.company_name,
+                "exchange": pos.exchange,
+                "sector": pos.sector,
+                "asset_type": pos.asset_type,
+                "side": pos.side,
+                "quantity": pos.quantity,
+                "entry_price": pos.entry_price,
+                "current_price": price,
+                "unrealized_pnl": round(pnl, 2),
+                "pnl_pct": round(pnl_pct, 2),
+                "stop_loss": pos.stop_loss,
+                "take_profit": pos.take_profit,
+                "source_report": pos.source_report,
+                "status": pos.status,
+                "entry_date": pos.entry_date.isoformat(),
+                "exit_date": pos.exit_date.isoformat() if pos.exit_date else None,
+                "exit_price": pos.exit_price,
+                "pnl_realized": pos.pnl_realized,
+                "total_fees": pos.total_fees,
+                "trade_count": pos.trade_count,
+                "hold_days": (
+                    (
+                        (
+                            (pos.exit_date or utcnow()).replace(tzinfo=None)
+                            - pos.entry_date.replace(tzinfo=None)
+                        ).days
+                    )
+                    if pos.entry_date
+                    else 0
+                ),
+                "price_updated_at": (
+                    pos.price_updated_at.isoformat() if pos.price_updated_at else None
+                ),
+            }
+        )
     return out
 
 
@@ -258,8 +277,8 @@ async def execute_trade(
             # Average up/down
             new_total_qty = position.quantity + quantity
             position.entry_price = (
-                (position.entry_price * position.quantity + price * quantity) / new_total_qty
-            )
+                position.entry_price * position.quantity + price * quantity
+            ) / new_total_qty
             position.quantity = new_total_qty
             position.current_price = price
             position.updated_at = utcnow()
@@ -440,9 +459,9 @@ async def portfolio_summary(
     worst_trade = min(closed, key=lambda p: p.pnl_realized) if closed else None
 
     # Trade count
-    trade_count = (await session.execute(
-        select(func.count()).where(PaperTrade.portfolio_id == portfolio_id)
-    )).scalar() or 0
+    trade_count = (
+        await session.execute(select(func.count()).where(PaperTrade.portfolio_id == portfolio_id))
+    ).scalar() or 0
 
     # Open positions unrealized
     open_stmt = select(PaperPosition).where(
@@ -457,7 +476,9 @@ async def portfolio_summary(
     )
 
     total_value = portfolio.cash_balance + positions_value
-    total_return_pct = ((total_value - portfolio.starting_balance) / portfolio.starting_balance) * 100
+    total_return_pct = (
+        (total_value - portfolio.starting_balance) / portfolio.starting_balance
+    ) * 100
 
     return {
         "portfolio_id": str(portfolio.id),
@@ -474,32 +495,55 @@ async def portfolio_summary(
         "winning_trades": len(winners),
         "losing_trades": len(losers),
         "win_rate_pct": round(len(winners) / len(closed) * 100, 1) if closed else 0,
-        "best_trade": {
-            "symbol": best_trade.symbol,
-            "pnl": round(best_trade.pnl_realized, 2),
-        } if best_trade else None,
-        "worst_trade": {
-            "symbol": worst_trade.symbol,
-            "pnl": round(worst_trade.pnl_realized, 2),
-        } if worst_trade else None,
-        "avg_win": round(
-            sum(p.pnl_realized for p in winners) / len(winners), 2
-        ) if winners else 0,
-        "avg_loss": round(
-            sum(p.pnl_realized for p in losers) / len(losers), 2
-        ) if losers else 0,
+        "best_trade": (
+            {
+                "symbol": best_trade.symbol,
+                "pnl": round(best_trade.pnl_realized, 2),
+            }
+            if best_trade
+            else None
+        ),
+        "worst_trade": (
+            {
+                "symbol": worst_trade.symbol,
+                "pnl": round(worst_trade.pnl_realized, 2),
+            }
+            if worst_trade
+            else None
+        ),
+        "avg_win": round(sum(p.pnl_realized for p in winners) / len(winners), 2) if winners else 0,
+        "avg_loss": round(sum(p.pnl_realized for p in losers) / len(losers), 2) if losers else 0,
         "largest_win": round(best_trade.pnl_realized, 2) if best_trade else 0,
         "largest_loss": round(worst_trade.pnl_realized, 2) if worst_trade else 0,
-        "profit_factor": round(
-            abs(sum(p.pnl_realized for p in winners)) /
-            abs(sum(p.pnl_realized for p in losers)), 2
-        ) if losers and sum(p.pnl_realized for p in losers) != 0 else 0,
+        "profit_factor": (
+            round(
+                abs(sum(p.pnl_realized for p in winners))
+                / abs(sum(p.pnl_realized for p in losers)),
+                2,
+            )
+            if losers and sum(p.pnl_realized for p in losers) != 0
+            else 0
+        ),
         "total_fees": round(
             sum(p.total_fees for p in closed) + sum(p.total_fees for p in open_positions), 2
         ),
-        "avg_hold_days": round(
-            sum((((p.exit_date or utcnow()).replace(tzinfo=None) - p.entry_date.replace(tzinfo=None)).days) for p in closed) / len(closed), 1
-        ) if closed else 0,
+        "avg_hold_days": (
+            round(
+                sum(
+                    (
+                        (
+                            (p.exit_date or utcnow()).replace(tzinfo=None)
+                            - p.entry_date.replace(tzinfo=None)
+                        ).days
+                    )
+                    for p in closed
+                )
+                / len(closed),
+                1,
+            )
+            if closed
+            else 0
+        ),
     }
 
 
@@ -544,7 +588,11 @@ async def update_position(
 
     await session.commit()
     price = position.current_price or position.entry_price
-    pnl = (price - position.entry_price) * position.quantity if position.side == "long" else (position.entry_price - price) * position.quantity
+    pnl = (
+        (price - position.entry_price) * position.quantity
+        if position.side == "long"
+        else (position.entry_price - price) * position.quantity
+    )
     return {
         "id": str(position.id),
         "symbol": position.symbol,
@@ -601,11 +649,13 @@ async def equity_curve(
     curve = []
     for day in sorted(daily_pnl.keys()):
         cumulative += daily_pnl[day]
-        curve.append({
-            "date": day,
-            "equity": round(portfolio.starting_balance + cumulative, 2),
-            "daily_pnl": round(daily_pnl[day], 2),
-            "cumulative_pnl": round(cumulative, 2),
-        })
+        curve.append(
+            {
+                "date": day,
+                "equity": round(portfolio.starting_balance + cumulative, 2),
+                "daily_pnl": round(daily_pnl[day], 2),
+                "cumulative_pnl": round(cumulative, 2),
+            }
+        )
 
     return curve

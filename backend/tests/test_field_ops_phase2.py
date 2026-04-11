@@ -10,7 +10,6 @@ from uuid import uuid4
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # TxAuditRecord model
 # ---------------------------------------------------------------------------
@@ -457,14 +456,21 @@ class TestPentestTxHook:
         session.commit = AsyncMock()
 
         # Mock bridge call
-        with patch(
-            "app.services.pentest.hooks._get_bridge_urls",
-            new_callable=AsyncMock,
-            return_value=("http://pi:8888", "api-key", "mgmt-key"),
-        ), patch(
-            "app.services.pentest.hooks._call_bridge_tx",
-            new_callable=AsyncMock,
-            return_value={"status": "success", "detail": "5 deauth packets sent", "scan_id": "deauth_123"},
+        with (
+            patch(
+                "app.services.pentest.hooks._get_bridge_urls",
+                new_callable=AsyncMock,
+                return_value=("http://pi:8888", "api-key", "mgmt-key"),
+            ),
+            patch(
+                "app.services.pentest.hooks._call_bridge_tx",
+                new_callable=AsyncMock,
+                return_value={
+                    "status": "success",
+                    "detail": "5 deauth packets sent",
+                    "scan_id": "deauth_123",
+                },
+            ),
         ):
             await handle_pentest_tx_approval_resolution(
                 session=session,
@@ -623,7 +629,16 @@ class TestConstants:
     def test_valid_environment_tags(self) -> None:
         from app.api.pentest import VALID_ENVIRONMENT_TAGS
 
-        expected = {"iot", "wifi", "office", "industrial", "healthcare", "datacenter", "retail", "vehicle"}
+        expected = {
+            "iot",
+            "wifi",
+            "office",
+            "industrial",
+            "healthcare",
+            "datacenter",
+            "retail",
+            "vehicle",
+        }
         assert set(VALID_ENVIRONMENT_TAGS) == expected
 
 

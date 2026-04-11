@@ -48,19 +48,32 @@ def generate_csv(transactions: list[dict[str, Any]]) -> str:
     Returns:
         CSV string with headers.
     """
-    headers = ["Date", "Transaction Type", "Account", "Amount", "GST Amount", "Description", "Job", "Category"]
+    headers = [
+        "Date",
+        "Transaction Type",
+        "Account",
+        "Amount",
+        "GST Amount",
+        "Description",
+        "Job",
+        "Category",
+    ]
     rows = []
     for t in transactions:
-        rows.append(",".join([
-            str(t.get("date", "")),
-            str(t.get("type", "")),
-            "Revenue" if t.get("type") == "income" else "Expenses",
-            f"{t.get('amount', 0):.2f}",
-            f"{t.get('gst_amount', 0):.2f}",
-            _escape_csv(str(t.get("description", ""))),
-            str(t.get("job_id", "")),
-            str(t.get("category", "")),
-        ]))
+        rows.append(
+            ",".join(
+                [
+                    str(t.get("date", "")),
+                    str(t.get("type", "")),
+                    "Revenue" if t.get("type") == "income" else "Expenses",
+                    f"{t.get('amount', 0):.2f}",
+                    f"{t.get('gst_amount', 0):.2f}",
+                    _escape_csv(str(t.get("description", ""))),
+                    str(t.get("job_id", "")),
+                    str(t.get("category", "")),
+                ]
+            )
+        )
     return "\n".join([",".join(headers)] + rows)
 
 

@@ -122,7 +122,9 @@ async def require_org_from_actor(
 
     if actor.actor_type == "agent" and actor.agent is not None:
         if not actor.agent.board_id:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Agent has no board assignment.")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail="Agent has no board assignment."
+            )
         board = await Board.objects.by_id(actor.agent.board_id).first(session)
         if board is None:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
@@ -131,6 +133,7 @@ async def require_org_from_actor(
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
         # Create a synthetic member context for the agent (operator-level access)
         from app.models.organization_members import OrganizationMember
+
         synthetic_member = OrganizationMember(
             organization_id=organization.id,
             user_id=organization.id,  # placeholder — agent doesn't have a user_id

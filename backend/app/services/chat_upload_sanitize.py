@@ -17,13 +17,15 @@ from app.core.sanitize import sanitize_extracted_document
 logger = logging.getLogger(__name__)
 
 # File types we can extract text from at upload time.
-TEXT_EXTRACTABLE_TYPES = frozenset({
-    "application/pdf",
-    "text/plain",
-    "text/csv",
-    "text/markdown",
-    "application/json",
-})
+TEXT_EXTRACTABLE_TYPES = frozenset(
+    {
+        "application/pdf",
+        "text/plain",
+        "text/csv",
+        "text/markdown",
+        "application/json",
+    }
+)
 
 
 async def extract_and_sanitize_upload(

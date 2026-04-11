@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from pathlib import Path
+from typing import TYPE_CHECKING
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
@@ -44,14 +43,22 @@ BOARD_ID_QUERY = Query(default=None)
 
 # Chat upload constraints
 _CHAT_UPLOAD_MAX_BYTES = 10 * 1024 * 1024  # 10 MB
-_CHAT_UPLOAD_ALLOWED_TYPES = frozenset({
-    "image/png", "image/jpeg", "image/gif", "image/webp", "image/svg+xml",
-    "application/pdf",
-    "text/plain", "text/csv", "text/markdown",
-    "application/json",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-})
+_CHAT_UPLOAD_ALLOWED_TYPES = frozenset(
+    {
+        "image/png",
+        "image/jpeg",
+        "image/gif",
+        "image/webp",
+        "image/svg+xml",
+        "application/pdf",
+        "text/plain",
+        "text/csv",
+        "text/markdown",
+        "application/json",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    }
+)
 
 
 @router.post(
@@ -129,7 +136,10 @@ async def upload_chat_file(
                 pass  # Fall back to moderate
 
             sanitized_text = await extract_and_sanitize_upload(
-                data, content_type, original_name, redaction_level,
+                data,
+                content_type,
+                original_name,
+                redaction_level,
             )
             if sanitized_text is not None:
                 sanitized_name = f"{uuid4().hex[:12]}.sanitized.txt"
@@ -138,17 +148,24 @@ async def upload_chat_file(
                 sanitized_workspace_path = f"{relative_dir}/{sanitized_name}"
                 logger.info(
                     "chat.upload.sanitized org_id=%s file=%s sanitized_path=%s",
-                    org_id, original_name, sanitized_workspace_path,
+                    org_id,
+                    original_name,
+                    sanitized_workspace_path,
                 )
     except Exception:
         logger.warning(
             "chat.upload.sanitize_failed org_id=%s file=%s",
-            org_id, original_name, exc_info=True,
+            org_id,
+            original_name,
+            exc_info=True,
         )
 
     logger.info(
         "chat.upload org_id=%s file=%s size=%d path=%s",
-        org_id, original_name, len(data), workspace_path,
+        org_id,
+        original_name,
+        len(data),
+        workspace_path,
     )
 
     return ChatUploadResponse(

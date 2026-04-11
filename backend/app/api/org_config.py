@@ -93,7 +93,9 @@ async def create_config_item(
             )
         )
         if existing.scalars().first():
-            raise HTTPException(status_code=409, detail=f"Config item '{category}/{payload.key}' already exists")
+            raise HTTPException(
+                status_code=409, detail=f"Config item '{category}/{payload.key}' already exists"
+            )
 
         item = OrgConfigData(
             id=uuid4(),
@@ -192,17 +194,19 @@ async def bulk_upsert(
             if existing.scalars().first():
                 continue  # skip existing
 
-            session.add(OrgConfigData(
-                id=uuid4(),
-                organization_id=org_id,
-                category=payload.category,
-                key=item.key,
-                label=item.label,
-                value_json=json.dumps(item.value),
-                sort_order=item.sort_order,
-                created_at=utcnow(),
-                updated_at=utcnow(),
-            ))
+            session.add(
+                OrgConfigData(
+                    id=uuid4(),
+                    organization_id=org_id,
+                    category=payload.category,
+                    key=item.key,
+                    label=item.label,
+                    value_json=json.dumps(item.value),
+                    sort_order=item.sort_order,
+                    created_at=utcnow(),
+                    updated_at=utcnow(),
+                )
+            )
             created += 1
 
         await session.commit()

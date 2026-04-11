@@ -26,14 +26,14 @@ from sqlmodel import SQLModel, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.deps import (
+    check_org_rate_limit,
     get_portfolio_for_org,
     get_session,
-    require_org_member,
     require_org_from_actor,
-    check_org_rate_limit,
+    require_org_member,
 )
-from app.api.paper_trading import router as paper_trading_router
 from app.api.paper_bets import router as paper_bets_router
+from app.api.paper_trading import router as paper_trading_router
 from app.api.watchlist import router as watchlist_router
 from app.models.organization_members import OrganizationMember
 from app.models.organization_settings import DEFAULT_FEATURE_FLAGS, OrganizationSettings
@@ -78,34 +78,48 @@ async def _seed(session: AsyncSession) -> dict:
     session.add(org)
 
     user = User(
-        id=USER_ID, clerk_user_id="flow-test-clerk", email="flow@test.com",
-        name="Flow Tester", active_organization_id=ORG_ID,
+        id=USER_ID,
+        clerk_user_id="flow-test-clerk",
+        email="flow@test.com",
+        name="Flow Tester",
+        active_organization_id=ORG_ID,
     )
     session.add(user)
 
     member = OrganizationMember(
-        id=uuid4(), organization_id=ORG_ID, user_id=USER_ID,
-        role="owner", all_boards_read=True, all_boards_write=True,
-        created_at=now, updated_at=now,
+        id=uuid4(),
+        organization_id=ORG_ID,
+        user_id=USER_ID,
+        role="owner",
+        all_boards_read=True,
+        all_boards_write=True,
+        created_at=now,
+        updated_at=now,
     )
     session.add(member)
 
     settings = OrganizationSettings(
-        id=uuid4(), organization_id=ORG_ID,
+        id=uuid4(),
+        organization_id=ORG_ID,
         feature_flags_json=json.dumps({k: True for k in DEFAULT_FEATURE_FLAGS}),
     )
     session.add(settings)
 
     portfolio = PaperPortfolio(
-        id=uuid4(), organization_id=ORG_ID, user_id=USER_ID,
-        name="Test Portfolio", starting_balance=STARTING_BALANCE,
+        id=uuid4(),
+        organization_id=ORG_ID,
+        user_id=USER_ID,
+        name="Test Portfolio",
+        starting_balance=STARTING_BALANCE,
         cash_balance=STARTING_BALANCE,
     )
     session.add(portfolio)
 
     await session.commit()
     return {
-        "org": org, "user": user, "member": member,
+        "org": org,
+        "user": user,
+        "member": member,
         "portfolio": portfolio,
     }
 
@@ -199,13 +213,20 @@ class TestTradeFlow:
     @pytest.mark.asyncio
     async def test_buy_creates_position_and_deducts_cash(self, env) -> None:
         pid = env["portfolio_id"]
-        async with AsyncClient(transport=ASGITransport(app=env["app"]), base_url="http://test") as c:
+        async with AsyncClient(
+            transport=ASGITransport(app=env["app"]), base_url="http://test"
+        ) as c:
             resp = await c.post(
                 f"/api/v1/paper-trading/portfolios/{pid}/trades",
                 params={
-                    "symbol": "NVDA", "trade_type": "buy", "quantity": 10,
-                    "price": 100.0, "stop_loss": 90.0, "take_profit": 120.0,
-                    "company_name": "NVIDIA", "sector": "Technology",
+                    "symbol": "NVDA",
+                    "trade_type": "buy",
+                    "quantity": 10,
+                    "price": 100.0,
+                    "stop_loss": 90.0,
+                    "take_profit": 120.0,
+                    "company_name": "NVIDIA",
+                    "sector": "Technology",
                 },
             )
             assert resp.status_code == 200
@@ -220,7 +241,9 @@ class TestTradeFlow:
     @pytest.mark.asyncio
     async def test_position_appears_after_buy(self, env) -> None:
         pid = env["portfolio_id"]
-        async with AsyncClient(transport=ASGITransport(app=env["app"]), base_url="http://test") as c:
+        async with AsyncClient(
+            transport=ASGITransport(app=env["app"]), base_url="http://test"
+        ) as c:
             # Buy
             await c.post(
                 f"/api/v1/paper-trading/portfolios/{pid}/trades",
@@ -239,7 +262,9 @@ class TestTradeFlow:
     @pytest.mark.asyncio
     async def test_second_buy_averages_up(self, env) -> None:
         pid = env["portfolio_id"]
-        async with AsyncClient(transport=ASGITransport(app=env["app"]), base_url="http://test") as c:
+        async with AsyncClient(
+            transport=ASGITransport(app=env["app"]), base_url="http://test"
+        ) as c:
             # Buy 10 @ $100
             await c.post(
                 f"/api/v1/paper-trading/portfolios/{pid}/trades",
@@ -260,7 +285,9 @@ class TestTradeFlow:
     @pytest.mark.asyncio
     async def test_sell_realizes_pnl_and_closes_position(self, env) -> None:
         pid = env["portfolio_id"]
-        async with AsyncClient(transport=ASGITransport(app=env["app"]), base_url="http://test") as c:
+        async with AsyncClient(
+            transport=ASGITransport(app=env["app"]), base_url="http://test"
+        ) as c:
             # Buy 10 @ $100
             await c.post(
                 f"/api/v1/paper-trading/portfolios/{pid}/trades",
@@ -287,7 +314,9 @@ class TestTradeFlow:
     @pytest.mark.asyncio
     async def test_partial_sell_keeps_position_open(self, env) -> None:
         pid = env["portfolio_id"]
-        async with AsyncClient(transport=ASGITransport(app=env["app"]), base_url="http://test") as c:
+        async with AsyncClient(
+            transport=ASGITransport(app=env["app"]), base_url="http://test"
+        ) as c:
             # Buy 20 @ $50
             await c.post(
                 f"/api/v1/paper-trading/portfolios/{pid}/trades",
@@ -308,7 +337,9 @@ class TestTradeFlow:
     @pytest.mark.asyncio
     async def test_sell_without_position_returns_400(self, env) -> None:
         pid = env["portfolio_id"]
-        async with AsyncClient(transport=ASGITransport(app=env["app"]), base_url="http://test") as c:
+        async with AsyncClient(
+            transport=ASGITransport(app=env["app"]), base_url="http://test"
+        ) as c:
             resp = await c.post(
                 f"/api/v1/paper-trading/portfolios/{pid}/trades",
                 params={"symbol": "FAKE", "trade_type": "sell", "quantity": 5, "price": 100.0},
@@ -318,7 +349,9 @@ class TestTradeFlow:
     @pytest.mark.asyncio
     async def test_insufficient_cash_returns_400(self, env) -> None:
         pid = env["portfolio_id"]
-        async with AsyncClient(transport=ASGITransport(app=env["app"]), base_url="http://test") as c:
+        async with AsyncClient(
+            transport=ASGITransport(app=env["app"]), base_url="http://test"
+        ) as c:
             resp = await c.post(
                 f"/api/v1/paper-trading/portfolios/{pid}/trades",
                 params={"symbol": "BRK", "trade_type": "buy", "quantity": 100, "price": 1000.0},
@@ -328,7 +361,9 @@ class TestTradeFlow:
     @pytest.mark.asyncio
     async def test_summary_reflects_closed_trade(self, env) -> None:
         pid = env["portfolio_id"]
-        async with AsyncClient(transport=ASGITransport(app=env["app"]), base_url="http://test") as c:
+        async with AsyncClient(
+            transport=ASGITransport(app=env["app"]), base_url="http://test"
+        ) as c:
             # Buy 10 @ $100, sell 10 @ $130 (win: $300)
             await c.post(
                 f"/api/v1/paper-trading/portfolios/{pid}/trades",
@@ -364,7 +399,9 @@ class TestTradeFlow:
     @pytest.mark.asyncio
     async def test_equity_curve_after_sell(self, env) -> None:
         pid = env["portfolio_id"]
-        async with AsyncClient(transport=ASGITransport(app=env["app"]), base_url="http://test") as c:
+        async with AsyncClient(
+            transport=ASGITransport(app=env["app"]), base_url="http://test"
+        ) as c:
             # Buy 10 @ $100
             await c.post(
                 f"/api/v1/paper-trading/portfolios/{pid}/trades",
@@ -389,7 +426,9 @@ class TestTradeFlow:
     @pytest.mark.asyncio
     async def test_equity_curve_empty_before_any_sells(self, env) -> None:
         pid = env["portfolio_id"]
-        async with AsyncClient(transport=ASGITransport(app=env["app"]), base_url="http://test") as c:
+        async with AsyncClient(
+            transport=ASGITransport(app=env["app"]), base_url="http://test"
+        ) as c:
             # Buy only — no sells means no realized P&L, empty curve
             await c.post(
                 f"/api/v1/paper-trading/portfolios/{pid}/trades",
@@ -402,7 +441,9 @@ class TestTradeFlow:
     @pytest.mark.asyncio
     async def test_trade_list_records_all_trades(self, env) -> None:
         pid = env["portfolio_id"]
-        async with AsyncClient(transport=ASGITransport(app=env["app"]), base_url="http://test") as c:
+        async with AsyncClient(
+            transport=ASGITransport(app=env["app"]), base_url="http://test"
+        ) as c:
             await c.post(
                 f"/api/v1/paper-trading/portfolios/{pid}/trades",
                 params={"symbol": "LOG", "trade_type": "buy", "quantity": 10, "price": 50.0},
@@ -422,7 +463,9 @@ class TestTradeFlow:
     @pytest.mark.asyncio
     async def test_portfolio_total_value_includes_positions(self, env) -> None:
         pid = env["portfolio_id"]
-        async with AsyncClient(transport=ASGITransport(app=env["app"]), base_url="http://test") as c:
+        async with AsyncClient(
+            transport=ASGITransport(app=env["app"]), base_url="http://test"
+        ) as c:
             # Buy 10 @ $100 → cash drops by 1009.99
             await c.post(
                 f"/api/v1/paper-trading/portfolios/{pid}/trades",
@@ -447,14 +490,22 @@ class TestBetFlow:
     @pytest.mark.asyncio
     async def test_place_bet_deducts_stake(self, env) -> None:
         pid = env["portfolio_id"]
-        async with AsyncClient(transport=ASGITransport(app=env["app"]), base_url="http://test") as c:
+        async with AsyncClient(
+            transport=ASGITransport(app=env["app"]), base_url="http://test"
+        ) as c:
             resp = await c.post(
                 f"/api/v1/paper-bets/portfolios/{pid}/bets",
                 params={
-                    "sport": "nhl", "game": "EDM vs CGY", "game_date": "2026-03-22",
-                    "bet_type": "moneyline", "selection": "EDM",
-                    "odds": -150, "stake": 100, "confidence": 75,
-                    "reasoning": "EDM at home", "book": "Bet365",
+                    "sport": "nhl",
+                    "game": "EDM vs CGY",
+                    "game_date": "2026-03-22",
+                    "bet_type": "moneyline",
+                    "selection": "EDM",
+                    "odds": -150,
+                    "stake": 100,
+                    "confidence": 75,
+                    "reasoning": "EDM at home",
+                    "book": "Bet365",
                 },
             )
             assert resp.status_code == 201
@@ -466,14 +517,21 @@ class TestBetFlow:
     @pytest.mark.asyncio
     async def test_resolve_won_pays_out(self, env) -> None:
         pid = env["portfolio_id"]
-        async with AsyncClient(transport=ASGITransport(app=env["app"]), base_url="http://test") as c:
+        async with AsyncClient(
+            transport=ASGITransport(app=env["app"]), base_url="http://test"
+        ) as c:
             # Place bet: $100 @ -150 odds → decimal = 1.6667 → payout = $166.67
             resp = await c.post(
                 f"/api/v1/paper-bets/portfolios/{pid}/bets",
                 params={
-                    "sport": "nhl", "game": "TOR vs MTL", "game_date": "2026-03-22",
-                    "bet_type": "moneyline", "selection": "TOR",
-                    "odds": -150, "stake": 100, "book": "Bet365",
+                    "sport": "nhl",
+                    "game": "TOR vs MTL",
+                    "game_date": "2026-03-22",
+                    "bet_type": "moneyline",
+                    "selection": "TOR",
+                    "odds": -150,
+                    "stake": 100,
+                    "book": "Bet365",
                 },
             )
             bet_id = resp.json()["bet_id"]
@@ -496,13 +554,20 @@ class TestBetFlow:
     @pytest.mark.asyncio
     async def test_resolve_lost_zero_payout(self, env) -> None:
         pid = env["portfolio_id"]
-        async with AsyncClient(transport=ASGITransport(app=env["app"]), base_url="http://test") as c:
+        async with AsyncClient(
+            transport=ASGITransport(app=env["app"]), base_url="http://test"
+        ) as c:
             resp = await c.post(
                 f"/api/v1/paper-bets/portfolios/{pid}/bets",
                 params={
-                    "sport": "nba", "game": "LAL vs BOS", "game_date": "2026-03-22",
-                    "bet_type": "spread", "selection": "LAL -3.5",
-                    "odds": -110, "stake": 50, "book": "Bet365",
+                    "sport": "nba",
+                    "game": "LAL vs BOS",
+                    "game_date": "2026-03-22",
+                    "bet_type": "spread",
+                    "selection": "LAL -3.5",
+                    "odds": -110,
+                    "stake": 50,
+                    "book": "Bet365",
                 },
             )
             bet_id = resp.json()["bet_id"]
@@ -523,13 +588,20 @@ class TestBetFlow:
     @pytest.mark.asyncio
     async def test_resolve_push_refunds_stake(self, env) -> None:
         pid = env["portfolio_id"]
-        async with AsyncClient(transport=ASGITransport(app=env["app"]), base_url="http://test") as c:
+        async with AsyncClient(
+            transport=ASGITransport(app=env["app"]), base_url="http://test"
+        ) as c:
             resp = await c.post(
                 f"/api/v1/paper-bets/portfolios/{pid}/bets",
                 params={
-                    "sport": "nfl", "game": "KC vs BUF", "game_date": "2026-03-22",
-                    "bet_type": "spread", "selection": "KC -7",
-                    "odds": -110, "stake": 75, "book": "Bet365",
+                    "sport": "nfl",
+                    "game": "KC vs BUF",
+                    "game_date": "2026-03-22",
+                    "bet_type": "spread",
+                    "selection": "KC -7",
+                    "odds": -110,
+                    "stake": 75,
+                    "book": "Bet365",
                 },
             )
             bet_id = resp.json()["bet_id"]
@@ -550,13 +622,20 @@ class TestBetFlow:
     @pytest.mark.asyncio
     async def test_resolve_already_resolved_returns_400(self, env) -> None:
         pid = env["portfolio_id"]
-        async with AsyncClient(transport=ASGITransport(app=env["app"]), base_url="http://test") as c:
+        async with AsyncClient(
+            transport=ASGITransport(app=env["app"]), base_url="http://test"
+        ) as c:
             resp = await c.post(
                 f"/api/v1/paper-bets/portfolios/{pid}/bets",
                 params={
-                    "sport": "nhl", "game": "VAN vs SEA", "game_date": "2026-03-22",
-                    "bet_type": "moneyline", "selection": "VAN",
-                    "odds": +130, "stake": 40, "book": "Bet365",
+                    "sport": "nhl",
+                    "game": "VAN vs SEA",
+                    "game_date": "2026-03-22",
+                    "bet_type": "moneyline",
+                    "selection": "VAN",
+                    "odds": +130,
+                    "stake": 40,
+                    "book": "Bet365",
                 },
             )
             bet_id = resp.json()["bet_id"]
@@ -577,13 +656,20 @@ class TestBetFlow:
     async def test_positive_odds_payout(self, env) -> None:
         """Underdog bet: +200 odds → $100 stake → $300 payout ($200 profit)."""
         pid = env["portfolio_id"]
-        async with AsyncClient(transport=ASGITransport(app=env["app"]), base_url="http://test") as c:
+        async with AsyncClient(
+            transport=ASGITransport(app=env["app"]), base_url="http://test"
+        ) as c:
             resp = await c.post(
                 f"/api/v1/paper-bets/portfolios/{pid}/bets",
                 params={
-                    "sport": "mlb", "game": "NYY vs BOS", "game_date": "2026-03-22",
-                    "bet_type": "moneyline", "selection": "BOS",
-                    "odds": 200, "stake": 100, "book": "Bet365",
+                    "sport": "mlb",
+                    "game": "NYY vs BOS",
+                    "game_date": "2026-03-22",
+                    "bet_type": "moneyline",
+                    "selection": "BOS",
+                    "odds": 200,
+                    "stake": 100,
+                    "book": "Bet365",
                 },
             )
             bet_id = resp.json()["bet_id"]
@@ -600,14 +686,21 @@ class TestBetFlow:
     @pytest.mark.asyncio
     async def test_bet_summary_after_mixed_results(self, env) -> None:
         pid = env["portfolio_id"]
-        async with AsyncClient(transport=ASGITransport(app=env["app"]), base_url="http://test") as c:
+        async with AsyncClient(
+            transport=ASGITransport(app=env["app"]), base_url="http://test"
+        ) as c:
             # Bet 1: win $100 @ -150 (pnl ~+66.67)
             r1 = await c.post(
                 f"/api/v1/paper-bets/portfolios/{pid}/bets",
                 params={
-                    "sport": "nhl", "game": "G1", "game_date": "2026-03-22",
-                    "bet_type": "moneyline", "selection": "A",
-                    "odds": -150, "stake": 100, "book": "Bet365",
+                    "sport": "nhl",
+                    "game": "G1",
+                    "game_date": "2026-03-22",
+                    "bet_type": "moneyline",
+                    "selection": "A",
+                    "odds": -150,
+                    "stake": 100,
+                    "book": "Bet365",
                 },
             )
             await c.patch(
@@ -619,9 +712,14 @@ class TestBetFlow:
             r2 = await c.post(
                 f"/api/v1/paper-bets/portfolios/{pid}/bets",
                 params={
-                    "sport": "nba", "game": "G2", "game_date": "2026-03-22",
-                    "bet_type": "spread", "selection": "B",
-                    "odds": -110, "stake": 50, "book": "Bet365",
+                    "sport": "nba",
+                    "game": "G2",
+                    "game_date": "2026-03-22",
+                    "bet_type": "spread",
+                    "selection": "B",
+                    "odds": -110,
+                    "stake": 50,
+                    "book": "Bet365",
                 },
             )
             await c.patch(
@@ -633,9 +731,14 @@ class TestBetFlow:
             r3 = await c.post(
                 f"/api/v1/paper-bets/portfolios/{pid}/bets",
                 params={
-                    "sport": "nhl", "game": "G3", "game_date": "2026-03-22",
-                    "bet_type": "total", "selection": "Over 5.5",
-                    "odds": -110, "stake": 30, "book": "Bet365",
+                    "sport": "nhl",
+                    "game": "G3",
+                    "game_date": "2026-03-22",
+                    "bet_type": "total",
+                    "selection": "Over 5.5",
+                    "odds": -110,
+                    "stake": 30,
+                    "book": "Bet365",
                 },
             )
             await c.patch(
@@ -663,22 +766,34 @@ class TestBetFlow:
     @pytest.mark.asyncio
     async def test_bet_list_filters_by_status(self, env) -> None:
         pid = env["portfolio_id"]
-        async with AsyncClient(transport=ASGITransport(app=env["app"]), base_url="http://test") as c:
+        async with AsyncClient(
+            transport=ASGITransport(app=env["app"]), base_url="http://test"
+        ) as c:
             # Place two bets, resolve one
             r1 = await c.post(
                 f"/api/v1/paper-bets/portfolios/{pid}/bets",
                 params={
-                    "sport": "nhl", "game": "FILT1", "game_date": "2026-03-22",
-                    "bet_type": "moneyline", "selection": "X",
-                    "odds": -110, "stake": 20, "book": "Bet365",
+                    "sport": "nhl",
+                    "game": "FILT1",
+                    "game_date": "2026-03-22",
+                    "bet_type": "moneyline",
+                    "selection": "X",
+                    "odds": -110,
+                    "stake": 20,
+                    "book": "Bet365",
                 },
             )
             await c.post(
                 f"/api/v1/paper-bets/portfolios/{pid}/bets",
                 params={
-                    "sport": "nhl", "game": "FILT2", "game_date": "2026-03-22",
-                    "bet_type": "moneyline", "selection": "Y",
-                    "odds": -110, "stake": 20, "book": "Bet365",
+                    "sport": "nhl",
+                    "game": "FILT2",
+                    "game_date": "2026-03-22",
+                    "bet_type": "moneyline",
+                    "selection": "Y",
+                    "odds": -110,
+                    "stake": 20,
+                    "book": "Bet365",
                 },
             )
             await c.patch(
@@ -710,16 +825,33 @@ class TestWatchlistFlow:
     @pytest.mark.asyncio
     async def test_bulk_add_items(self, env) -> None:
         pid = env["portfolio_id"]
-        async with AsyncClient(transport=ASGITransport(app=env["app"]), base_url="http://test") as c:
+        async with AsyncClient(
+            transport=ASGITransport(app=env["app"]), base_url="http://test"
+        ) as c:
             resp = await c.post(
                 f"/api/v1/watchlist/portfolios/{pid}/items/bulk",
                 json=[
-                    {"symbol": "NVDA", "yahoo_ticker": "NVDA", "company_name": "NVIDIA",
-                     "sector": "Technology", "source_report": "Test Report"},
-                    {"symbol": "MSFT", "yahoo_ticker": "MSFT", "company_name": "Microsoft",
-                     "sector": "Technology", "source_report": "Test Report"},
-                    {"symbol": "AAPL", "yahoo_ticker": "AAPL", "company_name": "Apple",
-                     "sector": "Technology", "source_report": "Test Report"},
+                    {
+                        "symbol": "NVDA",
+                        "yahoo_ticker": "NVDA",
+                        "company_name": "NVIDIA",
+                        "sector": "Technology",
+                        "source_report": "Test Report",
+                    },
+                    {
+                        "symbol": "MSFT",
+                        "yahoo_ticker": "MSFT",
+                        "company_name": "Microsoft",
+                        "sector": "Technology",
+                        "source_report": "Test Report",
+                    },
+                    {
+                        "symbol": "AAPL",
+                        "yahoo_ticker": "AAPL",
+                        "company_name": "Apple",
+                        "sector": "Technology",
+                        "source_report": "Test Report",
+                    },
                 ],
             )
             assert resp.status_code == 201
@@ -730,7 +862,9 @@ class TestWatchlistFlow:
     @pytest.mark.asyncio
     async def test_bulk_add_skips_duplicates(self, env) -> None:
         pid = env["portfolio_id"]
-        async with AsyncClient(transport=ASGITransport(app=env["app"]), base_url="http://test") as c:
+        async with AsyncClient(
+            transport=ASGITransport(app=env["app"]), base_url="http://test"
+        ) as c:
             # Add once
             await c.post(
                 f"/api/v1/watchlist/portfolios/{pid}/items/bulk",
@@ -754,14 +888,19 @@ class TestWatchlistFlow:
     @pytest.mark.asyncio
     async def test_add_single_item(self, env) -> None:
         pid = env["portfolio_id"]
-        async with AsyncClient(transport=ASGITransport(app=env["app"]), base_url="http://test") as c:
+        async with AsyncClient(
+            transport=ASGITransport(app=env["app"]), base_url="http://test"
+        ) as c:
             resp = await c.post(
                 f"/api/v1/watchlist/portfolios/{pid}/items",
                 params={
-                    "symbol": "TSLA", "yahoo_ticker": "TSLA",
-                    "company_name": "Tesla", "sector": "Auto",
+                    "symbol": "TSLA",
+                    "yahoo_ticker": "TSLA",
+                    "company_name": "Tesla",
+                    "sector": "Auto",
                     "source_report": "Research Note",
-                    "expected_low": 150.0, "expected_high": 300.0,
+                    "expected_low": 150.0,
+                    "expected_high": 300.0,
                 },
             )
             assert resp.status_code == 201
@@ -772,7 +911,9 @@ class TestWatchlistFlow:
     @pytest.mark.asyncio
     async def test_update_price_and_sentiment(self, env) -> None:
         pid = env["portfolio_id"]
-        async with AsyncClient(transport=ASGITransport(app=env["app"]), base_url="http://test") as c:
+        async with AsyncClient(
+            transport=ASGITransport(app=env["app"]), base_url="http://test"
+        ) as c:
             # Add item
             resp = await c.post(
                 f"/api/v1/watchlist/portfolios/{pid}/items",
@@ -784,8 +925,10 @@ class TestWatchlistFlow:
             resp = await c.patch(
                 f"/api/v1/watchlist/portfolios/{pid}/items/{item_id}",
                 params={
-                    "current_price": 42.50, "rsi": 35.0,
-                    "volume_ratio": 1.5, "sentiment": "BULLISH",
+                    "current_price": 42.50,
+                    "rsi": 35.0,
+                    "volume_ratio": 1.5,
+                    "sentiment": "BULLISH",
                     "sentiment_confidence": 8,
                 },
             )
@@ -798,7 +941,9 @@ class TestWatchlistFlow:
     @pytest.mark.asyncio
     async def test_update_status_to_alerting(self, env) -> None:
         pid = env["portfolio_id"]
-        async with AsyncClient(transport=ASGITransport(app=env["app"]), base_url="http://test") as c:
+        async with AsyncClient(
+            transport=ASGITransport(app=env["app"]), base_url="http://test"
+        ) as c:
             resp = await c.post(
                 f"/api/v1/watchlist/portfolios/{pid}/items",
                 params={"symbol": "ALT", "yahoo_ticker": "ALT", "source_report": "R"},
@@ -815,7 +960,9 @@ class TestWatchlistFlow:
     @pytest.mark.asyncio
     async def test_summary_counts(self, env) -> None:
         pid = env["portfolio_id"]
-        async with AsyncClient(transport=ASGITransport(app=env["app"]), base_url="http://test") as c:
+        async with AsyncClient(
+            transport=ASGITransport(app=env["app"]), base_url="http://test"
+        ) as c:
             # Add 3 items
             await c.post(
                 f"/api/v1/watchlist/portfolios/{pid}/items/bulk",
@@ -848,7 +995,9 @@ class TestWatchlistFlow:
     @pytest.mark.asyncio
     async def test_remove_item(self, env) -> None:
         pid = env["portfolio_id"]
-        async with AsyncClient(transport=ASGITransport(app=env["app"]), base_url="http://test") as c:
+        async with AsyncClient(
+            transport=ASGITransport(app=env["app"]), base_url="http://test"
+        ) as c:
             resp = await c.post(
                 f"/api/v1/watchlist/portfolios/{pid}/items",
                 params={"symbol": "DEL", "yahoo_ticker": "DEL", "source_report": "R"},
@@ -866,7 +1015,9 @@ class TestWatchlistFlow:
     @pytest.mark.asyncio
     async def test_duplicate_add_rejected(self, env) -> None:
         pid = env["portfolio_id"]
-        async with AsyncClient(transport=ASGITransport(app=env["app"]), base_url="http://test") as c:
+        async with AsyncClient(
+            transport=ASGITransport(app=env["app"]), base_url="http://test"
+        ) as c:
             await c.post(
                 f"/api/v1/watchlist/portfolios/{pid}/items",
                 params={"symbol": "DUPE", "yahoo_ticker": "DUPE", "source_report": "R"},
@@ -881,7 +1032,9 @@ class TestWatchlistFlow:
     @pytest.mark.asyncio
     async def test_list_filters_by_status(self, env) -> None:
         pid = env["portfolio_id"]
-        async with AsyncClient(transport=ASGITransport(app=env["app"]), base_url="http://test") as c:
+        async with AsyncClient(
+            transport=ASGITransport(app=env["app"]), base_url="http://test"
+        ) as c:
             await c.post(
                 f"/api/v1/watchlist/portfolios/{pid}/items/bulk",
                 json=[

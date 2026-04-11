@@ -3,20 +3,20 @@
 from __future__ import annotations
 
 import json
-from datetime import date, datetime, UTC
+from datetime import UTC, date, datetime
 from uuid import UUID, uuid4
 
 from sqlalchemy import text
 from sqlmodel import select
 
-from app.api.cost_tracker import _get_model_price, _classify_tier
+from app.api.cost_tracker import _classify_tier, _get_model_price
 from app.core.logging import get_logger
 from app.core.resilience import gateway_rpc_breaker, retry_async
 from app.core.time import utcnow
-from app.services.error_tracker import track_error
 from app.db.session import async_session_maker
 from app.models.budget import BudgetConfig, DailyAgentSpend
 from app.models.gateways import Gateway
+from app.services.error_tracker import track_error
 from app.services.openclaw.gateway_rpc import (
     GatewayConfig,
     compact_session,
@@ -131,7 +131,9 @@ async def _proactive_compaction(
                     _compact_fail_counts[key] = fails
                     logger.info(
                         "budget_monitor.compact_skipped session=%s fails=%d/%d",
-                        channel, fails, _COMPACT_FAIL_LIMIT,
+                        channel,
+                        fails,
+                        _COMPACT_FAIL_LIMIT,
                     )
                     if fails >= _COMPACT_FAIL_LIMIT:
                         logger.warning(
@@ -203,9 +205,7 @@ async def _aggregate_agent_spend(
         return {}
 
     raw_sessions = (
-        sessions_data
-        if isinstance(sessions_data, list)
-        else sessions_data.get("sessions", [])
+        sessions_data if isinstance(sessions_data, list) else sessions_data.get("sessions", [])
     )
 
     if _raw_sessions_out is not None:
@@ -392,7 +392,9 @@ async def _check_thresholds(
                 await session.commit()
 
 
-async def _update_prometheus_gauges(agent_agg: dict[str, dict], monthly_total: float, monthly_budget: float) -> None:
+async def _update_prometheus_gauges(
+    agent_agg: dict[str, dict], monthly_total: float, monthly_budget: float
+) -> None:
     """Update Prometheus gauges for budget metrics."""
     try:
         from app.core.prometheus import agent_daily_spend, monthly_budget_pct

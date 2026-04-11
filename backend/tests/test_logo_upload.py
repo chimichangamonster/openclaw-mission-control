@@ -7,7 +7,6 @@ from pathlib import Path
 
 import pytest
 
-
 LOGO_ALLOWED_TYPES = {
     "image/png": ".png",
     "image/jpeg": ".jpg",
@@ -118,7 +117,11 @@ class TestBrandingJson:
         from app.core.file_tokens import create_file_token, reset_signing_key
 
         reset_signing_key()
-        with patch("app.core.file_tokens.settings", encryption_key="test-key", email_token_encryption_key=""):
+        with patch(
+            "app.core.file_tokens.settings",
+            encryption_key="test-key",
+            email_token_encryption_key="",
+        ):
             reset_signing_key()
             token = create_file_token("orgs/abc/logo.png", expires_hours=168)
             url = f"http://100.100.202.83:8000/api/v1/files/download?token={token}"

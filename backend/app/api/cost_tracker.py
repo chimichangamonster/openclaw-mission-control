@@ -4,16 +4,21 @@ from __future__ import annotations
 
 import json
 import time
-from datetime import date, datetime, UTC
+from datetime import UTC, date, datetime
 
 import httpx
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
-from sqlmodel import select
 from sqlalchemy import text
+from sqlmodel import select
 
-from app.api.deps import ORG_MEMBER_DEP, ORG_RATE_LIMIT_DEP, require_feature, require_org_member, require_org_role
-from app.services.organizations import OrganizationContext
+from app.api.deps import (
+    ORG_MEMBER_DEP,
+    ORG_RATE_LIMIT_DEP,
+    require_feature,
+    require_org_member,
+    require_org_role,
+)
 from app.core.config import settings
 from app.core.logging import get_logger
 from app.core.resilience import openrouter_breaker, retry_async
@@ -21,6 +26,7 @@ from app.core.time import utcnow
 from app.db.session import async_session_maker
 from app.models.activity_events import ActivityEvent
 from app.models.budget import BudgetConfig, DailyAgentSpend
+from app.services.organizations import OrganizationContext
 
 logger = get_logger(__name__)
 router = APIRouter(
@@ -36,6 +42,7 @@ _pricing_cache_ts: float = 0
 
 async def _openrouter_get(url: str, api_key: str) -> dict:
     """Fetch from OpenRouter with retry and circuit breaker."""
+
     async def _fetch() -> dict:
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.get(url, headers={"Authorization": f"Bearer {api_key}"})
@@ -95,7 +102,10 @@ async def get_usage(
 @router.get("/models")
 async def get_model_pricing(
     org_ctx: OrganizationContext = Depends(require_org_member),
-    filter: str = Query("configured", description="'configured' = only models in our gateway, 'all' = everything on OpenRouter"),
+    filter: str = Query(
+        "configured",
+        description="'configured' = only models in our gateway, 'all' = everything on OpenRouter",
+    ),
 ):
     """Get live model pricing from OpenRouter. Cached for 1 hour."""
     import time
@@ -117,6 +127,7 @@ async def get_model_pricing(
 
     # Check org settings for configured models, fall back to platform defaults
     from app.models.organization_settings import OrganizationSettings
+
     org_configured: list[str] = []
     async with async_session_maker() as session:
         result = await session.execute(
@@ -129,22 +140,26 @@ async def get_model_pricing(
             org_configured = org_settings.configured_models
 
     # Default configured models if org hasn't customized
-    configured_ids = set(org_configured) if org_configured else {
-        "anthropic/claude-sonnet-4",
-        "anthropic/claude-sonnet-4.6",
-        "anthropic/claude-opus-4-6",
-        "deepseek/deepseek-v3.2",
-        "deepseek/deepseek-chat-v3.1",
-        "google/gemini-2.5-flash",
-        "google/gemini-2.5-flash-lite",
-        "x-ai/grok-4",
-        "x-ai/grok-4-fast",
-        "openai/gpt-5-nano",
-        "openai/gpt-5.4",
-        "google/gemini-3-pro-preview",
-        "qwen/qwen3-coder",
-        "openrouter/auto",
-    }
+    configured_ids = (
+        set(org_configured)
+        if org_configured
+        else {
+            "anthropic/claude-sonnet-4",
+            "anthropic/claude-sonnet-4.6",
+            "anthropic/claude-opus-4-6",
+            "deepseek/deepseek-v3.2",
+            "deepseek/deepseek-chat-v3.1",
+            "google/gemini-2.5-flash",
+            "google/gemini-2.5-flash-lite",
+            "x-ai/grok-4",
+            "x-ai/grok-4-fast",
+            "openai/gpt-5-nano",
+            "openai/gpt-5.4",
+            "google/gemini-3-pro-preview",
+            "qwen/qwen3-coder",
+            "openrouter/auto",
+        }
+    )
 
     # Agent assignments derived from session data (no hardcoding)
     agent_usage: dict[str, list[str]] = {}
@@ -161,16 +176,18 @@ async def get_model_pricing(
         is_configured = short_id in configured_ids
         agents = agent_usage.get(short_id, [])
 
-        models.append({
-            "id": model_id,
-            "name": m.get("name", model_id),
-            "prompt_per_m": round(prompt_price, 4),
-            "completion_per_m": round(completion_price, 4),
-            "context_length": m.get("context_length"),
-            "configured": is_configured,
-            "agents": agents,
-            "tier": _classify_tier(prompt_price),
-        })
+        models.append(
+            {
+                "id": model_id,
+                "name": m.get("name", model_id),
+                "prompt_per_m": round(prompt_price, 4),
+                "completion_per_m": round(completion_price, 4),
+                "context_length": m.get("context_length"),
+                "configured": is_configured,
+                "agents": agents,
+                "tier": _classify_tier(prompt_price),
+            }
+        )
 
     # Sort: configured first, then by prompt price
     models.sort(key=lambda x: (not x["configured"], x["prompt_per_m"]))
@@ -222,10 +239,11 @@ async def get_usage_by_model(
     org_ctx: OrganizationContext = Depends(require_org_member),
 ):
     """Aggregate gateway session tokens by model and compute cost using live pricing."""
-    from app.services.openclaw.gateway_rpc import GatewayConfig, openclaw_call
     from sqlmodel import select
+
     from app.db.session import async_session_maker
     from app.models.gateways import Gateway
+    from app.services.openclaw.gateway_rpc import GatewayConfig, openclaw_call
 
     # Find gateway for this org
     async with async_session_maker() as db_session:
@@ -245,9 +263,7 @@ async def get_usage_by_model(
         return {"models": [], "total_cost": 0}
 
     raw_sessions = (
-        sessions_data
-        if isinstance(sessions_data, list)
-        else sessions_data.get("sessions", [])
+        sessions_data if isinstance(sessions_data, list) else sessions_data.get("sessions", [])
     )
 
     # Aggregate by model
@@ -284,18 +300,22 @@ async def get_usage_by_model(
     total_cost = 0.0
     for agg in model_agg.values():
         prompt_pm, comp_pm = _get_model_price(agg["model"])
-        cost = (agg["input_tokens"] / 1_000_000) * prompt_pm + (agg["output_tokens"] / 1_000_000) * comp_pm
+        cost = (agg["input_tokens"] / 1_000_000) * prompt_pm + (
+            agg["output_tokens"] / 1_000_000
+        ) * comp_pm
         total_cost += cost
-        models_out.append({
-            "model": agg["model"],
-            "input_tokens": agg["input_tokens"],
-            "output_tokens": agg["output_tokens"],
-            "total_tokens": agg["input_tokens"] + agg["output_tokens"],
-            "estimated_cost": round(cost, 6),
-            "session_count": agg["session_count"],
-            "agents": sorted(agg["agents"]),
-            "tier": _classify_tier(prompt_pm),
-        })
+        models_out.append(
+            {
+                "model": agg["model"],
+                "input_tokens": agg["input_tokens"],
+                "output_tokens": agg["output_tokens"],
+                "total_tokens": agg["input_tokens"] + agg["output_tokens"],
+                "estimated_cost": round(cost, 6),
+                "session_count": agg["session_count"],
+                "agents": sorted(agg["agents"]),
+                "tier": _classify_tier(prompt_pm),
+            }
+        )
 
     # Sort by cost descending, then alphabetically for zero-cost
     models_out.sort(key=lambda x: (-x["estimated_cost"], x["model"]))
@@ -311,7 +331,10 @@ _activity_cache_ts: float = 0
 @router.get("/activity")
 async def get_activity(
     org_ctx: OrganizationContext = Depends(require_org_member),
-    period: str = Query("daily", description="'daily' = per-day rows, 'weekly' = aggregated by week, 'monthly' = aggregated by month"),
+    period: str = Query(
+        "daily",
+        description="'daily' = per-day rows, 'weekly' = aggregated by week, 'monthly' = aggregated by month",
+    ),
 ):
     """Get historical per-model spending from OpenRouter activity API (last 30 days)."""
     global _activity_cache, _activity_cache_ts
@@ -354,13 +377,25 @@ def _build_activity_response(rows: list, period: str) -> dict:
     from datetime import datetime, timedelta
 
     # Group rows by (period_key, model)
-    period_model: dict[str, dict[str, dict]] = defaultdict(lambda: defaultdict(lambda: {
-        "cost": 0.0, "requests": 0, "prompt_tokens": 0, "completion_tokens": 0,
-    }))
+    period_model: dict[str, dict[str, dict]] = defaultdict(
+        lambda: defaultdict(
+            lambda: {
+                "cost": 0.0,
+                "requests": 0,
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+            }
+        )
+    )
     # Also track per-model totals
-    model_totals: dict[str, dict] = defaultdict(lambda: {
-        "cost": 0.0, "requests": 0, "prompt_tokens": 0, "completion_tokens": 0,
-    })
+    model_totals: dict[str, dict] = defaultdict(
+        lambda: {
+            "cost": 0.0,
+            "requests": 0,
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+        }
+    )
 
     for r in rows:
         date_str = r.get("date", "").split(" ")[0].split("T")[0]  # Strip time portion
@@ -403,25 +438,34 @@ def _build_activity_response(rows: list, period: str) -> dict:
         period_cost = 0.0
         for model_name, agg in sorted(period_model[pkey].items(), key=lambda x: -x[1]["cost"]):
             period_cost += agg["cost"]
-            models_in_period.append({
-                "model": model_name,
-                "cost": round(agg["cost"], 6),
-                "requests": agg["requests"],
-                "prompt_tokens": agg["prompt_tokens"],
-                "completion_tokens": agg["completion_tokens"],
-                "tier": _classify_tier(_get_model_price(model_name)[0]),
-            })
-        periods_out.append({
-            "period": pkey,
-            "total_cost": round(period_cost, 6),
-            "models": models_in_period,
-        })
+            models_in_period.append(
+                {
+                    "model": model_name,
+                    "cost": round(agg["cost"], 6),
+                    "requests": agg["requests"],
+                    "prompt_tokens": agg["prompt_tokens"],
+                    "completion_tokens": agg["completion_tokens"],
+                    "tier": _classify_tier(_get_model_price(model_name)[0]),
+                }
+            )
+        periods_out.append(
+            {
+                "period": pkey,
+                "total_cost": round(period_cost, 6),
+                "models": models_in_period,
+            }
+        )
 
     # Model totals sorted by cost desc
     totals_out = [
-        {"model": m, "cost": round(t["cost"], 6), "requests": t["requests"],
-         "prompt_tokens": t["prompt_tokens"], "completion_tokens": t["completion_tokens"],
-         "tier": _classify_tier(_get_model_price(m)[0])}
+        {
+            "model": m,
+            "cost": round(t["cost"], 6),
+            "requests": t["requests"],
+            "prompt_tokens": t["prompt_tokens"],
+            "completion_tokens": t["completion_tokens"],
+            "tier": _classify_tier(_get_model_price(m)[0]),
+        }
         for m, t in sorted(model_totals.items(), key=lambda x: -x[1]["cost"])
     ]
 
@@ -492,20 +536,25 @@ async def get_budget(
 
     # Projected month-end
     import calendar
+
     days_in_month = calendar.monthrange(today.year, today.month)[1]
     projected = daily_avg * days_in_month
 
     agent_today = []
     for s in today_spends:
-        effective_limit = config.agent_daily_limits.get(s.agent_name) or config.default_agent_daily_limit
-        agent_today.append({
-            "agent": s.agent_name,
-            "cost": round(s.estimated_cost, 6),
-            "tokens": s.input_tokens + s.output_tokens,
-            "limit": effective_limit,
-            "exceeded": s.estimated_cost > effective_limit if effective_limit else False,
-            "models": s.model_breakdown,
-        })
+        effective_limit = (
+            config.agent_daily_limits.get(s.agent_name) or config.default_agent_daily_limit
+        )
+        agent_today.append(
+            {
+                "agent": s.agent_name,
+                "cost": round(s.estimated_cost, 6),
+                "tokens": s.input_tokens + s.output_tokens,
+                "limit": effective_limit,
+                "exceeded": s.estimated_cost > effective_limit if effective_limit else False,
+                "models": s.model_breakdown,
+            }
+        )
 
     return {
         "config": {
@@ -519,7 +568,9 @@ async def get_budget(
         "status": {
             "monthly_total": round(monthly_total, 4),
             "monthly_budget": config.monthly_budget,
-            "monthly_pct": round((monthly_total / config.monthly_budget * 100) if config.monthly_budget > 0 else 0, 1),
+            "monthly_pct": round(
+                (monthly_total / config.monthly_budget * 100) if config.monthly_budget > 0 else 0, 1
+            ),
             "remaining": round(config.monthly_budget - monthly_total, 4),
             "projected_month_end": round(projected, 4),
             "daily_avg": round(daily_avg, 4),
@@ -544,6 +595,7 @@ async def update_budget(
 
         if not config:
             from uuid import uuid4
+
             config = BudgetConfig(id=uuid4(), organization_id=org_id, updated_at=utcnow())
             session.add(config)
 
@@ -703,20 +755,35 @@ async def get_cost_estimate(
         input_tok = _EST_TOKENS_PER_CONVERSATION * 0.75
         output_tok = _EST_TOKENS_PER_CONVERSATION * 0.25
         per_conversation = (input_tok / 1_000_000) * prompt_pm + (output_tok / 1_000_000) * comp_pm
-        tier_costs.append({
-            "tier": label,
-            "model": model,
-            "per_conversation": round(per_conversation, 6),
-            "per_100_conversations": round(per_conversation * 100, 4),
-            "prompt_per_m": prompt_pm,
-            "completion_per_m": comp_pm,
-        })
+        tier_costs.append(
+            {
+                "tier": label,
+                "model": model,
+                "per_conversation": round(per_conversation, 6),
+                "per_100_conversations": round(per_conversation * 100, 4),
+                "prompt_per_m": prompt_pm,
+                "completion_per_m": comp_pm,
+            }
+        )
 
     # Usage examples to help non-technical users estimate
     examples = [
-        {"description": "Light usage — 1 agent, ~10 conversations/day, Tier 2", "monthly_est": round(tier_costs[1]["per_conversation"] * 10 * 30, 2)},
-        {"description": "Moderate — 2 agents, ~20 conversations/day, mixed Tier 2/3", "monthly_est": round((tier_costs[1]["per_conversation"] * 10 + tier_costs[2]["per_conversation"] * 10) * 30, 2)},
-        {"description": "Heavy — 4+ agents, cron jobs, mostly Tier 3", "monthly_est": round(tier_costs[2]["per_conversation"] * 40 * 30, 2)},
+        {
+            "description": "Light usage — 1 agent, ~10 conversations/day, Tier 2",
+            "monthly_est": round(tier_costs[1]["per_conversation"] * 10 * 30, 2),
+        },
+        {
+            "description": "Moderate — 2 agents, ~20 conversations/day, mixed Tier 2/3",
+            "monthly_est": round(
+                (tier_costs[1]["per_conversation"] * 10 + tier_costs[2]["per_conversation"] * 10)
+                * 30,
+                2,
+            ),
+        },
+        {
+            "description": "Heavy — 4+ agents, cron jobs, mostly Tier 3",
+            "monthly_est": round(tier_costs[2]["per_conversation"] * 40 * 30, 2),
+        },
     ]
 
     return {

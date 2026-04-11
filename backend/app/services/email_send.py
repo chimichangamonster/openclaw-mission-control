@@ -43,9 +43,7 @@ async def get_org_shared_email_account(
     result = await session.execute(stmt)
     account = result.scalars().first()
     if account is None:
-        raise NoEmailAccountError(
-            "No shared email account connected for this organization."
-        )
+        raise NoEmailAccountError("No shared email account connected for this organization.")
     return account
 
 

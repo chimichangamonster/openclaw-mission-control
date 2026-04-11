@@ -8,7 +8,13 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 
-from app.api.deps import ORG_MEMBER_DEP, ORG_RATE_LIMIT_DEP, SESSION_DEP, require_feature, require_org_admin
+from app.api.deps import (
+    ORG_MEMBER_DEP,
+    ORG_RATE_LIMIT_DEP,
+    SESSION_DEP,
+    require_feature,
+    require_org_admin,
+)
 from app.core.logging import get_logger
 from app.models.crypto_positions import CryptoPosition
 from app.models.crypto_trade_proposals import CryptoTradeProposal

@@ -49,15 +49,21 @@ class TestVerifySignature:
         parts = sorted([_TEST_TOKEN, timestamp, nonce, msg_encrypt])
         expected = hashlib.sha1("".join(parts).encode()).hexdigest()
         verify_signature(
-            _TEST_TOKEN, timestamp, nonce,
-            msg_encrypt=msg_encrypt, signature=expected,
+            _TEST_TOKEN,
+            timestamp,
+            nonce,
+            msg_encrypt=msg_encrypt,
+            signature=expected,
         )
 
     def test_invalid_signature_raises(self) -> None:
         with pytest.raises(WeComCryptoError, match="Signature verification failed"):
             verify_signature(
-                _TEST_TOKEN, "1234567890", "abc",
-                msg_encrypt="data", signature="bad",
+                _TEST_TOKEN,
+                "1234567890",
+                "abc",
+                msg_encrypt="data",
+                signature="bad",
             )
 
     def test_empty_msg_encrypt(self) -> None:
@@ -66,8 +72,11 @@ class TestVerifySignature:
         parts = sorted([_TEST_TOKEN, timestamp, nonce, ""])
         expected = hashlib.sha1("".join(parts).encode()).hexdigest()
         verify_signature(
-            _TEST_TOKEN, timestamp, nonce,
-            msg_encrypt="", signature=expected,
+            _TEST_TOKEN,
+            timestamp,
+            nonce,
+            msg_encrypt="",
+            signature=expected,
         )
 
 
@@ -149,12 +158,7 @@ class TestParseInbound:
         assert msg.encrypt == "enc_payload"
 
     def test_non_text_type(self) -> None:
-        xml = (
-            b"<xml>"
-            b"<MsgType><![CDATA[image]]></MsgType>"
-            b"<Content></Content>"
-            b"</xml>"
-        )
+        xml = b"<xml>" b"<MsgType><![CDATA[image]]></MsgType>" b"<Content></Content>" b"</xml>"
         msg = parse_inbound_message(xml)
         assert msg.msg_type == "image"
         assert msg.content == ""
@@ -163,16 +167,20 @@ class TestParseInbound:
 class TestBuildReply:
     def test_plaintext(self) -> None:
         xml = build_reply_xml(
-            to_user="user", from_user="corp",
-            content="Hi there", timestamp="1609459200",
+            to_user="user",
+            from_user="corp",
+            content="Hi there",
+            timestamp="1609459200",
         )
         assert "<Content><![CDATA[Hi there]]></Content>" in xml
         assert "<MsgType><![CDATA[text]]></MsgType>" in xml
 
     def test_encrypted(self) -> None:
         xml = build_encrypted_reply_xml(
-            encrypt="enc", signature="sig",
-            timestamp="1609459200", nonce="n1",
+            encrypt="enc",
+            signature="sig",
+            timestamp="1609459200",
+            nonce="n1",
         )
         assert "<Encrypt><![CDATA[enc]]></Encrypt>" in xml
         assert "<MsgSignature><![CDATA[sig]]></MsgSignature>" in xml
@@ -188,7 +196,9 @@ class TestWeComConnectionModel:
         from app.models.wecom_connection import WeComConnection
 
         conn = WeComConnection(
-            organization_id=uuid4(), user_id=uuid4(), corp_id="wx_test",
+            organization_id=uuid4(),
+            user_id=uuid4(),
+            corp_id="wx_test",
         )
         assert conn.is_active is True
         assert conn.target_agent_id == "the-claw"
@@ -218,13 +228,14 @@ ORG_ID = uuid4()
 USER_ID = uuid4()
 
 
-# Import all models so SQLModel.metadata knows about the tables
-from app.models.organizations import Organization  # noqa: E402
+from app.models.gateways import Gateway  # noqa: E402
 from app.models.organization_members import OrganizationMember  # noqa: E402
 from app.models.organization_settings import OrganizationSettings  # noqa: E402
+
+# Import all models so SQLModel.metadata knows about the tables
+from app.models.organizations import Organization  # noqa: E402
 from app.models.users import User  # noqa: E402
 from app.models.wecom_connection import WeComConnection  # noqa: E402
-from app.models.gateways import Gateway  # noqa: E402
 from app.services.organizations import OrganizationContext  # noqa: E402
 
 
@@ -244,10 +255,15 @@ async def wecom_app(monkeypatch):
     """FastAPI test app with WeCom router and org context overrides."""
     # Ensure encryption key is available
     import app.core.encryption as enc_mod
+
     enc_mod.reset_cache()
     monkeypatch.setattr(
         "app.core.encryption.settings",
-        type("S", (), {"encryption_key": "test-wecom-encryption-key", "email_token_encryption_key": ""})(),
+        type(
+            "S",
+            (),
+            {"encryption_key": "test-wecom-encryption-key", "email_token_encryption_key": ""},
+        )(),
     )
 
     engine = await _make_engine()
@@ -259,16 +275,20 @@ async def wecom_app(monkeypatch):
         session.add(org)
         await session.flush()
 
-        user = User(id=USER_ID, email="test@test.com", name="Test User", clerk_user_id="clerk_test_wecom")
+        user = User(
+            id=USER_ID, email="test@test.com", name="Test User", clerk_user_id="clerk_test_wecom"
+        )
         session.add(user)
         await session.flush()
 
         org_settings = OrganizationSettings(
             organization_id=ORG_ID,
-            feature_flags_json=json.dumps({
-                "wechat": True,
-                "paper_trading": True,
-            }),
+            feature_flags_json=json.dumps(
+                {
+                    "wechat": True,
+                    "paper_trading": True,
+                }
+            ),
         )
         session.add(org_settings)
         await session.commit()
@@ -278,13 +298,16 @@ async def wecom_app(monkeypatch):
             yield session
 
     member = OrganizationMember(
-        id=uuid4(), organization_id=ORG_ID, user_id=USER_ID, role="owner",
+        id=uuid4(),
+        organization_id=ORG_ID,
+        user_id=USER_ID,
+        role="owner",
     )
     org_ctx = OrganizationContext(organization=org, member=member)
 
     from fastapi import APIRouter, FastAPI
 
-    from app.api.deps import get_session, require_org_member, check_org_rate_limit
+    from app.api.deps import check_org_rate_limit, get_session, require_org_member
     from app.api.wecom import router as wecom_router
 
     @asynccontextmanager

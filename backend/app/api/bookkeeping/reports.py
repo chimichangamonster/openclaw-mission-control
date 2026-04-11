@@ -9,7 +9,7 @@ from sqlmodel import select
 
 from app.api.deps import ORG_ACTOR_DEP
 from app.db.session import async_session_maker
-from app.models.bookkeeping import BkTimesheet, BkExpense, BkPlacement, BkWorker
+from app.models.bookkeeping import BkExpense, BkPlacement, BkTimesheet, BkWorker
 from app.services.organizations import OrganizationContext
 
 router = APIRouter(prefix="/reports")
@@ -95,8 +95,12 @@ async def margin_report(
                 by_job[jid] = {"bill": 0.0, "pay": 0.0, "hours": 0.0}
             total_hours = ts.regular_hours + ts.overtime_hours
             by_job[jid]["hours"] += total_hours
-            by_job[jid]["bill"] += ts.regular_hours * pl.bill_rate + ts.overtime_hours * pl.bill_rate * 1.5
-            by_job[jid]["pay"] += ts.regular_hours * pl.pay_rate + ts.overtime_hours * pl.pay_rate * 1.5
+            by_job[jid]["bill"] += (
+                ts.regular_hours * pl.bill_rate + ts.overtime_hours * pl.bill_rate * 1.5
+            )
+            by_job[jid]["pay"] += (
+                ts.regular_hours * pl.pay_rate + ts.overtime_hours * pl.pay_rate * 1.5
+            )
 
         return [
             {
@@ -105,7 +109,9 @@ async def margin_report(
                 "billable": round(v["bill"], 2),
                 "labour_cost": round(v["pay"], 2),
                 "margin_dollars": round(v["bill"] - v["pay"], 2),
-                "margin_pct": round((v["bill"] - v["pay"]) / v["bill"] * 100, 1) if v["bill"] > 0 else 0,
+                "margin_pct": (
+                    round((v["bill"] - v["pay"]) / v["bill"] * 100, 1) if v["bill"] > 0 else 0
+                ),
             }
             for jid, v in by_job.items()
         ]

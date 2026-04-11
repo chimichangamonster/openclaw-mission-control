@@ -396,6 +396,7 @@ async def stream_task_comment_feed(
 # Live activity stream (real-time gateway events via in-memory broadcast)
 # ---------------------------------------------------------------------------
 
+
 @router.get("/live/stream")
 async def stream_live_activity(
     request: Request,
@@ -417,10 +418,7 @@ async def stream_live_activity(
         # Inject token as Authorization header for the standard auth chain.
         # Must invalidate Starlette's cached Headers object so the new header
         # is visible to downstream code (request.headers caches on first access).
-        scope_headers = [
-            (k, v) for k, v in request.scope["headers"]
-            if k != b"authorization"
-        ]
+        scope_headers = [(k, v) for k, v in request.scope["headers"] if k != b"authorization"]
         scope_headers.append((b"authorization", f"Bearer {token}".encode()))
         request.scope["headers"] = scope_headers
         if hasattr(request, "_headers"):

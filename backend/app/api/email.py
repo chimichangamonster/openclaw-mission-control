@@ -62,7 +62,11 @@ async def _get_account_or_404(
     if account is None or account.organization_id != ctx.organization.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
     # Private accounts are only visible to the owner or org admins
-    if account.visibility == "private" and account.user_id != ctx.member.user_id and not is_org_admin(ctx.member):
+    if (
+        account.visibility == "private"
+        and account.user_id != ctx.member.user_id
+        and not is_org_admin(ctx.member)
+    ):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
     return account
 
@@ -133,10 +137,16 @@ async def update_email_account(
         account.display_name = payload.display_name
     if payload.visibility is not None:
         if payload.visibility not in ("shared", "private"):
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="visibility must be 'shared' or 'private'")
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="visibility must be 'shared' or 'private'",
+            )
         # Only account owner or org admin can change visibility
         if account.user_id != ctx.member.user_id and not is_org_admin(ctx.member):
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the account owner or an admin can change visibility.")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only the account owner or an admin can change visibility.",
+            )
         account.visibility = payload.visibility
     account.updated_at = utcnow()
     session.add(account)
@@ -236,7 +246,9 @@ async def get_email_message(
     msg = await _get_message_or_404(message_id, account, session)
     msg.body_text = sanitize_text(msg.body_text)
     msg.body_html = sanitize_text(msg.body_html)
-    text, html, _, _ = redact_email_content(msg.body_text, msg.body_html, level=RedactionLevel.MODERATE)
+    text, html, _, _ = redact_email_content(
+        msg.body_text, msg.body_html, level=RedactionLevel.MODERATE
+    )
     msg.body_text = text
     msg.body_html = html
 
@@ -245,12 +257,9 @@ async def get_email_message(
     if msg.body_html and "cid:" in msg.body_html:
         from app.core.file_tokens import create_file_token
 
-        att_stmt = (
-            select(EmailAttachment)
-            .where(
-                EmailAttachment.email_message_id == msg.id,
-                EmailAttachment.content_id.isnot(None),  # type: ignore[union-attr]
-            )
+        att_stmt = select(EmailAttachment).where(
+            EmailAttachment.email_message_id == msg.id,
+            EmailAttachment.content_id.isnot(None),  # type: ignore[union-attr]
         )
         att_result = await session.execute(att_stmt)
         inline_atts = list(att_result.scalars().all())
@@ -586,7 +595,9 @@ async def get_inline_attachment(
 
     path = verify_file_token(token)
     if not path or not path.startswith("email-att:"):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid or expired token")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Invalid or expired token"
+        )
 
     parts = path.split(":")
     if len(parts) != 4:
@@ -595,6 +606,7 @@ async def get_inline_attachment(
     _, account_id_str, message_id_str, attachment_id_str = parts
     try:
         from uuid import UUID as _UUID
+
         account_id = _UUID(account_id_str)
         attachment_id = _UUID(attachment_id_str)
     except ValueError:

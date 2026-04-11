@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
-from pydantic import BaseModel
 from fastapi.responses import PlainTextResponse
+from pydantic import BaseModel
 from sqlmodel import col, select
 
 from app.api.deps import ORG_MEMBER_DEP, ORG_RATE_LIMIT_DEP, SESSION_DEP, require_feature
@@ -26,9 +26,9 @@ from app.schemas.wecom import (
     WeComConnectionUpdate,
     WeComTestResult,
 )
+from app.services.content_filter import filter_content, get_org_filter_region
 from app.services.organizations import OrganizationContext, is_org_admin
 from app.services.wecom.crypto import WeComCryptoError, check_timestamp, verify_signature
-from app.services.content_filter import filter_content, get_org_filter_region
 from app.services.wecom.message_handler import handle_message
 from app.services.wecom.reply import build_passive_reply, send_active_reply
 from app.services.wecom.xml_parser import parse_inbound_message
@@ -50,7 +50,10 @@ _AUTH_DEPS = [Depends(require_feature("wechat")), ORG_RATE_LIMIT_DEP]
 def _to_response(conn: WeComConnection, org_slug: str) -> WeComConnectionResponse:
     """Convert a WeComConnection to an API response with computed callback URL."""
     # The callback URL WeCom should POST to — uses env or Tailscale default
-    base_url = getattr(settings, "wecom_callback_base_url", "") or "https://vantageclaw.basa-dab.ts.net:8443"
+    base_url = (
+        getattr(settings, "wecom_callback_base_url", "")
+        or "https://vantageclaw.basa-dab.ts.net:8443"
+    )
     callback_url = f"{base_url}/api/v1/wecom/{org_slug}/callback"
     return WeComConnectionResponse(
         id=conn.id,
@@ -87,7 +90,9 @@ async def _get_connection_or_404(
     )
     conn = result.scalars().first()
     if not conn:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="WeCom connection not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="WeCom connection not found"
+        )
     return conn
 
 
@@ -238,6 +243,7 @@ async def test_connection(
 
 class WeComSendRequest(BaseModel):
     """Send a message to a WeCom user."""
+
     to_user: str  # WeCom user ID or "@all"
     content: str  # Text message body
     msg_type: str = "text"  # "text" or "news"
@@ -345,7 +351,9 @@ async def wecom_url_verification(
         return PlainTextResponse(echo_plain)
     except WeComCryptoError as exc:
         logger.warning("wecom.callback.verify_failed org=%s error=%s", org_slug, str(exc))
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Signature verification failed")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Signature verification failed"
+        )
 
 
 @router.post("/{org_slug}/callback", include_in_schema=False)
@@ -463,18 +471,14 @@ async def _resolve_callback_context(
     session: "AsyncSession",
 ) -> tuple[Organization | None, WeComConnection | None, OrganizationSettings | None]:
     """Resolve org, active WeCom connection, and org settings from org slug."""
-    result = await session.execute(
-        select(Organization).where(Organization.slug == org_slug)
-    )
+    result = await session.execute(select(Organization).where(Organization.slug == org_slug))
     org = result.scalars().first()
     if not org:
         return None, None, None
 
     # Check wechat feature flag
     settings_result = await session.execute(
-        select(OrganizationSettings).where(
-            OrganizationSettings.organization_id == org.id
-        )
+        select(OrganizationSettings).where(OrganizationSettings.organization_id == org.id)
     )
     org_settings = settings_result.scalars().first()
     if org_settings:
@@ -501,9 +505,7 @@ async def _resolve_gateway(
     session: "AsyncSession",
 ) -> Gateway | None:
     """Get the gateway for an organization."""
-    result = await session.execute(
-        select(Gateway).where(Gateway.organization_id == org.id)
-    )
+    result = await session.execute(select(Gateway).where(Gateway.organization_id == org.id))
     return result.scalars().first()
 
 

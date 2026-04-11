@@ -13,7 +13,14 @@ from app.api.deps import ORG_ACTOR_DEP
 from app.core.logging import get_logger
 from app.core.time import utcnow
 from app.db.session import async_session_maker
-from app.models.bookkeeping import BkInvoice, BkInvoiceLine, BkTimesheet, BkPlacement, BkWorker, BkClient
+from app.models.bookkeeping import (
+    BkClient,
+    BkInvoice,
+    BkInvoiceLine,
+    BkPlacement,
+    BkTimesheet,
+    BkWorker,
+)
 from app.services.organizations import OrganizationContext
 
 logger = get_logger(__name__)
@@ -76,7 +83,9 @@ async def create_invoice(payload: InvoiceCreate, org_ctx: OrganizationContext = 
 
 
 @router.post("/from-timesheets", status_code=201)
-async def create_from_timesheets(payload: InvoiceFromTimesheets, org_ctx: OrganizationContext = ORG_ACTOR_DEP):
+async def create_from_timesheets(
+    payload: InvoiceFromTimesheets, org_ctx: OrganizationContext = ORG_ACTOR_DEP
+):
     """Generate an invoice from approved timesheets for a job/client.
 
     Calculates line items from timesheet hours x placement bill rates.
@@ -106,7 +115,9 @@ async def create_from_timesheets(payload: InvoiceFromTimesheets, org_ctx: Organi
         rows = result.all()
 
         if not rows:
-            raise HTTPException(status_code=404, detail="No approved timesheets found for the given criteria")
+            raise HTTPException(
+                status_code=404, detail="No approved timesheets found for the given criteria"
+            )
 
         # Build line items
         lines = []
@@ -122,13 +133,15 @@ async def create_from_timesheets(payload: InvoiceFromTimesheets, org_ctx: Organi
             if ts.overtime_hours > 0:
                 desc += f" ({ts.overtime_hours}h OT)"
 
-            lines.append({
-                "description": desc,
-                "quantity": ts.regular_hours + ts.overtime_hours * 1.5,
-                "unit_price": pl.bill_rate,
-                "amount": line_total,
-                "timesheet_id": ts.id,
-            })
+            lines.append(
+                {
+                    "description": desc,
+                    "quantity": ts.regular_hours + ts.overtime_hours * 1.5,
+                    "unit_price": pl.bill_rate,
+                    "amount": line_total,
+                    "timesheet_id": ts.id,
+                }
+            )
             subtotal += line_total
 
         gst_amount = round(subtotal * GST_RATE, 2)
@@ -153,17 +166,19 @@ async def create_from_timesheets(payload: InvoiceFromTimesheets, org_ctx: Organi
 
         # Create line items
         for line in lines:
-            session.add(BkInvoiceLine(
-                id=uuid4(),
-                organization_id=org_id,
-                invoice_id=invoice.id,
-                description=line["description"],
-                quantity=line["quantity"],
-                unit_price=line["unit_price"],
-                amount=line["amount"],
-                timesheet_id=line["timesheet_id"],
-                created_at=utcnow(),
-            ))
+            session.add(
+                BkInvoiceLine(
+                    id=uuid4(),
+                    organization_id=org_id,
+                    invoice_id=invoice.id,
+                    description=line["description"],
+                    quantity=line["quantity"],
+                    unit_price=line["unit_price"],
+                    amount=line["amount"],
+                    timesheet_id=line["timesheet_id"],
+                    created_at=utcnow(),
+                )
+            )
 
         await session.commit()
         await session.refresh(invoice)
@@ -232,10 +247,14 @@ async def get_invoice(invoice_id: str, org_ctx: OrganizationContext = ORG_ACTOR_
 
 
 @router.put("/{invoice_id}/status")
-async def update_invoice_status(invoice_id: str, payload: StatusUpdate, org_ctx: OrganizationContext = ORG_ACTOR_DEP):
+async def update_invoice_status(
+    invoice_id: str, payload: StatusUpdate, org_ctx: OrganizationContext = ORG_ACTOR_DEP
+):
     async with async_session_maker() as session:
         result = await session.execute(
-            select(BkInvoice).where(BkInvoice.id == invoice_id, BkInvoice.organization_id == org_ctx.organization.id)
+            select(BkInvoice).where(
+                BkInvoice.id == invoice_id, BkInvoice.organization_id == org_ctx.organization.id
+            )
         )
         invoice = result.scalars().first()
         if not invoice:
@@ -313,15 +332,19 @@ async def send_invoice_email(
             "contact_email": client.contact_email or "",
             "address": client.address or "",
         }
-        line_items = [
-            {
-                "description": l.description,
-                "quantity": l.quantity,
-                "unit_price": l.unit_price,
-                "amount": l.amount,
-            }
-            for l in lines
-        ] if lines else None
+        line_items = (
+            [
+                {
+                    "description": l.description,
+                    "quantity": l.quantity,
+                    "unit_price": l.unit_price,
+                    "amount": l.amount,
+                }
+                for l in lines
+            ]
+            if lines
+            else None
+        )
 
         company = {
             "name": body.company_name or "Vantage Solutions",
@@ -364,7 +387,11 @@ async def send_invoice_email(
                     status_code=422,
                     detail="Client has no contact email address. Update the client record first.",
                 )
-            from app.services.email_send import NoEmailAccountError, get_org_shared_email_account, send_email
+            from app.services.email_send import (
+                NoEmailAccountError,
+                get_org_shared_email_account,
+                send_email,
+            )
 
             try:
                 email_account = await get_org_shared_email_account(session, org_id)
@@ -398,7 +425,11 @@ async def send_invoice_email(
                     status_code=422,
                     detail="wecom_user_id is required for WeCom delivery.",
                 )
-            from app.services.wecom_send import NoWeComConnectionError, get_org_wecom_connection, send_wecom_news
+            from app.services.wecom_send import (
+                NoWeComConnectionError,
+                get_org_wecom_connection,
+                send_wecom_news,
+            )
 
             try:
                 wecom_conn = await get_org_wecom_connection(session, org_id)
@@ -422,6 +453,7 @@ async def send_invoice_email(
 
             file_token = create_file_token(token_path, expires_hours=168)  # 7 days
             from app.core.config import settings
+
             download_url = f"{settings.base_url}/api/v1/files/download?token={file_token}"
 
             description = (

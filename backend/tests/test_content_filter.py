@@ -12,7 +12,6 @@ from app.services.content_filter import (
     get_org_filter_region,
 )
 
-
 # ---------------------------------------------------------------------------
 # Basic behavior
 # ---------------------------------------------------------------------------
@@ -243,7 +242,9 @@ class TestCNFalsePositives:
         assert result.filtered_count == 0
 
     def test_normal_business_english(self) -> None:
-        result = filter_content("Revenue increased 15% in Q3 2025. The manufacturing line ran at 92% OEE.", region="cn")
+        result = filter_content(
+            "Revenue increased 15% in Q3 2025. The manufacturing line ran at 92% OEE.", region="cn"
+        )
         assert result.filtered_count == 0
 
 

@@ -25,29 +25,37 @@ from app.api.board_memory import router as board_memory_router
 from app.api.board_onboarding import router as board_onboarding_router
 from app.api.board_webhooks import router as board_webhooks_router
 from app.api.boards import router as boards_router
-from app.api.crypto_trading import router as crypto_trading_router
-from app.api.email import inline_router as email_inline_router, router as email_router
-from app.api.email_oauth import router as email_oauth_router
-from app.api.gateway import router as gateway_router
+from app.api.bookkeeping import router as bookkeeping_router
+from app.api.contacts import router as contacts_router
 from app.api.cost_tracker import router as cost_tracker_router
-from app.api.organization_settings import router as org_settings_router
 from app.api.cron_jobs import router as cron_jobs_router
-from app.api.model_registry import router as model_registry_router
-from app.api.paper_bets import router as paper_bets_router
-from app.api.paper_trading import router as paper_trading_router
-from app.api.polymarket import router as polymarket_router
-from app.api.pentest import router as pentest_router
+from app.api.crypto_trading import router as crypto_trading_router
 from app.api.document_gen import router as document_gen_router
-from app.api.microsoft_graph import router as microsoft_graph_router
-from app.api.google_calendar import router as google_calendar_router
+from app.api.document_intake import router as document_intake_router
+from app.api.email import inline_router as email_inline_router
+from app.api.email import router as email_router
+from app.api.email_oauth import router as email_oauth_router
 from app.api.file_serve import router as file_serve_router
+from app.api.gateway import router as gateway_router
+from app.api.gateway_live import router as gateway_live_router
+from app.api.gateways import router as gateways_router
+from app.api.google_calendar import router as google_calendar_router
+from app.api.industry_templates import router as industry_templates_router
 from app.api.invoice_pdf import router as invoice_pdf_router
 from app.api.legal import router as legal_router
 from app.api.memory import router as memory_router
-from app.api.gateway_live import router as gateway_live_router
-from app.api.gateways import router as gateways_router
 from app.api.metrics import router as metrics_router
+from app.api.microsoft_graph import router as microsoft_graph_router
+from app.api.model_registry import router as model_registry_router
+from app.api.org_config import router as org_config_router
+from app.api.organization_settings import router as org_settings_router
 from app.api.organizations import router as organizations_router
+from app.api.paper_bets import router as paper_bets_router
+from app.api.paper_trading import router as paper_trading_router
+from app.api.pentest import router as pentest_router
+from app.api.platform_admin import router as platform_admin_router
+from app.api.polymarket import router as polymarket_router
+from app.api.skill_config import router as skill_config_router
 from app.api.skills_marketplace import router as skills_marketplace_router
 from app.api.souls_directory import router as souls_directory_router
 from app.api.tags import router as tags_router
@@ -55,14 +63,7 @@ from app.api.task_custom_fields import router as task_custom_fields_router
 from app.api.tasks import router as tasks_router
 from app.api.users import router as users_router
 from app.api.watchlist import router as watchlist_router
-from app.api.bookkeeping import router as bookkeeping_router
-from app.api.contacts import router as contacts_router
-from app.api.org_config import router as org_config_router
-from app.api.skill_config import router as skill_config_router
-from app.api.industry_templates import router as industry_templates_router
-from app.api.platform_admin import router as platform_admin_router
 from app.api.wechat_auth import router as wechat_auth_router
-from app.api.document_intake import router as document_intake_router
 from app.api.wecom import router as wecom_router
 from app.core.config import settings
 from app.core.error_handling import install_error_handling
@@ -495,9 +496,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         from app.services.openclaw.gateway_event_listener import run_all_event_listeners
 
         listener_tasks = await run_all_event_listeners()
-        logger.info(
-            "app.lifecycle.gateway_listeners started count=%d", len(listener_tasks)
-        )
+        logger.info("app.lifecycle.gateway_listeners started count=%d", len(listener_tasks))
     except Exception as exc:  # noqa: BLE001
         logger.warning("app.lifecycle.gateway_listeners_init_failed error=%s", exc)
 
@@ -692,14 +691,15 @@ def readyz() -> HealthStatusResponse:
 @app.get("/status", tags=["health"], summary="Dependency Health Status")
 async def dependency_status():
     """Check health of all external dependencies with circuit breaker state."""
-    from app.core.resilience import gateway_rpc_breaker, openrouter_breaker
     from app.core.prometheus import gateway_listener_connected
+    from app.core.resilience import gateway_rpc_breaker, openrouter_breaker
 
     checks: dict[str, dict] = {}
 
     # PostgreSQL
     try:
         from app.db.session import async_engine
+
         async with async_engine.connect() as conn:
             await conn.execute(__import__("sqlalchemy").text("SELECT 1"))
         checks["postgresql"] = {"status": "ok"}
@@ -709,7 +709,10 @@ async def dependency_status():
     # Redis
     try:
         import redis as redis_lib
-        r = redis_lib.Redis.from_url(settings.rate_limit_redis_url or "redis://redis:6379", socket_timeout=2)
+
+        r = redis_lib.Redis.from_url(
+            settings.rate_limit_redis_url or "redis://redis:6379", socket_timeout=2
+        )
         r.ping()
         checks["redis"] = {"status": "ok"}
     except Exception as exc:
@@ -736,11 +739,7 @@ async def dependency_status():
         },
     }
 
-    all_ok = all(
-        c.get("status") == "ok"
-        for k, c in checks.items()
-        if k != "circuit_breakers"
-    )
+    all_ok = all(c.get("status") == "ok" for k, c in checks.items() if k != "circuit_breakers")
 
     return {"ok": all_ok, "dependencies": checks}
 
@@ -752,8 +751,8 @@ async def system_health():
     Checks: PostgreSQL, Redis, gateway listener, circuit breakers, recent errors,
     and cron job health.
     """
-    from app.core.resilience import gateway_rpc_breaker, openrouter_breaker
     from app.core.prometheus import gateway_listener_connected
+    from app.core.resilience import gateway_rpc_breaker, openrouter_breaker
     from app.services.error_tracker import ERROR_PREFIX
 
     issues: list[str] = []
@@ -762,6 +761,7 @@ async def system_health():
     # ── PostgreSQL ─────────────────────────────────────────────────────────
     try:
         from app.db.session import async_engine
+
         async with async_engine.connect() as conn:
             await conn.execute(__import__("sqlalchemy").text("SELECT 1"))
         components["postgresql"] = {"status": "ok"}
@@ -772,8 +772,10 @@ async def system_health():
     # ── Redis ──────────────────────────────────────────────────────────────
     try:
         import redis as redis_lib
+
         r = redis_lib.Redis.from_url(
-            settings.rate_limit_redis_url or "redis://redis:6379", socket_timeout=2,
+            settings.rate_limit_redis_url or "redis://redis:6379",
+            socket_timeout=2,
         )
         r.ping()
         components["redis"] = {"status": "ok"}
@@ -804,16 +806,20 @@ async def system_health():
     # ── Recent Errors (last 1 hour) ────────────────────────────────────────
     error_count_1h = 0
     try:
+        from datetime import timedelta
+
+        from sqlalchemy import func
+
+        from app.core.time import utcnow
         from app.db.session import async_session_maker
         from app.models.activity_events import ActivityEvent
-        from app.core.time import utcnow
-        from datetime import timedelta
-        from sqlalchemy import func
 
         async with async_session_maker() as session:
             one_hour_ago = utcnow() - timedelta(hours=1)
             result = await session.execute(
-                __import__("sqlalchemy").select(func.count(ActivityEvent.id)).where(
+                __import__("sqlalchemy")
+                .select(func.count(ActivityEvent.id))
+                .where(
                     ActivityEvent.event_type.startswith(ERROR_PREFIX),
                     ActivityEvent.created_at >= one_hour_ago,
                 )
@@ -887,9 +893,7 @@ async def system_health():
         issues.append(f"{cron_failed} cron job(s) in failed state")
 
     # ── Overall Status ─────────────────────────────────────────────────────
-    critical = any(
-        k in ("postgresql down", "redis down") for k in issues
-    )
+    critical = any(k in ("postgresql down", "redis down") for k in issues)
     if critical:
         status = "down"
     elif issues:

@@ -66,7 +66,9 @@ async def log_audit(
     entry_id = uuid4()
 
     # Always emit to log stream regardless of DB success
-    _emit_audit_to_log(entry_id, org_id, action, user_id, resource_type, resource_id, details, ip_address)
+    _emit_audit_to_log(
+        entry_id, org_id, action, user_id, resource_type, resource_id, details, ip_address
+    )
 
     try:
         async with async_session_maker() as session:

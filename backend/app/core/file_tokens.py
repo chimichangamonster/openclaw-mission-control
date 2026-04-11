@@ -61,9 +61,7 @@ def verify_file_token(token: str) -> str | None:
         return None
     payload_b64, sig = parts
 
-    expected_sig = hmac.new(
-        _get_signing_key(), payload_b64.encode(), sha256
-    ).hexdigest()
+    expected_sig = hmac.new(_get_signing_key(), payload_b64.encode(), sha256).hexdigest()
     if not hmac.compare_digest(sig, expected_sig):
         return None
 

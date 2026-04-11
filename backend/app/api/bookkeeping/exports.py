@@ -10,8 +10,8 @@ from sqlmodel import select
 
 from app.api.deps import ORG_ACTOR_DEP
 from app.db.session import async_session_maker
-from app.models.bookkeeping import BkTransaction, BkExpense
-from app.services.bookkeeping_exports import generate_csv, generate_iif, generate_expense_summary
+from app.models.bookkeeping import BkExpense, BkTransaction
+from app.services.bookkeeping_exports import generate_csv, generate_expense_summary, generate_iif
 from app.services.organizations import OrganizationContext
 
 router = APIRouter(prefix="/exports")
@@ -107,10 +107,17 @@ async def export_expense_report(
         result = await session.execute(stmt)
         expenses = result.scalars().all()
 
-    summary = generate_expense_summary([
-        {"amount": e.amount, "gst_amount": e.gst_amount, "category": e.category, "job_id": str(e.job_id) if e.job_id else None}
-        for e in expenses
-    ])
+    summary = generate_expense_summary(
+        [
+            {
+                "amount": e.amount,
+                "gst_amount": e.gst_amount,
+                "category": e.category,
+                "job_id": str(e.job_id) if e.job_id else None,
+            }
+            for e in expenses
+        ]
+    )
 
     lines = [
         f"EXPENSE REPORT",
@@ -124,11 +131,15 @@ async def export_expense_report(
         f"BY CATEGORY",
     ]
     for cat, data in summary["by_category"].items():
-        lines.append(f"  {cat}: {data['count']} expenses, ${data['total']:,.2f} (GST ${data['gst']:,.2f})")
+        lines.append(
+            f"  {cat}: {data['count']} expenses, ${data['total']:,.2f} (GST ${data['gst']:,.2f})"
+        )
 
     lines.extend(["", "DETAIL"])
     for e in expenses:
-        lines.append(f"  {e.expense_date} | ${e.amount:,.2f} | {e.vendor or '-'} | {e.category or '-'} | {e.description or '-'}")
+        lines.append(
+            f"  {e.expense_date} | ${e.amount:,.2f} | {e.vendor or '-'} | {e.category or '-'} | {e.description or '-'}"
+        )
 
     return Response(
         content="\n".join(lines),

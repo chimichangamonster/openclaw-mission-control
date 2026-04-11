@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import json
 import datetime as _dt
+import json
 from datetime import date as _date_type
 from datetime import datetime
 from uuid import UUID, uuid4
@@ -51,7 +51,9 @@ class DailyAgentSpend(QueryModel, table=True):
     """Per-agent daily spend snapshot, scoped to organization."""
 
     __tablename__ = "daily_agent_spends"  # pyright: ignore[reportAssignmentType]
-    __table_args__ = (UniqueConstraint("organization_id", "agent_name", "date", name="uq_org_agent_date"),)
+    __table_args__ = (
+        UniqueConstraint("organization_id", "agent_name", "date", name="uq_org_agent_date"),
+    )
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     organization_id: UUID = Field(foreign_key="organizations.id", index=True)

@@ -74,7 +74,9 @@ def _resolve_safe_path(workspace_root: Path, relative_path: str) -> Path:
 
 class CreateLinkRequest(BaseModel):
     path: str = Field(..., description="Relative path from workspace root")
-    expires_hours: int = Field(default=24, ge=1, le=168, description="Link TTL in hours (max 7 days)")
+    expires_hours: int = Field(
+        default=24, ge=1, le=168, description="Link TTL in hours (max 7 days)"
+    )
 
 
 class CreateLinkResponse(BaseModel):
@@ -104,7 +106,9 @@ async def create_download_link(
 
     size = resolved.stat().st_size
     if size > _MAX_FILE_SIZE_BYTES:
-        raise HTTPException(status_code=413, detail=f"File too large ({size} bytes, max {_MAX_FILE_SIZE_BYTES}).")
+        raise HTTPException(
+            status_code=413, detail=f"File too large ({size} bytes, max {_MAX_FILE_SIZE_BYTES})."
+        )
 
     file_token = create_file_token(body.path, expires_hours=body.expires_hours)
     import time

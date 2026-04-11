@@ -16,9 +16,7 @@ class WeComConnection(TenantScoped, table=True):
     """WeCom integration credentials and config for an organization."""
 
     __tablename__ = "wecom_connections"  # pyright: ignore[reportAssignmentType]
-    __table_args__ = (
-        UniqueConstraint("organization_id", "corp_id", name="uq_wecom_org_corp"),
-    )
+    __table_args__ = (UniqueConstraint("organization_id", "corp_id", name="uq_wecom_org_corp"),)
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     organization_id: UUID = Field(foreign_key="organizations.id", index=True)

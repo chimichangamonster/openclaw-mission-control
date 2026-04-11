@@ -71,9 +71,7 @@ async def create_trade_proposal(
         raise ValueError("No active Polymarket wallet configured for this organization.")
 
     # Validate risk controls
-    stmt_risk = select(PolymarketRiskConfig).where(
-        PolymarketRiskConfig.organization_id == org_id
-    )
+    stmt_risk = select(PolymarketRiskConfig).where(PolymarketRiskConfig.organization_id == org_id)
     risk_config = (await session.execute(stmt_risk)).scalar_one_or_none()
     violations = validate_risk_controls(risk_config, params.size_usdc, params.condition_id)
     if violations:

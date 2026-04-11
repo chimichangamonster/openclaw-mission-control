@@ -60,12 +60,16 @@ class CircuitBreaker:
             # Persist circuit breaker trip to activity events (fire-and-forget)
             try:
                 import asyncio
+
                 from app.services.error_tracker import track_error
-                asyncio.ensure_future(track_error(
-                    source="circuit_breaker",
-                    message=f"Circuit breaker '{self.name}' opened after {self._failure_count} consecutive failures. Cooldown: {self.cooldown_seconds}s.",
-                    severity="warning",
-                ))
+
+                asyncio.ensure_future(
+                    track_error(
+                        source="circuit_breaker",
+                        message=f"Circuit breaker '{self.name}' opened after {self._failure_count} consecutive failures. Cooldown: {self.cooldown_seconds}s.",
+                        severity="warning",
+                    )
+                )
             except Exception:  # noqa: BLE001
                 pass
 
@@ -115,7 +119,7 @@ async def retry_async(
                 breaker.record_failure()
 
             if attempt < retries - 1:
-                delay = min(base_delay * (2 ** attempt), max_delay)
+                delay = min(base_delay * (2**attempt), max_delay)
                 logger.warning(
                     "%s.attempt_failed attempt=%d/%d delay=%.1fs error=%s",
                     label,

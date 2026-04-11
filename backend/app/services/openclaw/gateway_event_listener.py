@@ -33,16 +33,18 @@ from app.services.openclaw.gateway_rpc import (
 logger = get_logger(__name__)
 
 # Events we care about.
-_INTERESTING_EVENTS = frozenset({
-    "chat",
-    "agent",
-    "cron",
-    "exec.approval.requested",
-    "exec.approval.resolved",
-    "presence",
-    "shutdown",
-    "health",
-})
+_INTERESTING_EVENTS = frozenset(
+    {
+        "chat",
+        "agent",
+        "cron",
+        "exec.approval.requested",
+        "exec.approval.resolved",
+        "presence",
+        "shutdown",
+        "health",
+    }
+)
 
 # Track session state for diffing health events.
 _prev_sessions: dict[str, dict[str, Any]] = {}
@@ -202,7 +204,11 @@ def _extract_message_preview(messages: list[dict[str, Any]]) -> tuple[str, str]:
         content = msg.get("content") or msg.get("text") or ""
         if isinstance(content, list):
             # Multi-part content — extract text parts
-            content = " ".join(p.get("text", "") for p in content if isinstance(p, dict) and p.get("type") == "text")
+            content = " ".join(
+                p.get("text", "")
+                for p in content
+                if isinstance(p, dict) and p.get("type") == "text"
+            )
         content = str(content).strip()
         if role in ("assistant", "model") and not assistant_msg:
             assistant_msg = (content[:200] + "...") if len(content) > 200 else content
@@ -211,7 +217,9 @@ def _extract_message_preview(messages: list[dict[str, Any]]) -> tuple[str, str]:
     return user_msg, assistant_msg
 
 
-async def _diff_health_sessions(payload: dict[str, Any], config: GatewayConfig) -> list[LiveActivityEvent]:
+async def _diff_health_sessions(
+    payload: dict[str, Any], config: GatewayConfig
+) -> list[LiveActivityEvent]:
     """Compare health event sessions with previous state and emit deltas."""
     global _prev_sessions  # noqa: PLW0603
     sessions = payload.get("sessions")
@@ -243,13 +251,15 @@ async def _diff_health_sessions(payload: dict[str, Any], config: GatewayConfig) 
         updated_at = s.get("updatedAt", 0) or 0
 
         if prev is None and _prev_sessions:
-            events.append(LiveActivityEvent(
-                event_type="agent.new_session",
-                agent_name=agent_id,
-                channel=channel,
-                model=model,
-                message=f"New session in {channel}" if channel else "New session started",
-            ))
+            events.append(
+                LiveActivityEvent(
+                    event_type="agent.new_session",
+                    agent_name=agent_id,
+                    channel=channel,
+                    model=model,
+                    message=f"New session in {channel}" if channel else "New session started",
+                )
+            )
         elif prev and total > prev_total:
             delta = total - prev_total
             is_active = updated_at and (updated_at / 1000) > (_time.time() - 15)
@@ -267,26 +277,30 @@ async def _diff_health_sessions(payload: dict[str, Any], config: GatewayConfig) 
                 msg = f"Processing in {channel} (+{delta:,} tokens)"
                 if user_msg:
                     msg = f"📩 {user_msg}"
-                events.append(LiveActivityEvent(
-                    event_type="agent.working",
-                    agent_name=agent_id,
-                    channel=channel,
-                    model=model,
-                    message=msg,
-                    metadata={"tokenDelta": delta, "totalTokens": total},
-                ))
+                events.append(
+                    LiveActivityEvent(
+                        event_type="agent.working",
+                        agent_name=agent_id,
+                        channel=channel,
+                        model=model,
+                        message=msg,
+                        metadata={"tokenDelta": delta, "totalTokens": total},
+                    )
+                )
             else:
                 msg = f"Completed in {channel}"
                 if assistant_msg:
                     msg = f"💬 {assistant_msg}"
-                events.append(LiveActivityEvent(
-                    event_type="agent.completed",
-                    agent_name=agent_id,
-                    channel=channel,
-                    model=model,
-                    message=msg,
-                    metadata={"tokenDelta": delta, "totalTokens": total},
-                ))
+                events.append(
+                    LiveActivityEvent(
+                        event_type="agent.completed",
+                        agent_name=agent_id,
+                        channel=channel,
+                        model=model,
+                        message=msg,
+                        metadata={"tokenDelta": delta, "totalTokens": total},
+                    )
+                )
 
     _prev_sessions = current
     return events
@@ -345,6 +359,7 @@ async def _listen(
 
         try:
             from app.core.prometheus import gateway_listener_connected
+
             gateway_listener_connected.set(1)
         except Exception:  # noqa: BLE001
             pass
@@ -356,10 +371,14 @@ async def _listen(
             return event
 
         # Publish a synthetic "connected" event
-        broadcast.publish(_tag(LiveActivityEvent(
-            event_type="gateway.connected",
-            message="Connected to gateway event stream",
-        )))
+        broadcast.publish(
+            _tag(
+                LiveActivityEvent(
+                    event_type="gateway.connected",
+                    message="Connected to gateway event stream",
+                )
+            )
+        )
 
         # --- Event loop ---
         async for raw_msg in ws:
@@ -377,7 +396,11 @@ async def _listen(
                     "gateway_event_listener.event %s event=%s payload_keys=%s",
                     label,
                     event_name,
-                    sorted((data.get("payload") or {}).keys()) if isinstance(data.get("payload"), dict) else "n/a",
+                    (
+                        sorted((data.get("payload") or {}).keys())
+                        if isinstance(data.get("payload"), dict)
+                        else "n/a"
+                    ),
                 )
 
             if msg_type != "event":
@@ -434,15 +457,18 @@ async def run_event_listener(
             )
             try:
                 from app.core.prometheus import gateway_listener_connected
+
                 gateway_listener_connected.set(0)
             except Exception:  # noqa: BLE001
                 pass
-            broadcast.publish(LiveActivityEvent(
-                event_type="gateway.disconnected",
-                organization_id=organization_id,
-                gateway_id=gateway_id,
-                message=f"Disconnected: {exc}",
-            ))
+            broadcast.publish(
+                LiveActivityEvent(
+                    event_type="gateway.disconnected",
+                    organization_id=organization_id,
+                    gateway_id=gateway_id,
+                    message=f"Disconnected: {exc}",
+                )
+            )
 
         await asyncio.sleep(backoff)
         backoff = min(backoff * 2, _MAX_BACKOFF_SECONDS)
@@ -454,17 +480,16 @@ async def run_all_event_listeners() -> list[asyncio.Task[None]]:
     Returns the list of running tasks so the lifespan can cancel them on
     shutdown.
     """
+    from sqlmodel import col, select
+
     from app.db.session import async_session_maker
     from app.models.gateways import Gateway
-    from sqlmodel import col, select
 
     tasks: list[asyncio.Task[None]] = []
     try:
         async with async_session_maker() as session:
             gateways = (
-                await session.exec(
-                    select(Gateway).where(col(Gateway.url).is_not(None))
-                )
+                await session.exec(select(Gateway).where(col(Gateway.url).is_not(None)))
             ).all()
 
         for gw in gateways:

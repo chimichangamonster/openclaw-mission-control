@@ -26,13 +26,11 @@ from app.models.audit_log import AuditLog  # noqa: F401
 from app.models.board_webhook_payloads import BoardWebhookPayload  # noqa: F401
 from app.models.budget import DailyAgentSpend  # noqa: F401
 from app.models.email_messages import EmailMessage  # noqa: F401
-
 from app.services.data_retention import (
     DEFAULT_RETENTION,
     _cleanup_table,
     run_retention_cleanup,
 )
-
 
 # ---------------------------------------------------------------------------
 # DB fixture
@@ -91,9 +89,7 @@ class TestOrgRetentionPolicy:
         """Retention settings can be stored in data_policy_json."""
         from app.models.organization_settings import OrganizationSettings
 
-        settings = OrganizationSettings(
-            organization_id="00000000-0000-0000-0000-000000000001"
-        )
+        settings = OrganizationSettings(organization_id="00000000-0000-0000-0000-000000000001")
         policy = settings.data_policy
         policy["email_retention_days"] = 90
         policy["audit_retention_days"] = 730
@@ -109,9 +105,7 @@ class TestOrgRetentionPolicy:
         """Setting retention to 0 should keep data forever."""
         from app.models.organization_settings import OrganizationSettings
 
-        settings = OrganizationSettings(
-            organization_id="00000000-0000-0000-0000-000000000001"
-        )
+        settings = OrganizationSettings(organization_id="00000000-0000-0000-0000-000000000001")
         policy = settings.data_policy
         policy["email_retention_days"] = 0
         settings.data_policy_json = json.dumps(policy)
@@ -144,19 +138,23 @@ class TestCleanupTable:
 
         async with test_maker() as session:
             for i in range(3):
-                session.add(ActivityEvent(
-                    id=uuid4(),
-                    event_type="test.old",
-                    message=f"Old event {i}",
-                    created_at=old_time,
-                ))
+                session.add(
+                    ActivityEvent(
+                        id=uuid4(),
+                        event_type="test.old",
+                        message=f"Old event {i}",
+                        created_at=old_time,
+                    )
+                )
             for i in range(2):
-                session.add(ActivityEvent(
-                    id=uuid4(),
-                    event_type="test.new",
-                    message=f"New event {i}",
-                    created_at=new_time,
-                ))
+                session.add(
+                    ActivityEvent(
+                        id=uuid4(),
+                        event_type="test.new",
+                        message=f"New event {i}",
+                        created_at=new_time,
+                    )
+                )
             await session.commit()
 
         # Verify 5 total
@@ -188,12 +186,14 @@ class TestCleanupTable:
 
         async with test_maker() as session:
             for i in range(3):
-                session.add(ActivityEvent(
-                    id=uuid4(),
-                    event_type="test.recent",
-                    message=f"Recent {i}",
-                    created_at=recent_time,
-                ))
+                session.add(
+                    ActivityEvent(
+                        id=uuid4(),
+                        event_type="test.recent",
+                        message=f"Recent {i}",
+                        created_at=recent_time,
+                    )
+                )
             await session.commit()
 
         with patch("app.services.data_retention.async_session_maker", test_maker):
@@ -215,16 +215,24 @@ class TestCleanupTable:
         old_time = utcnow() - timedelta(days=400)
 
         async with test_maker() as session:
-            session.add(AuditLog(
-                id=uuid4(), organization_id=org_a,
-                action="test", resource_type="test",
-                created_at=old_time,
-            ))
-            session.add(AuditLog(
-                id=uuid4(), organization_id=org_b,
-                action="test", resource_type="test",
-                created_at=old_time,
-            ))
+            session.add(
+                AuditLog(
+                    id=uuid4(),
+                    organization_id=org_a,
+                    action="test",
+                    resource_type="test",
+                    created_at=old_time,
+                )
+            )
+            session.add(
+                AuditLog(
+                    id=uuid4(),
+                    organization_id=org_b,
+                    action="test",
+                    resource_type="test",
+                    created_at=old_time,
+                )
+            )
             await session.commit()
 
         with patch("app.services.data_retention.async_session_maker", test_maker):

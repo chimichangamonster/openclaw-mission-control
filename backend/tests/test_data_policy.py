@@ -26,7 +26,11 @@ class TestDataPolicyDefaults:
         from app.models.organization_settings import OrganizationSettings
 
         settings = OrganizationSettings(organization_id="00000000-0000-0000-0000-000000000001")
-        new_policy = {"redaction_level": "strict", "allow_email_content_to_llm": False, "log_llm_inputs": True}
+        new_policy = {
+            "redaction_level": "strict",
+            "allow_email_content_to_llm": False,
+            "log_llm_inputs": True,
+        }
         settings.data_policy_json = json.dumps(new_policy)
         assert settings.data_policy == new_policy
 

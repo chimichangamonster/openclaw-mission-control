@@ -45,11 +45,13 @@ async def list_memory_files(
     for f in MEMORY_FILES:
         path = workspace / f["name"]
         exists = path.exists()
-        files.append(MemoryFile(
-            name=f["name"],
-            description=f["description"],
-            content=None if not exists else f"({path.stat().st_size} bytes)",
-        ))
+        files.append(
+            MemoryFile(
+                name=f["name"],
+                description=f["description"],
+                content=None if not exists else f"({path.stat().st_size} bytes)",
+            )
+        )
     return files
 
 

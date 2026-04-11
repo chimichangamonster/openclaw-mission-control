@@ -4,10 +4,10 @@
 from __future__ import annotations
 
 from pathlib import Path
+
 import pytest
 
 from app.services.document_gen import generate_simple_pdf
-
 
 # ---------------------------------------------------------------------------
 # Simple PDF generation (reportlab)
@@ -215,7 +215,9 @@ class TestHelperFunctions:
     def test_format_company_lines_full(self):
         from app.services.document_gen import _format_company_lines
 
-        result = _format_company_lines({"name": "Acme", "address": "123 Main St", "email": "hi@acme.com"})
+        result = _format_company_lines(
+            {"name": "Acme", "address": "123 Main St", "email": "hi@acme.com"}
+        )
         assert "Acme" in result
         assert "123 Main St" in result
         assert "hi@acme.com" in result
@@ -249,14 +251,17 @@ class TestTemplateRendering:
     def test_proposal_template_renders(self):
         from app.services.document_gen import _render_html_template
 
-        html = _render_html_template("proposal", {
-            "title": "Test Proposal",
-            "subtitle": "Phase 1",
-            "company_name": "Test Co",
-            "sections": [
-                {"heading": "Overview", "content": "<p>Test content</p>"},
-            ],
-        })
+        html = _render_html_template(
+            "proposal",
+            {
+                "title": "Test Proposal",
+                "subtitle": "Phase 1",
+                "company_name": "Test Co",
+                "sections": [
+                    {"heading": "Overview", "content": "<p>Test content</p>"},
+                ],
+            },
+        )
         assert "Test Proposal" in html
         assert "Phase 1" in html
         assert "Test Co" in html
@@ -265,21 +270,25 @@ class TestTemplateRendering:
     def test_report_template_renders(self):
         from app.services.document_gen import _render_html_template
 
-        html = _render_html_template("report", {
-            "title": "Q1 Report",
-            "date": "March 2026",
-            "kpis": [
-                {"value": "+12%", "label": "Return", "change": "+2%", "direction": "up"},
-            ],
-            "sections": [],
-        })
+        html = _render_html_template(
+            "report",
+            {
+                "title": "Q1 Report",
+                "date": "March 2026",
+                "kpis": [
+                    {"value": "+12%", "label": "Return", "change": "+2%", "direction": "up"},
+                ],
+                "sections": [],
+            },
+        )
         assert "Q1 Report" in html
         assert "+12%" in html
         assert "March 2026" in html
 
     def test_missing_template_raises(self):
-        from app.services.document_gen import _render_html_template
         from jinja2 import TemplateNotFound
+
+        from app.services.document_gen import _render_html_template
 
         with pytest.raises(TemplateNotFound):
             _render_html_template("nonexistent_template", {})
@@ -293,7 +302,9 @@ class TestTemplateRendering:
 class TestSaveToWorkspace:
     """Test workspace file saving logic."""
 
-    def _save_to_workspace(self, workspace: Path, content: bytes, filename: str, extension: str) -> str:
+    def _save_to_workspace(
+        self, workspace: Path, content: bytes, filename: str, extension: str
+    ) -> str:
         """Replicate the save logic without importing the full API module."""
         from uuid import uuid4
 
@@ -452,9 +463,7 @@ class TestRedactionVault:
             "findings": [
                 {
                     "title": "Open SSH on 10.0.0.5",
-                    "affected_nodes": [
-                        {"address": "10.0.0.5", "hostname": "web01.corp.local"}
-                    ],
+                    "affected_nodes": [{"address": "10.0.0.5", "hostname": "web01.corp.local"}],
                 }
             ],
             "count": 1,
@@ -484,37 +493,40 @@ class TestRedactionVault:
     def test_security_assessment_template_renders(self):
         from app.services.document_gen import _render_html_template
 
-        html = _render_html_template("security-assessment", {
-            "client_name": "Test Corp",
-            "assessment_date": "March 15, 2026",
-            "report_date": "March 20, 2026",
-            "date": "March 20, 2026",
-            "engagement_type_label": "External Network Penetration Test",
-            "scope_summary": "external-facing infrastructure",
-            "overall_severity": "Medium",
-            "total_findings": 2,
-            "counts": {"critical": 0, "high": 0, "medium": 2, "low": 0, "info": 0},
-            "findings": [
-                {
-                    "id": "VS-2026-001",
-                    "title": "Insecure FTP Service",
-                    "severity": "medium",
-                    "category": "Insecure Protocols",
-                    "cvss_score": "5.3",
-                    "cvss_vector": "AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:N/A:N",
-                    "observation": "FTP service running without encryption.",
-                    "security_impact": "Credentials exposed in cleartext.",
-                    "affected_count": 1,
-                    "affected_nodes": [{"address": "10.0.0.1", "port": "21/tcp"}],
-                    "recommendation": "<p>Disable FTP or switch to SFTP.</p>",
-                    "remediation_timeline": "Within 30 days",
-                    "mitre_ids": ["T1046"],
-                    "reproduction_steps": ["Connect via ftp 10.0.0.1"],
-                    "evidence": [{"type": "text", "content": "220 ProFTPD Server ready"}],
-                    "references": [{"url": "https://example.com", "title": "FTP RFC"}],
-                },
-            ],
-        })
+        html = _render_html_template(
+            "security-assessment",
+            {
+                "client_name": "Test Corp",
+                "assessment_date": "March 15, 2026",
+                "report_date": "March 20, 2026",
+                "date": "March 20, 2026",
+                "engagement_type_label": "External Network Penetration Test",
+                "scope_summary": "external-facing infrastructure",
+                "overall_severity": "Medium",
+                "total_findings": 2,
+                "counts": {"critical": 0, "high": 0, "medium": 2, "low": 0, "info": 0},
+                "findings": [
+                    {
+                        "id": "VS-2026-001",
+                        "title": "Insecure FTP Service",
+                        "severity": "medium",
+                        "category": "Insecure Protocols",
+                        "cvss_score": "5.3",
+                        "cvss_vector": "AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:N/A:N",
+                        "observation": "FTP service running without encryption.",
+                        "security_impact": "Credentials exposed in cleartext.",
+                        "affected_count": 1,
+                        "affected_nodes": [{"address": "10.0.0.1", "port": "21/tcp"}],
+                        "recommendation": "<p>Disable FTP or switch to SFTP.</p>",
+                        "remediation_timeline": "Within 30 days",
+                        "mitre_ids": ["T1046"],
+                        "reproduction_steps": ["Connect via ftp 10.0.0.1"],
+                        "evidence": [{"type": "text", "content": "220 ProFTPD Server ready"}],
+                        "references": [{"url": "https://example.com", "title": "FTP RFC"}],
+                    },
+                ],
+            },
+        )
         assert "Test Corp" in html
         assert "VS-2026-001" in html
         assert "Insecure FTP Service" in html

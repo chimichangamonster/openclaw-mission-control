@@ -44,13 +44,21 @@ class SimpleDocRequest(BaseModel):
     company: dict[str, str] | None = None
     filename: str = Field(default="document.pdf", description="Output filename")
     page_size: str = Field(default="letter", pattern="^(letter|a4)$")
-    org_id: str | None = Field(default=None, description="Organization ID — auto-resolves logo and accent color")
+    org_id: str | None = Field(
+        default=None, description="Organization ID — auto-resolves logo and accent color"
+    )
 
 
 class ComplexDocRequest(BaseModel):
-    template: str | None = Field(default=None, description="Template name: proposal, report, or None for raw HTML")
-    template_data: dict[str, Any] = Field(default_factory=dict, description="Data for template rendering")
-    html: str | None = Field(default=None, description="Raw HTML content (used when template is None)")
+    template: str | None = Field(
+        default=None, description="Template name: proposal, report, or None for raw HTML"
+    )
+    template_data: dict[str, Any] = Field(
+        default_factory=dict, description="Data for template rendering"
+    )
+    html: str | None = Field(
+        default=None, description="Raw HTML content (used when template is None)"
+    )
     filename: str = Field(default="document.pdf", description="Output filename")
     page_width: float = Field(default=8.5, description="Page width in inches")
     page_height: float = Field(default=11.0, description="Page height in inches")
@@ -69,14 +77,16 @@ async def _get_adobe_credentials(org_id) -> tuple[str, str] | None:
     """Retrieve Adobe PDF Services credentials for the org, falling back to platform env."""
     async with async_session_maker() as session:
         result = await session.execute(
-            select(OrganizationSettings).where(
-                OrganizationSettings.organization_id == org_id
-            )
+            select(OrganizationSettings).where(OrganizationSettings.organization_id == org_id)
         )
         org_settings = result.scalars().first()
 
     # Try org BYOK first
-    if org_settings and org_settings.adobe_pdf_client_id_encrypted and org_settings.adobe_pdf_client_secret_encrypted:
+    if (
+        org_settings
+        and org_settings.adobe_pdf_client_id_encrypted
+        and org_settings.adobe_pdf_client_secret_encrypted
+    ):
         try:
             client_id = decrypt_token(org_settings.adobe_pdf_client_id_encrypted)
             client_secret = decrypt_token(org_settings.adobe_pdf_client_secret_encrypted)
@@ -122,9 +132,7 @@ async def _resolve_org_branding(org_id_str: str | None) -> dict[str, str | None]
         org_settings = result.scalars().first()
 
         # Get org name
-        org_result = await session.execute(
-            sel(Organization).where(Organization.id == oid)
-        )
+        org_result = await session.execute(sel(Organization).where(Organization.id == oid))
         org = org_result.scalars().first()
 
     branding = org_settings.branding if org_settings else {}
@@ -187,9 +195,13 @@ async def _try_onedrive_upload(
         from app.services.microsoft.token_manager import get_valid_graph_token
 
         async with async_session_maker() as session:
-            stmt = select(MicrosoftConnection).where(
-                col(MicrosoftConnection.is_active).is_(True),
-            ).limit(1)
+            stmt = (
+                select(MicrosoftConnection)
+                .where(
+                    col(MicrosoftConnection.is_active).is_(True),
+                )
+                .limit(1)
+            )
             conn = (await session.execute(stmt)).scalar_one_or_none()
             if not conn:
                 return {"onedrive_url": None, "onedrive_edit_url": None}
@@ -357,6 +369,7 @@ async def generate_complex(
     # Resolve HTML content
     if body.template:
         from app.services.document_gen import _render_html_template
+
         try:
             html_content = _render_html_template(body.template, body.template_data)
         except Exception as exc:
@@ -407,7 +420,9 @@ async def generate_complex(
     mime = "application/pdf" if extension == ".pdf" else "text/html"
     logger.info(
         "document_gen.complex filename=%s engine=%s size=%d",
-        body.filename, engine, len(pdf_bytes),
+        body.filename,
+        engine,
+        len(pdf_bytes),
     )
 
     title = body.template_data.get("title", "") or body.template or body.filename
@@ -441,6 +456,7 @@ async def generate_complex(
 
 class RedactForReviewRequest(BaseModel):
     """Raw pentest data to be redacted before human review."""
+
     template_data: dict[str, Any] = Field(
         ..., description="Template variables containing raw pentest findings data"
     )
@@ -454,6 +470,7 @@ class RedactedEntry(BaseModel):
 
 class RedactForReviewResponse(BaseModel):
     """Redacted data for human review before sending to LLM."""
+
     redacted_template_data: dict[str, Any]
     vault: dict
     redacted_entries: list[RedactedEntry]
@@ -462,13 +479,12 @@ class RedactForReviewResponse(BaseModel):
 
 class GenerateWithRehydrationRequest(BaseModel):
     """Generate report from LLM output, rehydrating redacted placeholders."""
+
     template: str = Field(default="security-assessment", description="Template name")
     template_data: dict[str, Any] = Field(
         ..., description="Template data (may contain LLM-generated text with placeholders)"
     )
-    vault: dict = Field(
-        ..., description="Vault from redact-for-review response"
-    )
+    vault: dict = Field(..., description="Vault from redact-for-review response")
     filename: str = Field(default="security-assessment.pdf")
     page_width: float = Field(default=8.5)
     page_height: float = Field(default=11.0)
@@ -526,9 +542,7 @@ async def redact_for_review(
     return RedactForReviewResponse(
         redacted_template_data=redacted_data,
         vault=vault.to_dict(),
-        redacted_entries=[
-            RedactedEntry(**e) for e in vault.entries
-        ],
+        redacted_entries=[RedactedEntry(**e) for e in vault.entries],
         entry_count=vault.entry_count,
     )
 
@@ -568,9 +582,7 @@ async def generate_complex_with_rehydration(
     try:
         html_content = _render_html_template(body.template, rehydrated_data)
     except Exception as exc:
-        raise HTTPException(
-            status_code=400, detail=f"Template rendering failed: {exc}"
-        )
+        raise HTTPException(status_code=400, detail=f"Template rendering failed: {exc}")
 
     # Generate PDF (same logic as generate_complex)
     adobe_creds = await _get_adobe_credentials(org_id=None)
@@ -603,7 +615,8 @@ async def generate_complex_with_rehydration(
     download_url = f"{settings.base_url}/api/v1/files/download?token={file_token}"
 
     od = await _try_onedrive_upload(
-        pdf_bytes, Path(relative_path).name,
+        pdf_bytes,
+        Path(relative_path).name,
         "application/pdf" if extension == ".pdf" else "text/html",
     )
 
@@ -611,7 +624,9 @@ async def generate_complex_with_rehydration(
     mime = "application/pdf" if extension == ".pdf" else "text/html"
     logger.info(
         "document_gen.complex_rehydrated filename=%s engine=%s entries_rehydrated=%d",
-        body.filename, engine, vault.entry_count,
+        body.filename,
+        engine,
+        vault.entry_count,
     )
 
     title = rehydrated_data.get("title", "") or body.template or body.filename
@@ -677,12 +692,17 @@ async def list_generated_documents(
 ):
     """List all tracked generated documents for the current organization."""
     from sqlmodel.ext.asyncio.session import AsyncSession
+
     session: AsyncSession  # type: ignore[no-redef]
 
-    stmt = select(GeneratedDocument).where(
-        (GeneratedDocument.organization_id == ctx.organization.id)
-        | (col(GeneratedDocument.organization_id).is_(None))
-    ).order_by(col(GeneratedDocument.created_at).desc())
+    stmt = (
+        select(GeneratedDocument)
+        .where(
+            (GeneratedDocument.organization_id == ctx.organization.id)
+            | (col(GeneratedDocument.organization_id).is_(None))
+        )
+        .order_by(col(GeneratedDocument.created_at).desc())
+    )
 
     if doc_type:
         stmt = stmt.where(GeneratedDocument.doc_type == doc_type)
@@ -699,20 +719,22 @@ async def list_generated_documents(
         except Exception:
             download_url = ""
 
-        items.append(GeneratedDocumentRead(
-            id=str(doc.id),
-            filename=doc.filename,
-            title=doc.title,
-            doc_type=doc.doc_type,
-            mode=doc.mode,
-            engine=doc.engine,
-            file_size=doc.file_size,
-            mime_type=doc.mime_type,
-            download_url=download_url,
-            onedrive_url=doc.onedrive_url,
-            onedrive_edit_url=doc.onedrive_edit_url,
-            created_at=doc.created_at.isoformat(),
-        ))
+        items.append(
+            GeneratedDocumentRead(
+                id=str(doc.id),
+                filename=doc.filename,
+                title=doc.title,
+                doc_type=doc.doc_type,
+                mode=doc.mode,
+                engine=doc.engine,
+                file_size=doc.file_size,
+                mime_type=doc.mime_type,
+                download_url=download_url,
+                onedrive_url=doc.onedrive_url,
+                onedrive_edit_url=doc.onedrive_edit_url,
+                created_at=doc.created_at.isoformat(),
+            )
+        )
     return items
 
 
@@ -728,6 +750,7 @@ async def delete_generated_document(
 ):
     """Delete a generated document record (and optionally the file on disk)."""
     from sqlmodel.ext.asyncio.session import AsyncSession
+
     session: AsyncSession  # type: ignore[no-redef]
 
     stmt = select(GeneratedDocument).where(GeneratedDocument.id == doc_id)

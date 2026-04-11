@@ -17,7 +17,6 @@ import pytest
 
 from app.core.file_tokens import create_file_token, reset_signing_key, verify_file_token
 
-
 # ---------------------------------------------------------------------------
 # Token unit tests
 # ---------------------------------------------------------------------------
@@ -118,8 +117,9 @@ class TestPathSafety:
     """Path traversal prevention in _resolve_safe_path."""
 
     def test_traversal_blocked(self, tmp_path: Path):
-        from app.api.file_serve import _resolve_safe_path
         from fastapi import HTTPException
+
+        from app.api.file_serve import _resolve_safe_path
 
         workspace = tmp_path / "workspace"
         workspace.mkdir()
@@ -129,8 +129,9 @@ class TestPathSafety:
         assert exc_info.value.status_code == 403
 
     def test_absolute_path_blocked(self, tmp_path: Path):
-        from app.api.file_serve import _resolve_safe_path
         from fastapi import HTTPException
+
+        from app.api.file_serve import _resolve_safe_path
 
         workspace = tmp_path / "workspace"
         workspace.mkdir()

@@ -12,11 +12,11 @@ from sqlmodel import select
 
 from app.api.deps import require_org_member, require_org_role
 from app.core.config import settings as app_settings
-from app.core.workspace import resolve_org_workspace
-from app.core.encryption import encrypt_token, decrypt_token
+from app.core.encryption import decrypt_token, encrypt_token
 from app.core.file_tokens import create_file_token
 from app.core.logging import get_logger
 from app.core.time import utcnow
+from app.core.workspace import resolve_org_workspace
 from app.db.session import async_session_maker
 from app.models.organization_settings import OrganizationSettings
 from app.services.audit import log_audit
@@ -177,12 +177,17 @@ async def update_settings(
         settings = result.scalars().first()
 
         if not settings:
-            settings = OrganizationSettings(id=uuid4(), organization_id=org_id, created_at=utcnow(), updated_at=utcnow())
+            settings = OrganizationSettings(
+                id=uuid4(), organization_id=org_id, created_at=utcnow(), updated_at=utcnow()
+            )
             session.add(settings)
 
         changes = {}
         if payload.default_model_tier_max is not None:
-            changes["default_model_tier_max"] = {"old": settings.default_model_tier_max, "new": payload.default_model_tier_max}
+            changes["default_model_tier_max"] = {
+                "old": settings.default_model_tier_max,
+                "new": payload.default_model_tier_max,
+            }
             settings.default_model_tier_max = payload.default_model_tier_max
         if payload.configured_models is not None:
             settings.configured_models_json = json.dumps(payload.configured_models)
@@ -201,16 +206,23 @@ async def update_settings(
             current = settings.data_policy
             if payload.data_policy.redaction_level is not None:
                 if payload.data_policy.redaction_level not in valid_levels:
-                    raise HTTPException(status_code=400, detail=f"redaction_level must be one of: {', '.join(valid_levels)}")
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"redaction_level must be one of: {', '.join(valid_levels)}",
+                    )
                 current["redaction_level"] = payload.data_policy.redaction_level
             if payload.data_policy.allow_email_content_to_llm is not None:
-                current["allow_email_content_to_llm"] = payload.data_policy.allow_email_content_to_llm
+                current["allow_email_content_to_llm"] = (
+                    payload.data_policy.allow_email_content_to_llm
+                )
             if payload.data_policy.log_llm_inputs is not None:
                 current["log_llm_inputs"] = payload.data_policy.log_llm_inputs
             # Retention settings
             for key in (
-                "activity_retention_days", "email_retention_days",
-                "audit_retention_days", "webhook_retention_days",
+                "activity_retention_days",
+                "email_retention_days",
+                "audit_retention_days",
+                "webhook_retention_days",
                 "spend_retention_days",
             ):
                 val = getattr(payload.data_policy, key, None)
@@ -231,7 +243,8 @@ async def update_settings(
         await session.commit()
 
     await log_audit(
-        org_id, "settings.update",
+        org_id,
+        "settings.update",
         user_id=org_ctx.member.user_id,
         resource_type="organization_settings",
         details={"changed_fields": list(changes.keys())},
@@ -278,7 +291,9 @@ async def set_openrouter_key(
         settings = result.scalars().first()
 
         if not settings:
-            settings = OrganizationSettings(id=uuid4(), organization_id=org_id, created_at=utcnow(), updated_at=utcnow())
+            settings = OrganizationSettings(
+                id=uuid4(), organization_id=org_id, created_at=utcnow(), updated_at=utcnow()
+            )
             session.add(settings)
 
         settings.openrouter_api_key_encrypted = encrypt_token(key)
@@ -286,7 +301,8 @@ async def set_openrouter_key(
         await session.commit()
 
     await log_audit(
-        org_id, "key.set",
+        org_id,
+        "key.set",
         user_id=org_ctx.member.user_id,
         resource_type="organization_settings",
         details={"key_type": "openrouter_api_key"},
@@ -314,7 +330,8 @@ async def remove_openrouter_key(
             await session.commit()
 
     await log_audit(
-        org_id, "key.remove",
+        org_id,
+        "key.remove",
         user_id=org_ctx.member.user_id,
         resource_type="organization_settings",
         details={"key_type": "openrouter_api_key"},
@@ -338,7 +355,9 @@ async def set_management_key(
         settings = result.scalars().first()
 
         if not settings:
-            settings = OrganizationSettings(id=uuid4(), organization_id=org_id, created_at=utcnow(), updated_at=utcnow())
+            settings = OrganizationSettings(
+                id=uuid4(), organization_id=org_id, created_at=utcnow(), updated_at=utcnow()
+            )
             session.add(settings)
 
         settings.openrouter_management_key_encrypted = encrypt_token(payload.key)
@@ -346,7 +365,8 @@ async def set_management_key(
         await session.commit()
 
     await log_audit(
-        org_id, "key.set",
+        org_id,
+        "key.set",
         user_id=org_ctx.member.user_id,
         resource_type="organization_settings",
         details={"key_type": "openrouter_management_key"},
@@ -374,7 +394,8 @@ async def remove_management_key(
             await session.commit()
 
     await log_audit(
-        org_id, "key.remove",
+        org_id,
+        "key.remove",
         user_id=org_ctx.member.user_id,
         resource_type="organization_settings",
         details={"key_type": "openrouter_management_key"},
@@ -403,7 +424,9 @@ async def set_adobe_pdf_key(
         settings = result.scalars().first()
 
         if not settings:
-            settings = OrganizationSettings(id=uuid4(), organization_id=org_id, created_at=utcnow(), updated_at=utcnow())
+            settings = OrganizationSettings(
+                id=uuid4(), organization_id=org_id, created_at=utcnow(), updated_at=utcnow()
+            )
             session.add(settings)
 
         settings.adobe_pdf_client_id_encrypted = encrypt_token(payload.client_id)
@@ -412,7 +435,8 @@ async def set_adobe_pdf_key(
         await session.commit()
 
     await log_audit(
-        org_id, "key.set",
+        org_id,
+        "key.set",
         user_id=org_ctx.member.user_id,
         resource_type="organization_settings",
         details={"key_type": "adobe_pdf_services"},
@@ -441,7 +465,8 @@ async def remove_adobe_pdf_key(
             await session.commit()
 
     await log_audit(
-        org_id, "key.remove",
+        org_id,
+        "key.remove",
         user_id=org_ctx.member.user_id,
         resource_type="organization_settings",
         details={"key_type": "adobe_pdf_services"},
@@ -470,7 +495,9 @@ async def upload_logo(
     # Read and validate size
     data = await file.read()
     if len(data) > _LOGO_MAX_SIZE:
-        raise HTTPException(status_code=413, detail=f"Logo too large ({len(data)} bytes, max {_LOGO_MAX_SIZE}).")
+        raise HTTPException(
+            status_code=413, detail=f"Logo too large ({len(data)} bytes, max {_LOGO_MAX_SIZE})."
+        )
 
     # Save to workspace: orgs/{org_id}/logo.{ext}
     workspace = resolve_org_workspace(org_ctx.organization)
@@ -493,7 +520,9 @@ async def upload_logo(
         settings = result.scalars().first()
 
         if not settings:
-            settings = OrganizationSettings(id=uuid4(), organization_id=org_id, created_at=utcnow(), updated_at=utcnow())
+            settings = OrganizationSettings(
+                id=uuid4(), organization_id=org_id, created_at=utcnow(), updated_at=utcnow()
+            )
             session.add(settings)
 
         branding = settings.branding
@@ -503,7 +532,8 @@ async def upload_logo(
         await session.commit()
 
     await log_audit(
-        org_id, "branding.logo_uploaded",
+        org_id,
+        "branding.logo_uploaded",
         user_id=org_ctx.member.user_id,
         resource_type="organization_settings",
         details={"filename": file.filename, "size": len(data), "content_type": content_type},
@@ -541,7 +571,8 @@ async def remove_logo(
                     full_path.unlink()
 
     await log_audit(
-        org_id, "branding.logo_removed",
+        org_id,
+        "branding.logo_removed",
         user_id=org_ctx.member.user_id,
         resource_type="organization_settings",
         details={},
@@ -576,21 +607,27 @@ async def set_custom_llm_endpoint(
         settings = result.scalars().first()
 
         if not settings:
-            settings = OrganizationSettings(id=uuid4(), organization_id=org_id, created_at=utcnow(), updated_at=utcnow())
+            settings = OrganizationSettings(
+                id=uuid4(), organization_id=org_id, created_at=utcnow(), updated_at=utcnow()
+            )
             session.add(settings)
 
         import json as json_mod
-        settings.custom_llm_endpoint_json = json_mod.dumps({
-            "api_url": payload.api_url.rstrip("/"),
-            "name": payload.name,
-            "models": payload.models,
-        })
+
+        settings.custom_llm_endpoint_json = json_mod.dumps(
+            {
+                "api_url": payload.api_url.rstrip("/"),
+                "name": payload.name,
+                "models": payload.models,
+            }
+        )
         settings.custom_llm_api_key_encrypted = encrypt_token(payload.api_key)
         settings.updated_at = utcnow()
         await session.commit()
 
     await log_audit(
-        org_id, "key.set",
+        org_id,
+        "key.set",
         user_id=org_ctx.member.user_id,
         resource_type="organization_settings",
         details={"key_type": "custom_llm_endpoint", "endpoint_name": payload.name},
@@ -620,7 +657,8 @@ async def remove_custom_llm_endpoint(
             await session.commit()
 
     await log_audit(
-        org_id, "key.remove",
+        org_id,
+        "key.remove",
         user_id=org_ctx.member.user_id,
         resource_type="organization_settings",
         details={"key_type": "custom_llm_endpoint"},
@@ -710,14 +748,12 @@ async def get_audit_log(
     org_id = org_ctx.organization.id
 
     async with async_session_maker() as session:
-        stmt = (
-            select(AuditLog)
-            .where(AuditLog.organization_id == org_id)
-        )
+        stmt = select(AuditLog).where(AuditLog.organization_id == org_id)
         if action:
             stmt = stmt.where(AuditLog.action == action)
         if user_id:
             from uuid import UUID as _UUID
+
             try:
                 stmt = stmt.where(AuditLog.user_id == _UUID(user_id))
             except ValueError:
@@ -725,6 +761,7 @@ async def get_audit_log(
 
         # Total count for pagination
         from sqlalchemy import func
+
         count_stmt = select(func.count()).select_from(stmt.subquery())
         total = (await session.execute(count_stmt)).scalar_one()
 
@@ -737,6 +774,7 @@ async def get_audit_log(
         user_names: dict[str, str] = {}
         if user_ids:
             from app.models.users import User
+
             users_result = await session.execute(
                 select(User.id, User.name).where(User.id.in_(user_ids))  # type: ignore[union-attr]
             )

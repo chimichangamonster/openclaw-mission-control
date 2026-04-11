@@ -163,7 +163,9 @@ async def run_retention_cleanup() -> dict[str, int]:
         overrides = org_settings.get(org_id, {})
 
         # Email messages (cascades to attachments via FK if configured, otherwise clean separately)
-        email_days = overrides.get("email_retention_days", DEFAULT_RETENTION["email_retention_days"])
+        email_days = overrides.get(
+            "email_retention_days", DEFAULT_RETENTION["email_retention_days"]
+        )
         email_total += await _cleanup_table(
             table_name="email_messages",
             timestamp_col="received_at",
@@ -173,7 +175,9 @@ async def run_retention_cleanup() -> dict[str, int]:
         )
 
         # Audit logs
-        audit_days = overrides.get("audit_retention_days", DEFAULT_RETENTION["audit_retention_days"])
+        audit_days = overrides.get(
+            "audit_retention_days", DEFAULT_RETENTION["audit_retention_days"]
+        )
         audit_total += await _cleanup_table(
             table_name="audit_logs",
             timestamp_col="created_at",
@@ -183,7 +187,9 @@ async def run_retention_cleanup() -> dict[str, int]:
         )
 
         # Daily agent spends
-        spend_days = overrides.get("spend_retention_days", DEFAULT_RETENTION["spend_retention_days"])
+        spend_days = overrides.get(
+            "spend_retention_days", DEFAULT_RETENTION["spend_retention_days"]
+        )
         spend_total += await _cleanup_table(
             table_name="daily_agent_spends",
             timestamp_col="created_at",

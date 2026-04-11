@@ -37,7 +37,9 @@ SESSION_DEP = Depends(get_session)
 AGENT_CTX_DEP = Depends(get_agent_auth_context)
 
 
-def _redact_message(msg: EmailMessage, level: RedactionLevel = RedactionLevel.MODERATE) -> EmailMessage:
+def _redact_message(
+    msg: EmailMessage, level: RedactionLevel = RedactionLevel.MODERATE
+) -> EmailMessage:
     """Apply sanitization + redaction to email content before returning to agents.
 
     Modifies the ORM object in-place (detached from session) to avoid
@@ -48,14 +50,18 @@ def _redact_message(msg: EmailMessage, level: RedactionLevel = RedactionLevel.MO
 
     if level != RedactionLevel.OFF:
         text, html, count, categories = redact_email_content(
-            msg.body_text, msg.body_html, level=level,
+            msg.body_text,
+            msg.body_html,
+            level=level,
         )
         msg.body_text = text
         msg.body_html = html
         if count > 0:
             logger.info(
                 "agent_email.redacted message_id=%s count=%d categories=%s",
-                msg.id, count, ",".join(sorted(categories)),
+                msg.id,
+                count,
+                ",".join(sorted(categories)),
             )
     return msg
 

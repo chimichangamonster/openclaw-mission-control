@@ -69,7 +69,7 @@ async def send_active_reply(
 
     Returns True on success, False on failure.
     """
-    from app.services.wecom.access_token import get_access_token, WeComTokenError
+    from app.services.wecom.access_token import WeComTokenError, get_access_token
 
     try:
         access_token = await get_access_token(connection, session)

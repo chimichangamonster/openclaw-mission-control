@@ -5,15 +5,21 @@ from __future__ import annotations
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.api.deps import ORG_RATE_LIMIT_DEP, PORTFOLIO_DEP, get_session, require_feature, require_org_member
+from app.api.deps import (
+    ORG_RATE_LIMIT_DEP,
+    PORTFOLIO_DEP,
+    get_session,
+    require_feature,
+    require_org_member,
+)
 from app.core.logging import get_logger
 from app.core.time import utcnow
-from app.services.notifications import notify
 from app.models.paper_bets import PaperBet
 from app.models.paper_trading import PaperPortfolio
+from app.services.notifications import notify
 from app.services.organizations import OrganizationContext
 
 logger = get_logger(__name__)
@@ -81,6 +87,7 @@ async def place_bet(
     if game_date:
         try:
             from datetime import datetime as _dt
+
             parsed_game_date = _dt.fromisoformat(game_date.replace("Z", "+00:00"))
         except (ValueError, AttributeError):
             parsed_game_date = now
@@ -315,18 +322,26 @@ async def bet_summary(
         "roi": roi,
         "avg_odds": round(sum(b.odds for b in resolved) / len(resolved)) if resolved else 0,
         "avg_stake": round(total_staked / len(resolved), 2) if resolved else 0,
-        "best_bet": {
-            "selection": best.selection,
-            "game": best.game,
-            "pnl": round(best.pnl, 2),
-            "odds": best.odds,
-        } if best else None,
-        "worst_bet": {
-            "selection": worst.selection,
-            "game": worst.game,
-            "pnl": round(worst.pnl, 2),
-            "odds": worst.odds,
-        } if worst else None,
+        "best_bet": (
+            {
+                "selection": best.selection,
+                "game": best.game,
+                "pnl": round(best.pnl, 2),
+                "odds": best.odds,
+            }
+            if best
+            else None
+        ),
+        "worst_bet": (
+            {
+                "selection": worst.selection,
+                "game": worst.game,
+                "pnl": round(worst.pnl, 2),
+                "odds": worst.odds,
+            }
+            if worst
+            else None
+        ),
         "by_sport": {
             sport: {
                 "record": f"{s['wins']}-{s['losses']}-{s['pushes']}",

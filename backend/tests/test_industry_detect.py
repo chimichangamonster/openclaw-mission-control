@@ -91,7 +91,6 @@ class TestDetectIndustry:
         assert "construction" in result["all_scores"]
         assert "waste_management" in result["all_scores"]
 
-
     # ── New vertical detection tests ────────────────────────────────────────
 
     def test_manufacturing(self):

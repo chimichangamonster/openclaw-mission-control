@@ -7,12 +7,12 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlmodel import select, func
+from sqlmodel import func, select
 
 from app.api.deps import ORG_ACTOR_DEP
 from app.core.time import utcnow
 from app.db.session import async_session_maker
-from app.models.bookkeeping import BkJob, BkExpense, BkTimesheet, BkPlacement
+from app.models.bookkeeping import BkExpense, BkJob, BkPlacement, BkTimesheet
 from app.services.organizations import OrganizationContext
 
 router = APIRouter(prefix="/jobs")
@@ -86,7 +86,9 @@ async def list_jobs(
 async def get_job(job_id: str, org_ctx: OrganizationContext = ORG_ACTOR_DEP):
     async with async_session_maker() as session:
         result = await session.execute(
-            select(BkJob).where(BkJob.id == job_id, BkJob.organization_id == org_ctx.organization.id)
+            select(BkJob).where(
+                BkJob.id == job_id, BkJob.organization_id == org_ctx.organization.id
+            )
         )
         job = result.scalars().first()
         if not job:
@@ -151,7 +153,9 @@ async def get_job_costs(job_id: str, org_ctx: OrganizationContext = ORG_ACTOR_DE
 async def update_job(job_id: str, payload: JobUpdate, org_ctx: OrganizationContext = ORG_ACTOR_DEP):
     async with async_session_maker() as session:
         result = await session.execute(
-            select(BkJob).where(BkJob.id == job_id, BkJob.organization_id == org_ctx.organization.id)
+            select(BkJob).where(
+                BkJob.id == job_id, BkJob.organization_id == org_ctx.organization.id
+            )
         )
         job = result.scalars().first()
         if not job:

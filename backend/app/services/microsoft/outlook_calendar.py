@@ -52,8 +52,12 @@ async def list_events(
     if time_min and time_max:
         url = f"{GRAPH_URL}/me/calendarView"
         params: dict[str, Any] = {
-            "startDateTime": time_min.isoformat() + "Z" if not time_min.tzinfo else time_min.isoformat(),
-            "endDateTime": time_max.isoformat() + "Z" if not time_max.tzinfo else time_max.isoformat(),
+            "startDateTime": (
+                time_min.isoformat() + "Z" if not time_min.tzinfo else time_min.isoformat()
+            ),
+            "endDateTime": (
+                time_max.isoformat() + "Z" if not time_max.tzinfo else time_max.isoformat()
+            ),
             "$top": max_results,
             "$orderby": "start/dateTime",
             "$select": "id,subject,body,location,start,end,isAllDay,attendees,webLink,createdDateTime,lastModifiedDateTime,showAs",

@@ -7,15 +7,14 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-
 # Model tier pricing (from CLAUDE.md)
 MODEL_PRICING = {
-    "gpt-5-nano": 0.05,       # Tier 1
-    "grok-4-fast": 0.20,      # Tier 1
-    "deepseek-v3.2": 0.26,    # Tier 2
+    "gpt-5-nano": 0.05,  # Tier 1
+    "grok-4-fast": 0.20,  # Tier 1
+    "deepseek-v3.2": 0.26,  # Tier 2
     "claude-sonnet-4": 3.00,  # Tier 3
-    "grok-4": 3.00,           # Tier 3
-    "claude-opus-4.6": 15.00, # Tier 4
+    "grok-4": 3.00,  # Tier 3
+    "claude-opus-4.6": 15.00,  # Tier 4
 }
 
 
@@ -108,10 +107,7 @@ class TestPerAgentSpend:
             {"agent": "stock-analyst", "model": "deepseek-v3.2", "tokens": 30_000},
             {"agent": "stock-analyst", "model": "claude-sonnet-4", "tokens": 10_000},
         ]
-        total = sum(
-            estimate_cost(s["model"], s["tokens"])
-            for s in sessions
-        )
+        total = sum(estimate_cost(s["model"], s["tokens"]) for s in sessions)
         # 80K * 0.26/M + 10K * 3.0/M = 0.0208 + 0.03 = 0.0508
         assert total == pytest.approx(0.0508, abs=0.001)
 
@@ -129,10 +125,7 @@ class TestPerAgentSpend:
         }
         daily_limit = 0.40
 
-        over_limit = [
-            agent for agent, spend in agent_spends.items()
-            if spend > daily_limit
-        ]
+        over_limit = [agent for agent, spend in agent_spends.items() if spend > daily_limit]
         assert over_limit == ["the-claw"]
 
 
@@ -143,6 +136,7 @@ class TestProactiveCompaction:
     def _clear_fail_counts(self):
         """Reset the module-level fail counter between tests."""
         from app.services.budget_monitor import _compact_fail_counts
+
         _compact_fail_counts.clear()
         yield
         _compact_fail_counts.clear()
@@ -157,9 +151,17 @@ class TestProactiveCompaction:
     @patch("app.services.budget_monitor.reset_session", new_callable=AsyncMock)
     @patch("app.services.budget_monitor.compact_session", new_callable=AsyncMock)
     async def test_compact_success_resets_fail_count(
-        self, mock_compact, mock_reset, mock_track, mock_alert,
+        self,
+        mock_compact,
+        mock_reset,
+        mock_track,
+        mock_alert,
     ):
-        from app.services.budget_monitor import _compact_fail_counts, _proactive_compaction, GatewayConfig
+        from app.services.budget_monitor import (
+            GatewayConfig,
+            _compact_fail_counts,
+            _proactive_compaction,
+        )
 
         mock_compact.return_value = {"compacted": True}
         config = GatewayConfig(url="ws://fake:1234")
@@ -180,9 +182,17 @@ class TestProactiveCompaction:
     @patch("app.services.budget_monitor.reset_session", new_callable=AsyncMock)
     @patch("app.services.budget_monitor.compact_session", new_callable=AsyncMock)
     async def test_compact_fail_increments_counter(
-        self, mock_compact, mock_reset, mock_track, mock_alert,
+        self,
+        mock_compact,
+        mock_reset,
+        mock_track,
+        mock_alert,
     ):
-        from app.services.budget_monitor import _compact_fail_counts, _proactive_compaction, GatewayConfig
+        from app.services.budget_monitor import (
+            GatewayConfig,
+            _compact_fail_counts,
+            _proactive_compaction,
+        )
 
         mock_compact.return_value = {"compacted": False}
         config = GatewayConfig(url="ws://fake:1234")
@@ -199,9 +209,17 @@ class TestProactiveCompaction:
     @patch("app.services.budget_monitor.reset_session", new_callable=AsyncMock)
     @patch("app.services.budget_monitor.compact_session", new_callable=AsyncMock)
     async def test_reset_after_three_compact_failures(
-        self, mock_compact, mock_reset, mock_track, mock_alert,
+        self,
+        mock_compact,
+        mock_reset,
+        mock_track,
+        mock_alert,
     ):
-        from app.services.budget_monitor import _compact_fail_counts, _proactive_compaction, GatewayConfig
+        from app.services.budget_monitor import (
+            GatewayConfig,
+            _compact_fail_counts,
+            _proactive_compaction,
+        )
 
         mock_compact.return_value = {"compacted": False}
         mock_reset.return_value = {"ok": True}
@@ -226,9 +244,13 @@ class TestProactiveCompaction:
     @patch("app.services.budget_monitor.reset_session", new_callable=AsyncMock)
     @patch("app.services.budget_monitor.compact_session", new_callable=AsyncMock)
     async def test_below_threshold_no_compact(
-        self, mock_compact, mock_reset, mock_track, mock_alert,
+        self,
+        mock_compact,
+        mock_reset,
+        mock_track,
+        mock_alert,
     ):
-        from app.services.budget_monitor import _proactive_compaction, GatewayConfig
+        from app.services.budget_monitor import GatewayConfig, _proactive_compaction
 
         config = GatewayConfig(url="ws://fake:1234")
         # 100K tokens = 50% of 200K window — below 75% threshold

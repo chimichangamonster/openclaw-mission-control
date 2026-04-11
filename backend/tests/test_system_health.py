@@ -74,7 +74,11 @@ class TestSystemHealthResponse:
 
     def test_down_overrides_degraded(self) -> None:
         """If both critical and non-critical issues exist, status is down."""
-        issues = ["postgresql down", "gateway listener disconnected", "openrouter circuit breaker open"]
+        issues = [
+            "postgresql down",
+            "gateway listener disconnected",
+            "openrouter circuit breaker open",
+        ]
         critical = any(k in ("postgresql down", "redis down") for k in issues)
         status = "down" if critical else ("degraded" if issues else "healthy")
         assert status == "down"

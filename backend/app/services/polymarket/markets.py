@@ -27,9 +27,16 @@ async def search_markets(
     """
     # Known category tags that map to Gamma event tag_slugs
     CATEGORY_TAGS = {
-        "elections", "politics", "crypto", "sports", "finance",
-        "science", "pop-culture", "us-presidential-election",
-        "global-elections", "world-elections",
+        "elections",
+        "politics",
+        "crypto",
+        "sports",
+        "finance",
+        "science",
+        "pop-culture",
+        "us-presidential-election",
+        "global-elections",
+        "world-elections",
     }
 
     async with httpx.AsyncClient(timeout=15.0) as client:
@@ -96,6 +103,7 @@ async def search_markets(
             if isinstance(raw_outcomes, str):
                 try:
                     import json as _json
+
                     raw_outcomes = _json.loads(raw_outcomes)
                 except (ValueError, TypeError):
                     raw_outcomes = []
@@ -107,6 +115,7 @@ async def search_markets(
             if isinstance(raw_prices, str) and raw_prices:
                 try:
                     import json as _json
+
                     price_list = _json.loads(raw_prices)
                     if isinstance(price_list, list) and len(price_list) >= 2:
                         yes_price = yes_price or float(price_list[0])
@@ -150,11 +159,13 @@ async def get_market_detail(condition_id: str) -> MarketDetailRead | None:
         outcome = tok.get("outcome", "")
         outcomes.append(outcome)
         price = tok.get("price")
-        tokens_data.append({
-            "token_id": tok.get("token_id", ""),
-            "outcome": outcome,
-            "price": str(price) if price else "0",
-        })
+        tokens_data.append(
+            {
+                "token_id": tok.get("token_id", ""),
+                "outcome": outcome,
+                "price": str(price) if price else "0",
+            }
+        )
         if price is not None:
             if outcome.lower() == "yes":
                 yes_price = float(price)
@@ -166,6 +177,7 @@ async def get_market_detail(condition_id: str) -> MarketDetailRead | None:
         if isinstance(raw_outcomes, str):
             try:
                 import json as _json
+
                 raw_outcomes = _json.loads(raw_outcomes)
             except (ValueError, TypeError):
                 raw_outcomes = []
@@ -176,6 +188,7 @@ async def get_market_detail(condition_id: str) -> MarketDetailRead | None:
         if isinstance(raw_prices, str) and raw_prices:
             try:
                 import json as _json
+
                 price_list = _json.loads(raw_prices)
                 if isinstance(price_list, list) and len(price_list) >= 2:
                     yes_price = yes_price or float(price_list[0])

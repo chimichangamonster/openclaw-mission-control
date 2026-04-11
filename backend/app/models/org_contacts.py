@@ -19,9 +19,7 @@ class OrgContact(TenantScoped, table=True):
 
     __tablename__ = "org_contacts"  # pyright: ignore[reportAssignmentType]
     __table_args__ = (
-        UniqueConstraint(
-            "organization_id", "email", name="uq_org_contacts_org_email"
-        ),
+        UniqueConstraint("organization_id", "email", name="uq_org_contacts_org_email"),
     )
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)

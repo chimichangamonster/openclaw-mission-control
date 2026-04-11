@@ -60,9 +60,7 @@ class OrganizationSettings(QueryModel, table=True):
     model_pins_json: str = Field(default="{}")
 
     # Feature flags
-    feature_flags_json: str = Field(
-        default=json.dumps(DEFAULT_FEATURE_FLAGS)
-    )
+    feature_flags_json: str = Field(default=json.dumps(DEFAULT_FEATURE_FLAGS))
 
     # Agent defaults (identity_profile template for new agents)
     agent_defaults_json: str = Field(default="{}")

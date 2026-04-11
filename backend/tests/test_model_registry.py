@@ -12,7 +12,6 @@ from typing import Any
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Re-implement core registry logic here to avoid DB import chain.
 # ---------------------------------------------------------------------------
@@ -99,28 +98,33 @@ class ModelRegistry:
                     family = _extract_family(model_id)
                     versions = self.get_family_versions(family)
                     replacement = versions[0].model_id if versions else None
-                    warnings.append(DeprecationWarning(
-                        pinned_model_id=model_id,
-                        pin_key=pin_key,
-                        status="removed",
-                        suggested_replacement=replacement,
-                    ))
+                    warnings.append(
+                        DeprecationWarning(
+                            pinned_model_id=model_id,
+                            pin_key=pin_key,
+                            status="removed",
+                            suggested_replacement=replacement,
+                        )
+                    )
             elif entry.status == "deprecated":
                 family_versions = self.get_family_versions(entry.family)
                 active_versions = [v for v in family_versions if v.status == "active"]
                 replacement = active_versions[0].model_id if active_versions else None
-                warnings.append(DeprecationWarning(
-                    pinned_model_id=model_id,
-                    pin_key=pin_key,
-                    status="deprecated",
-                    suggested_replacement=replacement,
-                ))
+                warnings.append(
+                    DeprecationWarning(
+                        pinned_model_id=model_id,
+                        pin_key=pin_key,
+                        status="deprecated",
+                        suggested_replacement=replacement,
+                    )
+                )
         return warnings
 
 
 # ---------------------------------------------------------------------------
 # Tests: Family extraction
 # ---------------------------------------------------------------------------
+
 
 class TestFamilyExtraction:
     """Verify model ID → family grouping."""
@@ -155,6 +159,7 @@ class TestFamilyExtraction:
 # Tests: Tier classification
 # ---------------------------------------------------------------------------
 
+
 class TestTierClassification:
     """Verify model tier assignment by price."""
 
@@ -183,7 +188,14 @@ class TestTierClassification:
 # Tests: Registry operations
 # ---------------------------------------------------------------------------
 
-def _make_entry(model_id: str, *, status: str = "active", context_window: int = 200_000, last_seen: float = 1000.0) -> ModelEntry:
+
+def _make_entry(
+    model_id: str,
+    *,
+    status: str = "active",
+    context_window: int = 200_000,
+    last_seen: float = 1000.0,
+) -> ModelEntry:
     return ModelEntry(
         model_id=model_id,
         family=_extract_family(model_id),
@@ -259,13 +271,16 @@ class TestContextWindowLookup:
 
     def test_deprecated_model_not_matched_by_short_name(self) -> None:
         reg = ModelRegistry()
-        reg.add(_make_entry("anthropic/claude-sonnet-3", context_window=100_000, status="deprecated"))
+        reg.add(
+            _make_entry("anthropic/claude-sonnet-3", context_window=100_000, status="deprecated")
+        )
         assert reg.get_context_window("claude-sonnet-3") is None
 
 
 # ---------------------------------------------------------------------------
 # Tests: Deprecation checking
 # ---------------------------------------------------------------------------
+
 
 class TestDeprecationChecking:
     def test_active_pin_no_warning(self) -> None:
@@ -276,7 +291,9 @@ class TestDeprecationChecking:
 
     def test_deprecated_pin_warns(self) -> None:
         reg = ModelRegistry()
-        reg.add(_make_entry("anthropic/claude-sonnet-4-20260101", status="deprecated", last_seen=100.0))
+        reg.add(
+            _make_entry("anthropic/claude-sonnet-4-20260101", status="deprecated", last_seen=100.0)
+        )
         reg.add(_make_entry("anthropic/claude-sonnet-4-20260514", status="active", last_seen=200.0))
         warnings = reg.check_pins({"primary": "anthropic/claude-sonnet-4-20260101"})
         assert len(warnings) == 1
@@ -314,16 +331,19 @@ class TestDeprecationChecking:
         reg = ModelRegistry()
         reg.add(_make_entry("anthropic/claude-sonnet-4", status="deprecated"))
         reg.add(_make_entry("deepseek/deepseek-v3.2", status="deprecated"))
-        warnings = reg.check_pins({
-            "primary": "anthropic/claude-sonnet-4",
-            "budget": "deepseek/deepseek-v3.2",
-        })
+        warnings = reg.check_pins(
+            {
+                "primary": "anthropic/claude-sonnet-4",
+                "budget": "deepseek/deepseek-v3.2",
+            }
+        )
         assert len(warnings) == 2
 
 
 # ---------------------------------------------------------------------------
 # Tests: Persistence (JSON serialization)
 # ---------------------------------------------------------------------------
+
 
 class TestPersistence:
     def test_entry_serializable(self) -> None:

@@ -100,9 +100,12 @@ async def test_personal_email_blocked():
         org = Organization(id=uuid4(), name="Fake", slug="fake")
         session.add(org)
         await session.flush()
-        session.add(OrganizationDomain(
-            organization_id=org.id, domain="gmail.com",
-        ))
+        session.add(
+            OrganizationDomain(
+                organization_id=org.id,
+                domain="gmail.com",
+            )
+        )
         await session.commit()
 
         result = await _find_org_by_email_domain(session, "user@gmail.com")
@@ -116,9 +119,13 @@ async def test_unverified_domain_not_matched():
         org = Organization(id=uuid4(), name="Corp", slug="corp")
         session.add(org)
         await session.flush()
-        session.add(OrganizationDomain(
-            organization_id=org.id, domain="corp.com", verified=False,
-        ))
+        session.add(
+            OrganizationDomain(
+                organization_id=org.id,
+                domain="corp.com",
+                verified=False,
+            )
+        )
         await session.commit()
 
         result = await _find_org_by_email_domain(session, "user@corp.com")
@@ -243,8 +250,15 @@ async def test_invite_takes_precedence_over_domain():
 
 def test_blocklist_has_common_providers():
     """Sanity check that the blocklist covers the obvious ones."""
-    for domain in ("gmail.com", "outlook.com", "hotmail.com", "yahoo.com",
-                   "icloud.com", "protonmail.com", "proton.me"):
+    for domain in (
+        "gmail.com",
+        "outlook.com",
+        "hotmail.com",
+        "yahoo.com",
+        "icloud.com",
+        "protonmail.com",
+        "proton.me",
+    ):
         assert domain in PERSONAL_EMAIL_DOMAINS, f"{domain} missing from blocklist"
 
 

@@ -46,6 +46,7 @@ class TestIsOrgAdmin:
 
     def test_owner_is_admin(self):
         from unittest.mock import MagicMock
+
         from app.services.organizations import is_org_admin
 
         member = MagicMock()
@@ -54,6 +55,7 @@ class TestIsOrgAdmin:
 
     def test_admin_is_admin(self):
         from unittest.mock import MagicMock
+
         from app.services.organizations import is_org_admin
 
         member = MagicMock()
@@ -62,6 +64,7 @@ class TestIsOrgAdmin:
 
     def test_operator_is_not_admin(self):
         from unittest.mock import MagicMock
+
         from app.services.organizations import is_org_admin
 
         member = MagicMock()
@@ -70,6 +73,7 @@ class TestIsOrgAdmin:
 
     def test_member_is_not_admin(self):
         from unittest.mock import MagicMock
+
         from app.services.organizations import is_org_admin
 
         member = MagicMock()
@@ -78,6 +82,7 @@ class TestIsOrgAdmin:
 
     def test_viewer_is_not_admin(self):
         from unittest.mock import MagicMock
+
         from app.services.organizations import is_org_admin
 
         member = MagicMock()
@@ -120,6 +125,7 @@ class TestPermissionMatrix:
 
     def _can_access(self, user_role: str, required_role: str) -> bool:
         from app.services.organizations import ROLE_RANK
+
         return ROLE_RANK.get(user_role, 0) >= ROLE_RANK.get(required_role, 0)
 
     def test_viewer_permissions(self):

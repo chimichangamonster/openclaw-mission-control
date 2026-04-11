@@ -45,32 +45,50 @@ class RedactionResult(NamedTuple):
 
 _CREDENTIAL_PATTERNS: list[tuple[re.Pattern, str, str]] = [
     # Password reset / magic links
-    (re.compile(r"https?://\S*(?:reset|password|verify|confirm|activate|token|magic[-_]?link)\S*", re.IGNORECASE),
-     "[REDACTED_LINK]", "reset_link"),
-
+    (
+        re.compile(
+            r"https?://\S*(?:reset|password|verify|confirm|activate|token|magic[-_]?link)\S*",
+            re.IGNORECASE,
+        ),
+        "[REDACTED_LINK]",
+        "reset_link",
+    ),
     # API keys (common formats: sk-..., key-..., api_..., AKIA..., etc.)
-    (re.compile(r"\b(?:sk|pk|api|key|token|secret|bearer)[-_]?[A-Za-z0-9]{20,}\b", re.IGNORECASE),
-     "[REDACTED_API_KEY]", "api_key"),
-
+    (
+        re.compile(
+            r"\b(?:sk|pk|api|key|token|secret|bearer)[-_]?[A-Za-z0-9]{20,}\b", re.IGNORECASE
+        ),
+        "[REDACTED_API_KEY]",
+        "api_key",
+    ),
     # AWS access keys
-    (re.compile(r"\bAKIA[0-9A-Z]{16}\b"),
-     "[REDACTED_AWS_KEY]", "aws_key"),
-
+    (re.compile(r"\bAKIA[0-9A-Z]{16}\b"), "[REDACTED_AWS_KEY]", "aws_key"),
     # Generic high-entropy strings that look like secrets (40+ hex chars)
-    (re.compile(r"\b[0-9a-f]{40,}\b", re.IGNORECASE),
-     "[REDACTED_TOKEN]", "hex_token"),
-
+    (re.compile(r"\b[0-9a-f]{40,}\b", re.IGNORECASE), "[REDACTED_TOKEN]", "hex_token"),
     # JWT tokens
-    (re.compile(r"\beyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\b"),
-     "[REDACTED_JWT]", "jwt"),
-
+    (
+        re.compile(r"\beyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\b"),
+        "[REDACTED_JWT]",
+        "jwt",
+    ),
     # Passwords in common email formats
-    (re.compile(r"(?:password|passwd|passcode|PIN|temporary password|new password|your password)\s*[:=]\s*\S+", re.IGNORECASE),
-     "[REDACTED_PASSWORD]", "password"),
-
+    (
+        re.compile(
+            r"(?:password|passwd|passcode|PIN|temporary password|new password|your password)\s*[:=]\s*\S+",
+            re.IGNORECASE,
+        ),
+        "[REDACTED_PASSWORD]",
+        "password",
+    ),
     # Verification/OTP codes (6-8 digit codes in context)
-    (re.compile(r"(?:verification|confirm|auth|security|one[- ]?time)\s*(?:code|pin|number)\s*[:=]?\s*\d{4,8}", re.IGNORECASE),
-     "[REDACTED_OTP]", "otp"),
+    (
+        re.compile(
+            r"(?:verification|confirm|auth|security|one[- ]?time)\s*(?:code|pin|number)\s*[:=]?\s*\d{4,8}",
+            re.IGNORECASE,
+        ),
+        "[REDACTED_OTP]",
+        "otp",
+    ),
 ]
 
 # ---------------------------------------------------------------------------
@@ -79,16 +97,24 @@ _CREDENTIAL_PATTERNS: list[tuple[re.Pattern, str, str]] = [
 
 _FINANCIAL_PATTERNS: list[tuple[re.Pattern, str, str]] = [
     # Credit card numbers (13-19 digits, possibly with spaces/dashes)
-    (re.compile(r"\b(?:\d{4}[-\s]?){3,4}\d{1,4}\b"),
-     "[REDACTED_CARD]", "credit_card"),
-
+    (re.compile(r"\b(?:\d{4}[-\s]?){3,4}\d{1,4}\b"), "[REDACTED_CARD]", "credit_card"),
     # Bank account / routing numbers in context
-    (re.compile(r"(?:account|routing|transit|acct)\s*(?:number|no|#)?\s*[:=]?\s*\d{5,12}", re.IGNORECASE),
-     "[REDACTED_ACCOUNT]", "bank_account"),
-
+    (
+        re.compile(
+            r"(?:account|routing|transit|acct)\s*(?:number|no|#)?\s*[:=]?\s*\d{5,12}", re.IGNORECASE
+        ),
+        "[REDACTED_ACCOUNT]",
+        "bank_account",
+    ),
     # SIN / SSN (with context keywords to avoid matching phone numbers)
-    (re.compile(r"(?:SIN|SSN|social\s+security|social\s+insurance)\s*(?:number|no|#)?\s*[:=]?\s*\d{3}[-\s]\d{2,3}[-\s]\d{3,4}", re.IGNORECASE),
-     "[REDACTED_ID_NUMBER]", "sin_ssn"),
+    (
+        re.compile(
+            r"(?:SIN|SSN|social\s+security|social\s+insurance)\s*(?:number|no|#)?\s*[:=]?\s*\d{3}[-\s]\d{2,3}[-\s]\d{3,4}",
+            re.IGNORECASE,
+        ),
+        "[REDACTED_ID_NUMBER]",
+        "sin_ssn",
+    ),
 ]
 
 # ---------------------------------------------------------------------------
@@ -98,20 +124,37 @@ _FINANCIAL_PATTERNS: list[tuple[re.Pattern, str, str]] = [
 _PII_PATTERNS: list[tuple[re.Pattern, str, str]] = [
     # Phone numbers (North American + international)
     # Negative lookbehind for '.' prevents matching decimal numbers like GPS coords
-    (re.compile(r"(?<!\d\.)(?<!\d)\b(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b(?!\.\d)"),
-     "[REDACTED_PHONE]", "phone"),
-
+    (
+        re.compile(
+            r"(?<!\d\.)(?<!\d)\b(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b(?!\.\d)"
+        ),
+        "[REDACTED_PHONE]",
+        "phone",
+    ),
     # Email addresses (within body text, not sender/recipient headers)
-    (re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"),
-     "[REDACTED_EMAIL]", "email_in_body"),
-
+    (
+        re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"),
+        "[REDACTED_EMAIL]",
+        "email_in_body",
+    ),
     # Date of birth patterns
-    (re.compile(r"(?:date of birth|DOB|born|birthday)\s*[:=]?\s*\d{1,2}[/\-]\d{1,2}[/\-]\d{2,4}", re.IGNORECASE),
-     "[REDACTED_DOB]", "dob"),
-
+    (
+        re.compile(
+            r"(?:date of birth|DOB|born|birthday)\s*[:=]?\s*\d{1,2}[/\-]\d{1,2}[/\-]\d{2,4}",
+            re.IGNORECASE,
+        ),
+        "[REDACTED_DOB]",
+        "dob",
+    ),
     # Mailing addresses (basic pattern: number + street + city/province)
-    (re.compile(r"\b\d{1,5}\s+(?:[A-Z][a-z]+\s+){1,3}(?:St|Ave|Rd|Blvd|Dr|Ln|Ct|Way|Cres|Pl)\b\.?", re.IGNORECASE),
-     "[REDACTED_ADDRESS]", "address"),
+    (
+        re.compile(
+            r"\b\d{1,5}\s+(?:[A-Z][a-z]+\s+){1,3}(?:St|Ave|Rd|Blvd|Dr|Ln|Ct|Way|Cres|Pl)\b\.?",
+            re.IGNORECASE,
+        ),
+        "[REDACTED_ADDRESS]",
+        "address",
+    ),
 ]
 
 
@@ -185,7 +228,9 @@ def redact_sensitive(
     if count > 0:
         logger.info(
             "redact.applied count=%d categories=%s level=%s",
-            count, ",".join(sorted(categories)), level.value,
+            count,
+            ",".join(sorted(categories)),
+            level.value,
         )
 
     return RedactionResult(text=text, redaction_count=count, categories=categories)
@@ -199,91 +244,116 @@ def redact_sensitive(
 _PENTEST_PATTERNS: list[tuple[re.Pattern, str, str]] = [
     # GPS coordinates — must come before IP/phone patterns to prevent false matches
     # Matches lat,lon pairs like "53.590542, -113.522905" or "53.590542/-113.522905"
-    (re.compile(r"-?\d{1,3}\.\d{4,8}\s*[,/]\s*-?\d{1,3}\.\d{4,8}"),
-     "gps_coordinates", "GPS coordinates"),
-
+    (
+        re.compile(r"-?\d{1,3}\.\d{4,8}\s*[,/]\s*-?\d{1,3}\.\d{4,8}"),
+        "gps_coordinates",
+        "GPS coordinates",
+    ),
     # Database connection strings — must come before IP/hostname patterns
     # so the whole URL is redacted before IP regex strips the embedded address
-    (re.compile(r"(?:mongodb|mysql|postgres(?:ql)?|mssql|redis|amqp)://[^\s\"']+@[^\s\"']+", re.IGNORECASE),
-     "db_connection_string", "database connection string"),
-
+    (
+        re.compile(
+            r"(?:mongodb|mysql|postgres(?:ql)?|mssql|redis|amqp)://[^\s\"']+@[^\s\"']+",
+            re.IGNORECASE,
+        ),
+        "db_connection_string",
+        "database connection string",
+    ),
     # MAC addresses — must come before IPv6 (MACs look like short IPv6)
-    (re.compile(r"\b(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}\b"),
-     "mac_address", "MAC address"),
-
+    (re.compile(r"\b(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}\b"), "mac_address", "MAC address"),
     # CIDR ranges — must come before bare IPv4
-    (re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}/\d{1,2}\b"),
-     "cidr_range", "CIDR range"),
-
+    (re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}/\d{1,2}\b"), "cidr_range", "CIDR range"),
     # IPv4 addresses
-    (re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b"),
-     "ip_address", "IP address"),
-
+    (re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b"), "ip_address", "IP address"),
     # IPv6 addresses (simplified — common formats)
-    (re.compile(r"\b(?:[0-9a-fA-F]{1,4}:){2,7}[0-9a-fA-F]{1,4}\b"),
-     "ipv6_address", "IPv6 address"),
-
+    (re.compile(r"\b(?:[0-9a-fA-F]{1,4}:){2,7}[0-9a-fA-F]{1,4}\b"), "ipv6_address", "IPv6 address"),
     # Hostnames / FQDNs (conservative — requires at least 2 dots or common TLDs)
-    (re.compile(r"\b(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.){2,}[a-zA-Z]{2,}\b"),
-     "hostname", "hostname"),
-
+    (
+        re.compile(r"\b(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.){2,}[a-zA-Z]{2,}\b"),
+        "hostname",
+        "hostname",
+    ),
     # Internal domain names (single-label .local, .internal, .corp, .lan)
-    (re.compile(r"\b[a-zA-Z0-9-]+\.(?:local|internal|corp|lan|home|intranet)\b", re.IGNORECASE),
-     "internal_host", "internal hostname"),
-
+    (
+        re.compile(r"\b[a-zA-Z0-9-]+\.(?:local|internal|corp|lan|home|intranet)\b", re.IGNORECASE),
+        "internal_host",
+        "internal hostname",
+    ),
     # Hostnames in keyword context (Hostname: X, Computer Name: X, NetBIOS: X)
-    (re.compile(r"(?:hostname|computer\s*name|netbios\s*name|device\s*name)\s*[:=]\s*[\"']?([A-Za-z0-9][A-Za-z0-9._-]{2,})[\"']?", re.IGNORECASE),
-     "hostname_context", "hostname"),
-
+    (
+        re.compile(
+            r"(?:hostname|computer\s*name|netbios\s*name|device\s*name)\s*[:=]\s*[\"']?([A-Za-z0-9][A-Za-z0-9._-]{2,})[\"']?",
+            re.IGNORECASE,
+        ),
+        "hostname_context",
+        "hostname",
+    ),
     # Windows-style hostnames: uppercase + digits + hyphens, 8+ chars (e.g. W482CAD-LNWZ77E6BDD4FB0)
     # Only match when ALL-CAPS with digits mixed in (avoids false positives on normal words)
-    (re.compile(r"\b[A-Z][A-Z0-9]{2,}-[A-Z0-9]{4,}\b"),
-     "windows_hostname", "Windows hostname"),
-
+    (re.compile(r"\b[A-Z][A-Z0-9]{2,}-[A-Z0-9]{4,}\b"), "windows_hostname", "Windows hostname"),
     # SSIDs in common pentest output patterns
     # \b prefix prevents matching tail of "BSSID:" as "B" + "SSID:"
-    (re.compile(r'\b(?:E?SSID|network)\s*[:=]\s*["\']?([^\s"\']+)["\']?', re.IGNORECASE),
-     "ssid", "WiFi SSID"),
-
+    (
+        re.compile(r'\b(?:E?SSID|network)\s*[:=]\s*["\']?([^\s"\']+)["\']?', re.IGNORECASE),
+        "ssid",
+        "WiFi SSID",
+    ),
     # WiFi PSK / WPA passwords in tool output
-    (re.compile(r'(?:PSK|WPA\s*(?:passphrase|password|key)|pre[- ]?shared[- ]?key|wifi[- ]?pass(?:word)?)\s*[:=]\s*["\']?(\S+)["\']?', re.IGNORECASE),
-     "wifi_password", "WiFi password"),
-
+    (
+        re.compile(
+            r'(?:PSK|WPA\s*(?:passphrase|password|key)|pre[- ]?shared[- ]?key|wifi[- ]?pass(?:word)?)\s*[:=]\s*["\']?(\S+)["\']?',
+            re.IGNORECASE,
+        ),
+        "wifi_password",
+        "WiFi password",
+    ),
     # NTLM hashes (LM:NT format from secretsdump, or standalone 32-char hex)
-    (re.compile(r"\b[0-9a-fA-F]{32}:[0-9a-fA-F]{32}\b"),
-     "ntlm_hash", "NTLM hash pair"),
-
+    (re.compile(r"\b[0-9a-fA-F]{32}:[0-9a-fA-F]{32}\b"), "ntlm_hash", "NTLM hash pair"),
     # NetNTLMv2 hashes (user::domain:challenge:response format from Responder)
-    (re.compile(r"\b\S+::\S+:[0-9a-fA-F]{16}:[0-9a-fA-F]{32}:[0-9a-fA-F]+\b"),
-     "netntlmv2_hash", "NetNTLMv2 hash"),
-
+    (
+        re.compile(r"\b\S+::\S+:[0-9a-fA-F]{16}:[0-9a-fA-F]{32}:[0-9a-fA-F]+\b"),
+        "netntlmv2_hash",
+        "NetNTLMv2 hash",
+    ),
     # Standalone password hashes in tool output (hashcat/john context)
-    (re.compile(r'(?:hash|Hash|HASH)\s*[:=]\s*["\']?([0-9a-fA-F]{32,128})["\']?'),
-     "password_hash", "password hash"),
-
+    (
+        re.compile(r'(?:hash|Hash|HASH)\s*[:=]\s*["\']?([0-9a-fA-F]{32,128})["\']?'),
+        "password_hash",
+        "password hash",
+    ),
     # SSH private keys (PEM blocks)
-    (re.compile(r"-----BEGIN (?:RSA |OPENSSH |EC |ED25519 |DSA )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |OPENSSH |EC |ED25519 |DSA )?PRIVATE KEY-----"),
-     "ssh_private_key", "SSH private key"),
-
+    (
+        re.compile(
+            r"-----BEGIN (?:RSA |OPENSSH |EC |ED25519 |DSA )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |OPENSSH |EC |ED25519 |DSA )?PRIVATE KEY-----"
+        ),
+        "ssh_private_key",
+        "SSH private key",
+    ),
     # Kerberos ticket blobs (krb5 base64, typically from klist or ticket exports)
-    (re.compile(r"\bkrb(?:tgt|5cc|5_)\S{20,}\b", re.IGNORECASE),
-     "kerberos_ticket", "Kerberos ticket"),
-
+    (
+        re.compile(r"\bkrb(?:tgt|5cc|5_)\S{20,}\b", re.IGNORECASE),
+        "kerberos_ticket",
+        "Kerberos ticket",
+    ),
     # AWS temporary session tokens (STS)
-    (re.compile(r"\bASIA[0-9A-Z]{16}\b"),
-     "aws_sts_key", "AWS STS key"),
-
+    (re.compile(r"\bASIA[0-9A-Z]{16}\b"), "aws_sts_key", "AWS STS key"),
     # Credential pairs in pentest tool output (user:pass, user/pass patterns in context)
-    (re.compile(r'(?:credential|cred|login|logon|username/password|user/pass)\s*[:=]\s*["\']?(\S+\s*[:/]\s*\S+)["\']?', re.IGNORECASE),
-     "credential_pair", "credential pair"),
-
+    (
+        re.compile(
+            r'(?:credential|cred|login|logon|username/password|user/pass)\s*[:=]\s*["\']?(\S+\s*[:/]\s*\S+)["\']?',
+            re.IGNORECASE,
+        ),
+        "credential_pair",
+        "credential pair",
+    ),
     # Windows domain\user patterns
-    (re.compile(r"\b[A-Z][A-Z0-9_-]{1,15}\\[a-zA-Z0-9._-]+\b"),
-     "domain_user", "domain\\user"),
-
+    (re.compile(r"\b[A-Z][A-Z0-9_-]{1,15}\\[a-zA-Z0-9._-]+\b"), "domain_user", "domain\\user"),
     # File paths that may reveal internal structure
-    (re.compile(r"(?:/(?:home|opt|var|etc|usr|root)/[^\s]{3,}|[A-Z]:\\[^\s]{3,})"),
-     "file_path", "file path"),
+    (
+        re.compile(r"(?:/(?:home|opt|var|etc|usr|root)/[^\s]{3,}|[A-Z]:\\[^\s]{3,})"),
+        "file_path",
+        "file path",
+    ),
 ]
 
 

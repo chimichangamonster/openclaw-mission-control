@@ -39,6 +39,7 @@ _OPERATOR_DEP = Depends(require_org_role("operator"))
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _resolve_cron_file(org_ctx: OrganizationContext) -> Path:
     """Resolve the cron jobs.json path for the current org.
 
@@ -90,8 +91,12 @@ def _normalize_job(j: dict) -> dict:
         "timeout_seconds": payload.get("timeoutSeconds", 0),
         "session_target": j.get("sessionTarget", ""),
         "announce": delivery.get("mode") == "announce",
-        "next_run": datetime.fromtimestamp(next_run_ms / 1000, tz=UTC).isoformat() if next_run_ms else None,
-        "last_run": datetime.fromtimestamp(last_run_ms / 1000, tz=UTC).isoformat() if last_run_ms else None,
+        "next_run": (
+            datetime.fromtimestamp(next_run_ms / 1000, tz=UTC).isoformat() if next_run_ms else None
+        ),
+        "last_run": (
+            datetime.fromtimestamp(last_run_ms / 1000, tz=UTC).isoformat() if last_run_ms else None
+        ),
         "last_status": state.get("lastRunStatus", None),
         "created_at": datetime.fromtimestamp(j.get("createdAtMs", 0) / 1000, tz=UTC).isoformat(),
     }
@@ -211,6 +216,7 @@ def _build_update_params(job_id: str, payload: CronJobUpdate) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
+
 
 @router.get("")
 async def list_cron_jobs(

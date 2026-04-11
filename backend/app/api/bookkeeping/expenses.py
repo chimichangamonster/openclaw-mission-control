@@ -96,7 +96,12 @@ async def expense_summary(org_ctx: OrganizationContext = ORG_ACTOR_DEP):
             select(BkExpense).where(BkExpense.organization_id == org_ctx.organization.id)
         )
         expenses = [
-            {"amount": e.amount, "gst_amount": e.gst_amount, "category": e.category, "job_id": str(e.job_id) if e.job_id else None}
+            {
+                "amount": e.amount,
+                "gst_amount": e.gst_amount,
+                "category": e.category,
+                "job_id": str(e.job_id) if e.job_id else None,
+            }
             for e in result.scalars().all()
         ]
         return generate_expense_summary(expenses)
@@ -106,7 +111,9 @@ async def expense_summary(org_ctx: OrganizationContext = ORG_ACTOR_DEP):
 async def get_expense(expense_id: str, org_ctx: OrganizationContext = ORG_ACTOR_DEP):
     async with async_session_maker() as session:
         result = await session.execute(
-            select(BkExpense).where(BkExpense.id == expense_id, BkExpense.organization_id == org_ctx.organization.id)
+            select(BkExpense).where(
+                BkExpense.id == expense_id, BkExpense.organization_id == org_ctx.organization.id
+            )
         )
         expense = result.scalars().first()
         if not expense:
@@ -115,10 +122,14 @@ async def get_expense(expense_id: str, org_ctx: OrganizationContext = ORG_ACTOR_
 
 
 @router.put("/{expense_id}")
-async def update_expense(expense_id: str, payload: ExpenseUpdate, org_ctx: OrganizationContext = ORG_ACTOR_DEP):
+async def update_expense(
+    expense_id: str, payload: ExpenseUpdate, org_ctx: OrganizationContext = ORG_ACTOR_DEP
+):
     async with async_session_maker() as session:
         result = await session.execute(
-            select(BkExpense).where(BkExpense.id == expense_id, BkExpense.organization_id == org_ctx.organization.id)
+            select(BkExpense).where(
+                BkExpense.id == expense_id, BkExpense.organization_id == org_ctx.organization.id
+            )
         )
         expense = result.scalars().first()
         if not expense:
@@ -141,8 +152,9 @@ async def upload_receipt(
 ):
     """Upload a receipt image → OCR extraction → auto-categorize → create expense."""
     import json as json_mod
-    from app.services.bookkeeping_ocr import process_receipt
+
     from app.services.bookkeeping_categorization import categorize_expense
+    from app.services.bookkeeping_ocr import process_receipt
 
     image_bytes = await file.read()
     if len(image_bytes) > 10 * 1024 * 1024:

@@ -18,9 +18,7 @@ class PolymarketWallet(TenantScoped, table=True):
     """Encrypted Polymarket wallet and API credentials for an organization."""
 
     __tablename__ = "polymarket_wallets"  # pyright: ignore[reportAssignmentType]
-    __table_args__ = (
-        UniqueConstraint("organization_id", name="uq_polymarket_wallets_org"),
-    )
+    __table_args__ = (UniqueConstraint("organization_id", name="uq_polymarket_wallets_org"),)
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     organization_id: UUID = Field(foreign_key="organizations.id", index=True)

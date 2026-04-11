@@ -54,10 +54,12 @@ async def initiate_oauth(
 ) -> dict[str, str]:
     """Generate the OAuth2 authorization URL for Google Calendar."""
     state = secrets.token_urlsafe(32)
-    state_payload = json.dumps({
-        "user_id": str(ctx.member.user_id),
-        "organization_id": str(ctx.organization.id),
-    })
+    state_payload = json.dumps(
+        {
+            "user_id": str(ctx.member.user_id),
+            "organization_id": str(ctx.organization.id),
+        }
+    )
     client = _redis_client()
     client.setex(f"gcal_oauth_state:{state}", _STATE_TTL_SECONDS, state_payload)
 
@@ -80,7 +82,9 @@ async def oauth_callback(
     client = _redis_client()
     raw_state = client.get(f"gcal_oauth_state:{state}")
     if raw_state is None:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired OAuth state.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired OAuth state."
+        )
     client.delete(f"gcal_oauth_state:{state}")
 
     state_data = json.loads(raw_state if isinstance(raw_state, str) else raw_state.decode())
@@ -130,7 +134,8 @@ async def oauth_callback(
 
     logger.info(
         "google_calendar.oauth.connected email=%s org_id=%s",
-        result.email_address, organization_id,
+        result.email_address,
+        organization_id,
     )
     return RedirectResponse(url="/org-settings?gcal_connected=true")
 
@@ -170,7 +175,9 @@ async def connection_status(
         "display_name": connections[0].display_name,
         "default_calendar_id": connections[0].default_calendar_id,
         "scopes": connections[0].scopes,
-        "connected_at": connections[0].created_at.isoformat() if connections[0].created_at else None,
+        "connected_at": (
+            connections[0].created_at.isoformat() if connections[0].created_at else None
+        ),
     }
 
 
@@ -181,16 +188,23 @@ async def disconnect(
     connection_id: str = Query(default="", description="Specific connection to disconnect"),
 ) -> dict[str, bool]:
     """Deactivate a Google Calendar connection."""
-    conn = await _get_connection(session, ctx.organization.id, ctx=ctx, connection_id=connection_id or None)
+    conn = await _get_connection(
+        session, ctx.organization.id, ctx=ctx, connection_id=connection_id or None
+    )
     if conn:
         # Only owner of connection or admin can disconnect
         if conn.user_id != ctx.member.user_id and not is_org_admin(ctx.member):
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the connection owner or admin can disconnect.")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only the connection owner or admin can disconnect.",
+            )
         conn.is_active = False
         conn.updated_at = utcnow()
         session.add(conn)
         await session.commit()
-        logger.info("google_calendar.disconnected org_id=%s conn_id=%s", ctx.organization.id, conn.id)
+        logger.info(
+            "google_calendar.disconnected org_id=%s conn_id=%s", ctx.organization.id, conn.id
+        )
     return {"ok": True}
 
 
@@ -198,7 +212,11 @@ class CalendarConnectionUpdate(BaseModel):
     visibility: str = Field(..., description="'shared' or 'private'")
 
 
-@router.patch("/connections/{connection_id}", summary="Update calendar connection visibility", dependencies=_AUTH_DEPS)
+@router.patch(
+    "/connections/{connection_id}",
+    summary="Update calendar connection visibility",
+    dependencies=_AUTH_DEPS,
+)
 async def update_connection(
     connection_id: str,
     body: CalendarConnectionUpdate,
@@ -207,10 +225,18 @@ async def update_connection(
 ) -> dict[str, Any]:
     """Update calendar connection settings (visibility)."""
     if body.visibility not in ("shared", "private"):
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="visibility must be 'shared' or 'private'")
-    conn = await _get_connection(session, ctx.organization.id, require=True, connection_id=connection_id, ctx=ctx)
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="visibility must be 'shared' or 'private'",
+        )
+    conn = await _get_connection(
+        session, ctx.organization.id, require=True, connection_id=connection_id, ctx=ctx
+    )
     if conn.user_id != ctx.member.user_id and not is_org_admin(ctx.member):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the connection owner or admin can change visibility.")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the connection owner or admin can change visibility.",
+        )
     conn.visibility = body.visibility
     conn.updated_at = utcnow()
     session.add(conn)
@@ -276,7 +302,9 @@ async def list_events(
     """List events from a calendar."""
     from app.services.google.calendar import list_events as gcal_list_events
 
-    conn = await _get_connection(session, ctx.organization.id, require=True, connection_id=connection_id or None, ctx=ctx)
+    conn = await _get_connection(
+        session, ctx.organization.id, require=True, connection_id=connection_id or None, ctx=ctx
+    )
     token = await get_valid_google_token(session, conn)
     await session.commit()
 
@@ -285,8 +313,10 @@ async def list_events(
     t_max = datetime.fromisoformat(time_max) if time_max else None
 
     events = await gcal_list_events(
-        token, cal_id,
-        time_min=t_min, time_max=t_max,
+        token,
+        cal_id,
+        time_min=t_min,
+        time_max=t_max,
         max_results=max_results,
         q=q or None,
     )
@@ -305,7 +335,9 @@ class CreateEventRequest(BaseModel):
     time_zone: str = "America/Edmonton"
 
 
-@router.post("/events", status_code=status.HTTP_201_CREATED, summary="Create event", dependencies=_AUTH_DEPS)
+@router.post(
+    "/events", status_code=status.HTTP_201_CREATED, summary="Create event", dependencies=_AUTH_DEPS
+)
 async def create_event(
     body: CreateEventRequest,
     ctx: OrganizationContext = ORG_MEMBER_DEP,
@@ -314,13 +346,20 @@ async def create_event(
     """Create a calendar event."""
     from app.services.google.calendar import create_event as gcal_create
 
-    conn = await _get_connection(session, ctx.organization.id, require=True, connection_id=body.connection_id or None, ctx=ctx)
+    conn = await _get_connection(
+        session,
+        ctx.organization.id,
+        require=True,
+        connection_id=body.connection_id or None,
+        ctx=ctx,
+    )
     token = await get_valid_google_token(session, conn)
     await session.commit()
 
     cal_id = body.calendar_id or conn.default_calendar_id
     event = await gcal_create(
-        token, cal_id,
+        token,
+        cal_id,
         summary=body.summary,
         start=body.start,
         end=body.end,
@@ -353,13 +392,17 @@ async def update_event(
     """Update an existing calendar event."""
     from app.services.google.calendar import update_event as gcal_update
 
-    conn = await _get_connection(session, ctx.organization.id, require=True, connection_id=connection_id or None, ctx=ctx)
+    conn = await _get_connection(
+        session, ctx.organization.id, require=True, connection_id=connection_id or None, ctx=ctx
+    )
     token = await get_valid_google_token(session, conn)
     await session.commit()
 
     cal_id = calendar_id or conn.default_calendar_id
     event = await gcal_update(
-        token, cal_id, event_id,
+        token,
+        cal_id,
+        event_id,
         summary=body.summary,
         start=body.start,
         end=body.end,
@@ -370,7 +413,12 @@ async def update_event(
     return event
 
 
-@router.delete("/events/{event_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete event", dependencies=_AUTH_DEPS)
+@router.delete(
+    "/events/{event_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete event",
+    dependencies=_AUTH_DEPS,
+)
 async def delete_event(
     event_id: str,
     ctx: OrganizationContext = ORG_MEMBER_DEP,
@@ -381,7 +429,9 @@ async def delete_event(
     """Delete a calendar event."""
     from app.services.google.calendar import delete_event as gcal_delete
 
-    conn = await _get_connection(session, ctx.organization.id, require=True, connection_id=connection_id or None, ctx=ctx)
+    conn = await _get_connection(
+        session, ctx.organization.id, require=True, connection_id=connection_id or None, ctx=ctx
+    )
     token = await get_valid_google_token(session, conn)
     await session.commit()
 
@@ -411,12 +461,21 @@ async def _get_connection(
         conn = await session.get(GoogleCalendarConnection, _UUID(connection_id))
         if conn is None or conn.organization_id != org_id or not conn.is_active:
             if require:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Calendar connection not found.")
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND, detail="Calendar connection not found."
+                )
             return None
         # Visibility check
-        if ctx and conn.visibility == "private" and conn.user_id != ctx.member.user_id and not is_org_admin(ctx.member):
+        if (
+            ctx
+            and conn.visibility == "private"
+            and conn.user_id != ctx.member.user_id
+            and not is_org_admin(ctx.member)
+        ):
             if require:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Calendar connection not found.")
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND, detail="Calendar connection not found."
+                )
             return None
         return conn
 

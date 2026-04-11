@@ -22,9 +22,15 @@ class GeneratedDocument(QueryModel, table=True):
     relative_path: str = Field(description="Path relative to gateway workspace root")
     file_size: int = Field(default=0)
     mime_type: str = Field(default="application/pdf")
-    doc_type: str = Field(default="other", index=True, description="proposal, report, security-assessment, invoice, other")
+    doc_type: str = Field(
+        default="other",
+        index=True,
+        description="proposal, report, security-assessment, invoice, other",
+    )
     mode: str = Field(default="simple", description="simple, complex, complex_rehydrated")
-    engine: str = Field(default="reportlab", description="reportlab, adobe_pdf_services, html_fallback")
+    engine: str = Field(
+        default="reportlab", description="reportlab, adobe_pdf_services, html_fallback"
+    )
     title: str = Field(default="")
     onedrive_url: str | None = Field(default=None)
     onedrive_edit_url: str | None = Field(default=None)

@@ -32,7 +32,9 @@ OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 class LLMEndpoint:
     """Resolved LLM endpoint for an organization."""
 
-    api_url: str  # Base URL (e.g., "https://openrouter.ai/api/v1" or "https://llm.corp.internal/v1")
+    api_url: (
+        str  # Base URL (e.g., "https://openrouter.ai/api/v1" or "https://llm.corp.internal/v1")
+    )
     api_key: str  # API key for authentication
     source: str  # "custom", "byok_openrouter", "platform_openrouter"
     name: str  # Human-readable name
@@ -151,7 +153,9 @@ async def check_endpoint_health(
                 result["models"] = [
                     m.get("id", m.get("name", str(m)))
                     for m in (models if isinstance(models, list) else [])
-                ][:20]  # cap at 20
+                ][
+                    :20
+                ]  # cap at 20
 
             # 2. Simple inference test
             import time

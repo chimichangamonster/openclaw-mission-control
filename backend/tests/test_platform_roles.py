@@ -13,7 +13,6 @@ from app.core.platform_auth import (
     check_operator_data_access,
 )
 
-
 # ---------------------------------------------------------------------------
 # Role constants
 # ---------------------------------------------------------------------------
@@ -141,6 +140,6 @@ class TestRoleHierarchy:
             "feature_flags",
         }
         for category in infra_categories:
-            assert category not in OPERATOR_RESTRICTED_DATA, (
-                f"{category} should NOT be restricted — operators need infrastructure access"
-            )
+            assert (
+                category not in OPERATOR_RESTRICTED_DATA
+            ), f"{category} should NOT be restricted — operators need infrastructure access"

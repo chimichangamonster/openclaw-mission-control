@@ -69,7 +69,12 @@ async def get_template_detail(template_id: str, org_ctx: OrganizationContext = O
             for cat, items in template.default_config.items()
         },
         "onboarding_steps": [
-            {"key": s.key, "label": s.label, "description": s.description, "sort_order": s.sort_order}
+            {
+                "key": s.key,
+                "label": s.label,
+                "description": s.description,
+                "sort_order": s.sort_order,
+            }
             for s in template.onboarding_steps
         ],
     }
@@ -106,7 +111,9 @@ async def apply_template(
         )
         settings = result.scalars().first()
         if not settings:
-            settings = OrganizationSettings(id=uuid4(), organization_id=org_id, created_at=utcnow(), updated_at=utcnow())
+            settings = OrganizationSettings(
+                id=uuid4(), organization_id=org_id, created_at=utcnow(), updated_at=utcnow()
+            )
             session.add(settings)
 
         # Merge flags (template flags override, but don't disable existing enabled flags)
@@ -133,17 +140,19 @@ async def apply_template(
                 )
                 if existing.scalars().first():
                     continue
-                session.add(OrgConfigData(
-                    id=uuid4(),
-                    organization_id=org_id,
-                    category=category,
-                    key=item.key,
-                    label=item.label,
-                    value_json=json.dumps(item.value),
-                    sort_order=items.index(item),
-                    created_at=utcnow(),
-                    updated_at=utcnow(),
-                ))
+                session.add(
+                    OrgConfigData(
+                        id=uuid4(),
+                        organization_id=org_id,
+                        category=category,
+                        key=item.key,
+                        label=item.label,
+                        value_json=json.dumps(item.value),
+                        sort_order=items.index(item),
+                        created_at=utcnow(),
+                        updated_at=utcnow(),
+                    )
+                )
                 config_created += 1
 
         # 3. Create onboarding steps (replace existing for this template)
@@ -154,34 +163,47 @@ async def apply_template(
             )
         )
         # Delete old steps for this template if re-applying
-        old_steps = (await session.execute(
-            select(OrgOnboardingStep).where(
-                OrgOnboardingStep.organization_id == org_id,
-                OrgOnboardingStep.template_id == template_id,
+        old_steps = (
+            (
+                await session.execute(
+                    select(OrgOnboardingStep).where(
+                        OrgOnboardingStep.organization_id == org_id,
+                        OrgOnboardingStep.template_id == template_id,
+                    )
+                )
             )
-        )).scalars().all()
+            .scalars()
+            .all()
+        )
         for old in old_steps:
             await session.delete(old)
 
         for step in template.onboarding_steps:
-            session.add(OrgOnboardingStep(
-                id=uuid4(),
-                organization_id=org_id,
-                template_id=template_id,
-                step_key=step.key,
-                label=step.label,
-                description=step.description,
-                sort_order=step.sort_order,
-                created_at=utcnow(),
-            ))
+            session.add(
+                OrgOnboardingStep(
+                    id=uuid4(),
+                    organization_id=org_id,
+                    template_id=template_id,
+                    step_key=step.key,
+                    label=step.label,
+                    description=step.description,
+                    sort_order=step.sort_order,
+                    created_at=utcnow(),
+                )
+            )
 
         await session.commit()
 
     await log_audit(
-        org_id, "template.applied",
+        org_id,
+        "template.applied",
         user_id=org_ctx.member.user_id,
         resource_type="industry_template",
-        details={"template_id": template_id, "config_items_created": config_created, "excluded_categories": list(excluded) if excluded else []},
+        details={
+            "template_id": template_id,
+            "config_items_created": config_created,
+            "excluded_categories": list(excluded) if excluded else [],
+        },
     )
 
     return {

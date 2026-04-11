@@ -45,63 +45,124 @@ async def _seed(session: AsyncSession) -> dict:
     org = Organization(id=ORG_ID, name="Waste Gurus", slug="waste-gurus")
     session.add(org)
 
-    henry = User(id=HENRY_USER_ID, clerk_user_id="clerk_henry", email="henry@wastegurus.ca", name="Henry Chin")
-    samir = User(id=SAMIR_USER_ID, clerk_user_id="clerk_samir", email="samir@wastegurus.ca", name="Samir Khan")
+    henry = User(
+        id=HENRY_USER_ID,
+        clerk_user_id="clerk_henry",
+        email="henry@wastegurus.ca",
+        name="Henry Chin",
+    )
+    samir = User(
+        id=SAMIR_USER_ID,
+        clerk_user_id="clerk_samir",
+        email="samir@wastegurus.ca",
+        name="Samir Khan",
+    )
     session.add_all([henry, samir])
 
-    henry_member = OrganizationMember(id=uuid4(), organization_id=ORG_ID, user_id=HENRY_USER_ID, role="owner")
-    samir_member = OrganizationMember(id=uuid4(), organization_id=ORG_ID, user_id=SAMIR_USER_ID, role="member")
+    henry_member = OrganizationMember(
+        id=uuid4(), organization_id=ORG_ID, user_id=HENRY_USER_ID, role="owner"
+    )
+    samir_member = OrganizationMember(
+        id=uuid4(), organization_id=ORG_ID, user_id=SAMIR_USER_ID, role="member"
+    )
     session.add_all([henry_member, samir_member])
 
     # Manual contacts
     client_contact = OrgContact(
-        id=uuid4(), organization_id=ORG_ID, created_by_user_id=HENRY_USER_ID,
-        email="bob@client.com", name="Bob Builder", company="BuildCo", role="client",
-        source="manual", created_at=utcnow(), updated_at=utcnow(),
+        id=uuid4(),
+        organization_id=ORG_ID,
+        created_by_user_id=HENRY_USER_ID,
+        email="bob@client.com",
+        name="Bob Builder",
+        company="BuildCo",
+        role="client",
+        source="manual",
+        created_at=utcnow(),
+        updated_at=utcnow(),
     )
     supplier_contact = OrgContact(
-        id=uuid4(), organization_id=ORG_ID, created_by_user_id=HENRY_USER_ID,
-        email="alice@supplies.com", name="Alice Supply", company="Supplies Inc", role="supplier",
-        source="manual", created_at=utcnow(), updated_at=utcnow(),
+        id=uuid4(),
+        organization_id=ORG_ID,
+        created_by_user_id=HENRY_USER_ID,
+        email="alice@supplies.com",
+        name="Alice Supply",
+        company="Supplies Inc",
+        role="supplier",
+        source="manual",
+        created_at=utcnow(),
+        updated_at=utcnow(),
     )
     session.add_all([client_contact, supplier_contact])
 
     # Email account + messages (for email-derived contacts)
     email_account = EmailAccount(
-        id=uuid4(), organization_id=ORG_ID, user_id=HENRY_USER_ID,
-        provider="microsoft", email_address="henry@wastegurus.ca",
-        visibility="shared", sync_enabled=True,
+        id=uuid4(),
+        organization_id=ORG_ID,
+        user_id=HENRY_USER_ID,
+        provider="microsoft",
+        email_address="henry@wastegurus.ca",
+        visibility="shared",
+        sync_enabled=True,
     )
     session.add(email_account)
 
     msg1 = EmailMessage(
-        id=uuid4(), organization_id=ORG_ID, email_account_id=email_account.id,
-        provider_message_id="msg-1", subject="Quote request",
-        sender_email="dave@contractor.com", sender_name="Dave Contractor",
-        body_text="Hi", received_at=utcnow(), folder="inbox",
-        triage_status="pending", is_read=False, is_starred=False, has_attachments=False,
+        id=uuid4(),
+        organization_id=ORG_ID,
+        email_account_id=email_account.id,
+        provider_message_id="msg-1",
+        subject="Quote request",
+        sender_email="dave@contractor.com",
+        sender_name="Dave Contractor",
+        body_text="Hi",
+        received_at=utcnow(),
+        folder="inbox",
+        triage_status="pending",
+        is_read=False,
+        is_starred=False,
+        has_attachments=False,
     )
     msg2 = EmailMessage(
-        id=uuid4(), organization_id=ORG_ID, email_account_id=email_account.id,
-        provider_message_id="msg-2", subject="Follow up",
-        sender_email="dave@contractor.com", sender_name="Dave Contractor",
-        body_text="Following up", received_at=utcnow(), folder="inbox",
-        triage_status="pending", is_read=False, is_starred=False, has_attachments=False,
+        id=uuid4(),
+        organization_id=ORG_ID,
+        email_account_id=email_account.id,
+        provider_message_id="msg-2",
+        subject="Follow up",
+        sender_email="dave@contractor.com",
+        sender_name="Dave Contractor",
+        body_text="Following up",
+        received_at=utcnow(),
+        folder="inbox",
+        triage_status="pending",
+        is_read=False,
+        is_starred=False,
+        has_attachments=False,
     )
     msg3 = EmailMessage(
-        id=uuid4(), organization_id=ORG_ID, email_account_id=email_account.id,
-        provider_message_id="msg-3", subject="Invoice",
-        sender_email="eve@vendor.com", sender_name="Eve Vendor",
-        body_text="Invoice attached", received_at=utcnow(), folder="inbox",
-        triage_status="pending", is_read=False, is_starred=False, has_attachments=False,
+        id=uuid4(),
+        organization_id=ORG_ID,
+        email_account_id=email_account.id,
+        provider_message_id="msg-3",
+        subject="Invoice",
+        sender_email="eve@vendor.com",
+        sender_name="Eve Vendor",
+        body_text="Invoice attached",
+        received_at=utcnow(),
+        folder="inbox",
+        triage_status="pending",
+        is_read=False,
+        is_starred=False,
+        has_attachments=False,
     )
     session.add_all([msg1, msg2, msg3])
 
     await session.commit()
     return {
         "org": org,
-        "henry": henry, "samir": samir,
-        "client_contact": client_contact, "supplier_contact": supplier_contact,
+        "henry": henry,
+        "samir": samir,
+        "client_contact": client_contact,
+        "supplier_contact": supplier_contact,
         "email_account": email_account,
     }
 
@@ -115,7 +176,9 @@ async def _seed(session: AsyncSession) -> dict:
 async def test_contact_defaults():
     """OrgContact defaults are correct."""
     contact = OrgContact(
-        id=uuid4(), organization_id=ORG_ID, email="test@example.com",
+        id=uuid4(),
+        organization_id=ORG_ID,
+        email="test@example.com",
     )
     assert contact.source == "manual"
     assert contact.name == ""
@@ -129,12 +192,18 @@ async def test_contact_unique_email_per_org():
     async with maker() as session:
         now = utcnow()
         c1 = OrgContact(
-            id=uuid4(), organization_id=ORG_ID, email="dupe@test.com",
-            created_at=now, updated_at=now,
+            id=uuid4(),
+            organization_id=ORG_ID,
+            email="dupe@test.com",
+            created_at=now,
+            updated_at=now,
         )
         c2 = OrgContact(
-            id=uuid4(), organization_id=ORG_ID, email="dupe@test.com",
-            created_at=now, updated_at=now,
+            id=uuid4(),
+            organization_id=ORG_ID,
+            email="dupe@test.com",
+            created_at=now,
+            updated_at=now,
         )
         session.add(c1)
         await session.commit()
@@ -308,18 +377,31 @@ async def test_private_email_contacts_excluded():
 
         # Add a private email account with a message
         private_account = EmailAccount(
-            id=uuid4(), organization_id=ORG_ID, user_id=SAMIR_USER_ID,
-            provider="microsoft", email_address="samir@wastegurus.ca",
-            visibility="private", sync_enabled=True,
+            id=uuid4(),
+            organization_id=ORG_ID,
+            user_id=SAMIR_USER_ID,
+            provider="microsoft",
+            email_address="samir@wastegurus.ca",
+            visibility="private",
+            sync_enabled=True,
         )
         session.add(private_account)
 
         private_msg = EmailMessage(
-            id=uuid4(), organization_id=ORG_ID, email_account_id=private_account.id,
-            provider_message_id="msg-private", subject="Personal",
-            sender_email="secret@personal.com", sender_name="Secret Person",
-            body_text="Private", received_at=utcnow(), folder="inbox",
-            triage_status="pending", is_read=False, is_starred=False, has_attachments=False,
+            id=uuid4(),
+            organization_id=ORG_ID,
+            email_account_id=private_account.id,
+            provider_message_id="msg-private",
+            subject="Personal",
+            sender_email="secret@personal.com",
+            sender_name="Secret Person",
+            body_text="Private",
+            received_at=utcnow(),
+            folder="inbox",
+            triage_status="pending",
+            is_read=False,
+            is_starred=False,
+            has_attachments=False,
         )
         session.add(private_msg)
         await session.commit()

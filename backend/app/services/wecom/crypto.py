@@ -90,9 +90,7 @@ def decrypt_message(encoding_aes_key: str, encrypted_msg: str, corp_id: str) -> 
     extracted_corp_id = plaintext[20 + msg_length :].decode("utf-8")
 
     if extracted_corp_id != corp_id:
-        raise WeComCryptoError(
-            f"Corp ID mismatch: expected {corp_id}, got {extracted_corp_id}"
-        )
+        raise WeComCryptoError(f"Corp ID mismatch: expected {corp_id}, got {extracted_corp_id}")
 
     return msg
 

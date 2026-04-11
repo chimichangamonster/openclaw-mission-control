@@ -31,7 +31,9 @@ class TransactionCreate(BaseModel):
 
 
 @router.post("", status_code=201)
-async def create_transaction(payload: TransactionCreate, org_ctx: OrganizationContext = ORG_ACTOR_DEP):
+async def create_transaction(
+    payload: TransactionCreate, org_ctx: OrganizationContext = ORG_ACTOR_DEP
+):
     if payload.type not in ("income", "expense"):
         raise HTTPException(status_code=400, detail="type must be 'income' or 'expense'")
     async with async_session_maker() as session:

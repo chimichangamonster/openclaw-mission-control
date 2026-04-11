@@ -69,13 +69,16 @@ async def test_app():
 
     # Override dependencies
     member = OrganizationMember(
-        id=uuid4(), organization_id=ORG_ID, user_id=USER_ID, role="owner",
+        id=uuid4(),
+        organization_id=ORG_ID,
+        user_id=USER_ID,
+        role="owner",
     )
     org_ctx = OrganizationContext(organization=org, member=member)
 
     admin_dep = require_org_role("admin")
 
-    from fastapi import FastAPI, APIRouter
+    from fastapi import APIRouter, FastAPI
 
     @asynccontextmanager
     async def noop_lifespan(app):
@@ -183,14 +186,13 @@ async def test_apply_construction_template(test_app):
     assert data["onboarding_steps"] > 0
 
     # Verify feature flags were merged in DB
-    from app.models.organization_settings import OrganizationSettings
     from sqlmodel import select
+
+    from app.models.organization_settings import OrganizationSettings
 
     async with session_maker() as session:
         result = await session.execute(
-            select(OrganizationSettings).where(
-                OrganizationSettings.organization_id == ORG_ID
-            )
+            select(OrganizationSettings).where(OrganizationSettings.organization_id == ORG_ID)
         )
         settings = result.scalars().first()
         assert settings is not None
@@ -219,9 +221,7 @@ async def test_apply_construction_template(test_app):
 
     async with session_maker() as session:
         result = await session.execute(
-            select(OrgOnboardingStep).where(
-                OrgOnboardingStep.organization_id == ORG_ID
-            )
+            select(OrgOnboardingStep).where(OrgOnboardingStep.organization_id == ORG_ID)
         )
         steps = result.scalars().all()
         assert len(steps) > 0
@@ -250,8 +250,9 @@ async def test_apply_template_idempotent(test_app):
     assert resp2.json()["config_items_created"] == 0
 
     # Verify no duplicate config items
-    from app.models.org_config import OrgConfigData
     from sqlmodel import select
+
+    from app.models.org_config import OrgConfigData
 
     async with session_maker() as session:
         result = await session.execute(
@@ -268,14 +269,13 @@ async def test_apply_template_merges_flags_without_disabling(test_app):
     app, session_maker = test_app
 
     # Pre-enable a flag that construction template doesn't set
-    from app.models.organization_settings import OrganizationSettings
     from sqlmodel import select
+
+    from app.models.organization_settings import OrganizationSettings
 
     async with session_maker() as session:
         result = await session.execute(
-            select(OrganizationSettings).where(
-                OrganizationSettings.organization_id == ORG_ID
-            )
+            select(OrganizationSettings).where(OrganizationSettings.organization_id == ORG_ID)
         )
         settings = result.scalars().first()
         settings.feature_flags_json = json.dumps({"email": True, "paper_trading": True})
@@ -287,9 +287,7 @@ async def test_apply_template_merges_flags_without_disabling(test_app):
 
     async with session_maker() as session:
         result = await session.execute(
-            select(OrganizationSettings).where(
-                OrganizationSettings.organization_id == ORG_ID
-            )
+            select(OrganizationSettings).where(OrganizationSettings.organization_id == ORG_ID)
         )
         settings = result.scalars().first()
         flags = settings.feature_flags
@@ -380,9 +378,7 @@ async def test_complete_all_steps_reaches_100(test_app):
 
         # Complete all steps
         for step in steps:
-            resp = await c.patch(
-                f"/api/v1/industry-templates/onboarding/{step['step_key']}"
-            )
+            resp = await c.patch(f"/api/v1/industry-templates/onboarding/{step['step_key']}")
             assert resp.status_code == 200
 
         # Check 100% progress
@@ -418,14 +414,13 @@ async def test_apply_different_template(test_app):
     assert len(data["steps"]) > 0
 
     # Verify settings updated to latest template
-    from app.models.organization_settings import OrganizationSettings
     from sqlmodel import select
+
+    from app.models.organization_settings import OrganizationSettings
 
     async with session_maker() as session:
         result = await session.execute(
-            select(OrganizationSettings).where(
-                OrganizationSettings.organization_id == ORG_ID
-            )
+            select(OrganizationSettings).where(OrganizationSettings.organization_id == ORG_ID)
         )
         settings = result.scalars().first()
         assert settings.industry_template_id == "waste_management"

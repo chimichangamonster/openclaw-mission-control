@@ -8,7 +8,13 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 
-from app.api.deps import ORG_MEMBER_DEP, ORG_RATE_LIMIT_DEP, SESSION_DEP, require_feature, require_org_admin
+from app.api.deps import (
+    ORG_MEMBER_DEP,
+    ORG_RATE_LIMIT_DEP,
+    SESSION_DEP,
+    require_feature,
+    require_org_admin,
+)
 from app.core.logging import get_logger
 from app.core.time import utcnow
 from app.models.polymarket_positions import PolymarketPosition
@@ -77,9 +83,7 @@ async def get_wallet(
     session: AsyncSession = SESSION_DEP,
 ) -> PolymarketWallet | None:
     """Get wallet status (no secrets exposed)."""
-    stmt = select(PolymarketWallet).where(
-        PolymarketWallet.organization_id == ctx.organization.id
-    )
+    stmt = select(PolymarketWallet).where(PolymarketWallet.organization_id == ctx.organization.id)
     return (await session.execute(stmt)).scalar_one_or_none()
 
 
@@ -89,9 +93,7 @@ async def disconnect_wallet(
     session: AsyncSession = SESSION_DEP,
 ) -> None:
     """Remove the Polymarket wallet."""
-    stmt = select(PolymarketWallet).where(
-        PolymarketWallet.organization_id == ctx.organization.id
-    )
+    stmt = select(PolymarketWallet).where(PolymarketWallet.organization_id == ctx.organization.id)
     wallet = (await session.execute(stmt)).scalar_one_or_none()
     if wallet:
         await session.delete(wallet)
@@ -104,9 +106,7 @@ async def re_derive_credentials(
     session: AsyncSession = SESSION_DEP,
 ) -> PolymarketWallet:
     """Re-derive Polymarket API credentials from stored private key."""
-    stmt = select(PolymarketWallet).where(
-        PolymarketWallet.organization_id == ctx.organization.id
-    )
+    stmt = select(PolymarketWallet).where(PolymarketWallet.organization_id == ctx.organization.id)
     wallet = (await session.execute(stmt)).scalar_one_or_none()
     if wallet is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No wallet configured.")

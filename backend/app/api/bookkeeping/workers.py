@@ -8,12 +8,12 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlmodel import select, col
+from sqlmodel import col, select
 
 from app.api.deps import ORG_ACTOR_DEP
 from app.core.time import utcnow
 from app.db.session import async_session_maker
-from app.models.bookkeeping import BkWorker, BkPlacement
+from app.models.bookkeeping import BkPlacement, BkWorker
 from app.services.organizations import OrganizationContext
 
 router = APIRouter(prefix="/workers")
@@ -109,7 +109,9 @@ async def available_workers(org_ctx: OrganizationContext = ORG_ACTOR_DEP):
 
 
 @router.get("/expiring-certs")
-async def expiring_certs(days: int = Query(default=30), org_ctx: OrganizationContext = ORG_ACTOR_DEP):
+async def expiring_certs(
+    days: int = Query(default=30), org_ctx: OrganizationContext = ORG_ACTOR_DEP
+):
     cutoff = date.today() + timedelta(days=days)
     async with async_session_maker() as session:
         stmt = (
@@ -133,7 +135,9 @@ async def expiring_certs(days: int = Query(default=30), org_ctx: OrganizationCon
 async def get_worker(worker_id: str, org_ctx: OrganizationContext = ORG_ACTOR_DEP):
     async with async_session_maker() as session:
         result = await session.execute(
-            select(BkWorker).where(BkWorker.id == worker_id, BkWorker.organization_id == org_ctx.organization.id)
+            select(BkWorker).where(
+                BkWorker.id == worker_id, BkWorker.organization_id == org_ctx.organization.id
+            )
         )
         worker = result.scalars().first()
         if not worker:
@@ -142,10 +146,14 @@ async def get_worker(worker_id: str, org_ctx: OrganizationContext = ORG_ACTOR_DE
 
 
 @router.put("/{worker_id}")
-async def update_worker(worker_id: str, payload: WorkerUpdate, org_ctx: OrganizationContext = ORG_ACTOR_DEP):
+async def update_worker(
+    worker_id: str, payload: WorkerUpdate, org_ctx: OrganizationContext = ORG_ACTOR_DEP
+):
     async with async_session_maker() as session:
         result = await session.execute(
-            select(BkWorker).where(BkWorker.id == worker_id, BkWorker.organization_id == org_ctx.organization.id)
+            select(BkWorker).where(
+                BkWorker.id == worker_id, BkWorker.organization_id == org_ctx.organization.id
+            )
         )
         worker = result.scalars().first()
         if not worker:

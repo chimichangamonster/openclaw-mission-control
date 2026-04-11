@@ -47,7 +47,9 @@ async def create_placement(payload: PlacementCreate, org_ctx: OrganizationContex
 
         # Auto-set worker status to "placed"
         worker_result = await session.execute(
-            select(BkWorker).where(BkWorker.id == payload.worker_id, BkWorker.organization_id == org_id)
+            select(BkWorker).where(
+                BkWorker.id == payload.worker_id, BkWorker.organization_id == org_id
+            )
         )
         worker = worker_result.scalars().first()
         if worker:
@@ -83,7 +85,10 @@ async def list_placements(
 async def get_placement(placement_id: str, org_ctx: OrganizationContext = ORG_ACTOR_DEP):
     async with async_session_maker() as session:
         result = await session.execute(
-            select(BkPlacement).where(BkPlacement.id == placement_id, BkPlacement.organization_id == org_ctx.organization.id)
+            select(BkPlacement).where(
+                BkPlacement.id == placement_id,
+                BkPlacement.organization_id == org_ctx.organization.id,
+            )
         )
         placement = result.scalars().first()
         if not placement:
@@ -97,7 +102,9 @@ async def end_placement(placement_id: str, org_ctx: OrganizationContext = ORG_AC
     org_id = org_ctx.organization.id
     async with async_session_maker() as session:
         result = await session.execute(
-            select(BkPlacement).where(BkPlacement.id == placement_id, BkPlacement.organization_id == org_id)
+            select(BkPlacement).where(
+                BkPlacement.id == placement_id, BkPlacement.organization_id == org_id
+            )
         )
         placement = result.scalars().first()
         if not placement:
@@ -118,7 +125,9 @@ async def end_placement(placement_id: str, org_ctx: OrganizationContext = ORG_AC
         )
         if not other.scalars().first():
             worker_result = await session.execute(
-                select(BkWorker).where(BkWorker.id == placement.worker_id, BkWorker.organization_id == org_id)
+                select(BkWorker).where(
+                    BkWorker.id == placement.worker_id, BkWorker.organization_id == org_id
+                )
             )
             worker = worker_result.scalars().first()
             if worker:

@@ -67,21 +67,21 @@ async def list_all_orgs(
 
         # Get feature flags (not secrets)
         settings_result = await session.execute(
-            select(OrganizationSettings).where(
-                OrganizationSettings.organization_id == org.id
-            )
+            select(OrganizationSettings).where(OrganizationSettings.organization_id == org.id)
         )
         org_settings = settings_result.scalars().first()
 
-        org_list.append({
-            "id": str(org.id),
-            "name": org.name,
-            "slug": getattr(org, "slug", None),
-            "member_count": member_count,
-            "feature_flags": org_settings.feature_flags if org_settings else {},
-            "timezone": org_settings.timezone if org_settings else "UTC",
-            "created_at": org.created_at.isoformat() if hasattr(org, "created_at") else None,
-        })
+        org_list.append(
+            {
+                "id": str(org.id),
+                "name": org.name,
+                "slug": getattr(org, "slug", None),
+                "member_count": member_count,
+                "feature_flags": org_settings.feature_flags if org_settings else {},
+                "timezone": org_settings.timezone if org_settings else "UTC",
+                "created_at": org.created_at.isoformat() if hasattr(org, "created_at") else None,
+            }
+        )
 
     await log_audit(
         org_id=orgs[0].id if orgs else UUID(int=0),
@@ -102,19 +102,19 @@ async def org_gateway_health(
     """Check gateway connectivity for an organization. No client data exposed."""
     org = await _get_org_or_404(org_id, session)
 
-    result = await session.execute(
-        select(Gateway).where(Gateway.organization_id == org_id)
-    )
+    result = await session.execute(select(Gateway).where(Gateway.organization_id == org_id))
     gateways = result.scalars().all()
 
     gateway_status = []
     for gw in gateways:
-        gateway_status.append({
-            "id": str(gw.id),
-            "url": gw.url,
-            "name": getattr(gw, "name", None),
-            "connected": True,  # Simplified — real health check would ping
-        })
+        gateway_status.append(
+            {
+                "id": str(gw.id),
+                "url": gw.url,
+                "name": getattr(gw, "name", None),
+                "connected": True,  # Simplified — real health check would ping
+            }
+        )
 
     await log_audit(
         org_id=org_id,
@@ -140,9 +140,7 @@ async def list_org_members(
     await _get_org_or_404(org_id, session)
 
     result = await session.execute(
-        select(OrganizationMember).where(
-            OrganizationMember.organization_id == org_id
-        )
+        select(OrganizationMember).where(OrganizationMember.organization_id == org_id)
     )
     members = result.scalars().all()
 
@@ -150,16 +148,16 @@ async def list_org_members(
 
     member_list = []
     for m in members:
-        user_result = await session.execute(
-            select(UserModel).where(UserModel.id == m.user_id)
-        )
+        user_result = await session.execute(select(UserModel).where(UserModel.id == m.user_id))
         user = user_result.scalars().first()
-        member_list.append({
-            "user_id": str(m.user_id),
-            "name": user.name if user else None,
-            "email": user.email if user else None,
-            "role": m.role,
-        })
+        member_list.append(
+            {
+                "user_id": str(m.user_id),
+                "name": user.name if user else None,
+                "email": user.email if user else None,
+                "role": m.role,
+            }
+        )
 
     await log_audit(
         org_id=org_id,
@@ -190,9 +188,7 @@ async def get_org_settings(
     await _get_org_or_404(org_id, session)
 
     result = await session.execute(
-        select(OrganizationSettings).where(
-            OrganizationSettings.organization_id == org_id
-        )
+        select(OrganizationSettings).where(OrganizationSettings.organization_id == org_id)
     )
     settings = result.scalars().first()
 
@@ -291,9 +287,7 @@ async def org_readiness_check(
 
     # 1. Org settings exist
     settings_result = await session.execute(
-        select(OrganizationSettings).where(
-            OrganizationSettings.organization_id == org_id
-        )
+        select(OrganizationSettings).where(OrganizationSettings.organization_id == org_id)
     )
     org_settings = settings_result.scalars().first()
     add("org_settings_exist", org_settings is not None, "OrganizationSettings row exists")
@@ -314,21 +308,22 @@ async def org_readiness_check(
     if org_settings:
         has_key = bool(org_settings.openrouter_api_key_encrypted)
         has_custom = bool(
-            org_settings.custom_llm_endpoint
-            and org_settings.custom_llm_endpoint.get("api_url")
+            org_settings.custom_llm_endpoint and org_settings.custom_llm_endpoint.get("api_url")
         )
         add(
             "llm_access",
             has_key or has_custom,
-            "BYOK key" if has_key else ("Custom endpoint" if has_custom else "No LLM key or endpoint configured"),
+            (
+                "BYOK key"
+                if has_key
+                else ("Custom endpoint" if has_custom else "No LLM key or endpoint configured")
+            ),
         )
     else:
         add("llm_access", False, "No settings — cannot check LLM access")
 
     # 4. Gateway connected
-    gw_result = await session.execute(
-        select(Gateway).where(Gateway.organization_id == org_id)
-    )
+    gw_result = await session.execute(select(Gateway).where(Gateway.organization_id == org_id))
     gateways = gw_result.scalars().all()
     add("gateway_connected", len(gateways) > 0, f"{len(gateways)} gateway(s)")
 
@@ -413,9 +408,7 @@ async def org_readiness_check(
 
 async def _get_org_or_404(org_id: UUID, session: AsyncSession) -> Organization:
     """Load an organization by ID or raise 404."""
-    result = await session.execute(
-        select(Organization).where(Organization.id == org_id)
-    )
+    result = await session.execute(select(Organization).where(Organization.id == org_id))
     org = result.scalars().first()
     if org is None:
         raise HTTPException(

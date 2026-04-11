@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
@@ -32,6 +32,7 @@ _ADMIN_DEP = Depends(require_org_role("admin"))
 # Schemas
 # ---------------------------------------------------------------------------
 
+
 class ModelPinsUpdate(BaseModel):
     pins: dict[str, str]  # e.g. {"primary": "anthropic/claude-sonnet-4-20260514"}
 
@@ -39,6 +40,7 @@ class ModelPinsUpdate(BaseModel):
 # ---------------------------------------------------------------------------
 # Registry endpoints
 # ---------------------------------------------------------------------------
+
 
 @router.get("/registry")
 async def list_models(
@@ -51,7 +53,11 @@ async def list_models(
     return {
         "models": [asdict(e) for e in entries],
         "total": len(entries),
-        "last_refresh": datetime.fromtimestamp(registry.last_refresh, tz=UTC).isoformat() if registry.last_refresh else None,
+        "last_refresh": (
+            datetime.fromtimestamp(registry.last_refresh, tz=UTC).isoformat()
+            if registry.last_refresh
+            else None
+        ),
         "families": registry.list_families(),
     }
 
@@ -93,6 +99,7 @@ async def get_family_versions(
 # ---------------------------------------------------------------------------
 # Model pins endpoints
 # ---------------------------------------------------------------------------
+
 
 @router.get("/pins")
 async def get_model_pins(

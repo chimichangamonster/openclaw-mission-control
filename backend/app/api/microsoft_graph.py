@@ -53,10 +53,12 @@ async def initiate_oauth(
 ) -> dict[str, str]:
     """Generate the OAuth2 authorization URL for Microsoft Graph."""
     state = secrets.token_urlsafe(32)
-    state_payload = json.dumps({
-        "user_id": str(ctx.member.user_id),
-        "organization_id": str(ctx.organization.id),
-    })
+    state_payload = json.dumps(
+        {
+            "user_id": str(ctx.member.user_id),
+            "organization_id": str(ctx.organization.id),
+        }
+    )
     client = _redis_client()
     client.setex(f"msgraph_oauth_state:{state}", _STATE_TTL_SECONDS, state_payload)
 
@@ -79,7 +81,9 @@ async def oauth_callback(
     client = _redis_client()
     raw_state = client.get(f"msgraph_oauth_state:{state}")
     if raw_state is None:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired OAuth state.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired OAuth state."
+        )
     client.delete(f"msgraph_oauth_state:{state}")
 
     state_data = json.loads(raw_state if isinstance(raw_state, str) else raw_state.decode())
@@ -128,7 +132,8 @@ async def oauth_callback(
 
     logger.info(
         "microsoft_graph.oauth.connected email=%s org_id=%s",
-        result.email_address, organization_id,
+        result.email_address,
+        organization_id,
     )
     return RedirectResponse(url="/org-settings?graph_connected=true")
 
@@ -216,7 +221,9 @@ async def list_onedrive_files(
 
 
 class UploadRequest(BaseModel):
-    folder_path: str = Field(default="", description="OneDrive folder path (defaults to org's default folder)")
+    folder_path: str = Field(
+        default="", description="OneDrive folder path (defaults to org's default folder)"
+    )
     filename: str
     content_base64: str = Field(..., description="Base64-encoded file content")
     content_type: str = Field(default="application/octet-stream")
@@ -253,7 +260,8 @@ async def upload_to_onedrive(
 
     if body.create_sharing_link and item.get("id"):
         share_url = await create_sharing_link(
-            token, item["id"],
+            token,
+            item["id"],
             link_type="view",
             scope=body.sharing_scope,
         )
@@ -262,7 +270,9 @@ async def upload_to_onedrive(
     return result
 
 
-@router.post("/files/upload-workspace", summary="Upload workspace file to OneDrive", dependencies=_AUTH_DEPS)
+@router.post(
+    "/files/upload-workspace", summary="Upload workspace file to OneDrive", dependencies=_AUTH_DEPS
+)
 async def upload_workspace_to_onedrive(
     token: str = Query(..., description="Auth token"),
     workspace_path: str = Query(..., description="Relative path in gateway workspace"),
@@ -279,9 +289,13 @@ async def upload_workspace_to_onedrive(
         raise HTTPException(status_code=401, detail="Invalid token")
 
     # Get the first active connection (platform-level call)
-    stmt = select(MicrosoftConnection).where(
-        col(MicrosoftConnection.is_active).is_(True),
-    ).limit(1)
+    stmt = (
+        select(MicrosoftConnection)
+        .where(
+            col(MicrosoftConnection.is_active).is_(True),
+        )
+        .limit(1)
+    )
     conn = (await session.execute(stmt)).scalar_one_or_none()
     if not conn:
         raise HTTPException(status_code=404, detail="No active Microsoft Graph connection.")
@@ -302,6 +316,7 @@ async def upload_workspace_to_onedrive(
 
     # Determine MIME type
     from app.api.file_serve import _MIME_MAP
+
     mime = _MIME_MAP.get(file_path.suffix.lower(), "application/octet-stream")
 
     folder = folder_path or conn.default_folder
@@ -316,7 +331,8 @@ async def upload_workspace_to_onedrive(
 
     if item.get("id"):
         share_url = await create_sharing_link(
-            graph_token, item["id"],
+            graph_token,
+            item["id"],
             link_type="view",
             scope=sharing_scope,
         )
@@ -351,7 +367,9 @@ async def list_outlook_events(
     t_min = dt.fromisoformat(time_min) if time_min else None
     t_max = dt.fromisoformat(time_max) if time_max else None
 
-    events = await outlook_list(token, time_min=t_min, time_max=t_max, max_results=max_results, q=q or None)
+    events = await outlook_list(
+        token, time_min=t_min, time_max=t_max, max_results=max_results, q=q or None
+    )
     return {"events": events}
 
 
@@ -365,7 +383,12 @@ class OutlookCreateEventRequest(BaseModel):
     time_zone: str = "America/Edmonton"
 
 
-@router.post("/calendar/events", status_code=status.HTTP_201_CREATED, summary="Create Outlook Calendar event", dependencies=_AUTH_DEPS)
+@router.post(
+    "/calendar/events",
+    status_code=status.HTTP_201_CREATED,
+    summary="Create Outlook Calendar event",
+    dependencies=_AUTH_DEPS,
+)
 async def create_outlook_event(
     body: OutlookCreateEventRequest,
     ctx: OrganizationContext = ORG_MEMBER_DEP,
@@ -400,7 +423,9 @@ class OutlookUpdateEventRequest(BaseModel):
     time_zone: str = "America/Edmonton"
 
 
-@router.patch("/calendar/events/{event_id}", summary="Update Outlook Calendar event", dependencies=_AUTH_DEPS)
+@router.patch(
+    "/calendar/events/{event_id}", summary="Update Outlook Calendar event", dependencies=_AUTH_DEPS
+)
 async def update_outlook_event(
     event_id: str,
     body: OutlookUpdateEventRequest,
@@ -415,7 +440,8 @@ async def update_outlook_event(
     await session.commit()
 
     event = await outlook_update(
-        token, event_id,
+        token,
+        event_id,
         summary=body.summary,
         start=body.start,
         end=body.end,
@@ -426,7 +452,12 @@ async def update_outlook_event(
     return event
 
 
-@router.delete("/calendar/events/{event_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete Outlook Calendar event", dependencies=_AUTH_DEPS)
+@router.delete(
+    "/calendar/events/{event_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete Outlook Calendar event",
+    dependencies=_AUTH_DEPS,
+)
 async def delete_outlook_event(
     event_id: str,
     ctx: OrganizationContext = ORG_MEMBER_DEP,

@@ -14,10 +14,10 @@ from cryptography.fernet import Fernet
 
 import app.core.encryption as enc
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_settings(key: str = "test-master-key-for-aes256"):
     """Create a mock settings object with the given encryption key."""

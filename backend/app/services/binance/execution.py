@@ -49,7 +49,9 @@ async def create_crypto_trade_proposal(
     if params.quote_amount:
         trade_value = f"${params.quote_amount:.2f} USDT"
     elif params.price and params.quantity:
-        trade_value = f"{params.quantity} @ ${params.price:.2f} = ~${params.quantity * params.price:.2f}"
+        trade_value = (
+            f"{params.quantity} @ ${params.price:.2f} = ~${params.quantity * params.price:.2f}"
+        )
     elif params.quantity:
         trade_value = f"{params.quantity} units (market)"
 
@@ -83,15 +85,11 @@ async def create_crypto_trade_proposal(
     await session.flush()
 
     # Check if auto-execution is allowed (uses shared Polymarket risk config)
-    stmt_risk = select(PolymarketRiskConfig).where(
-        PolymarketRiskConfig.organization_id == org_id
-    )
+    stmt_risk = select(PolymarketRiskConfig).where(PolymarketRiskConfig.organization_id == org_id)
     risk_config = (await session.execute(stmt_risk)).scalar_one_or_none()
 
     # Determine trade size for auto-execute check
-    trade_size = params.quote_amount or (
-        (params.quantity or 0) * (params.price or 0)
-    )
+    trade_size = params.quote_amount or ((params.quantity or 0) * (params.price or 0))
     auto_execute = (
         risk_config is not None
         and not risk_config.require_approval

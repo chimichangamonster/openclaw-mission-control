@@ -18,10 +18,10 @@ os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite://")
 
 from app.models.wecom_connection import WeComConnection
 
-
 # ---------------------------------------------------------------------------
 # DB fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest_asyncio.fixture()
 async def db_session():
@@ -70,7 +70,9 @@ class TestSendNewsMessage:
         conn = _make_connection()
         session = AsyncMock()
 
-        with patch("app.services.wecom.access_token.get_access_token", new_callable=AsyncMock) as mock_token:
+        with patch(
+            "app.services.wecom.access_token.get_access_token", new_callable=AsyncMock
+        ) as mock_token:
             mock_token.return_value = "test_access_token"
             with patch("httpx.AsyncClient") as mock_client_cls:
                 mock_client = AsyncMock()
@@ -108,7 +110,9 @@ class TestSendNewsMessage:
         conn = _make_connection()
         session = AsyncMock()
 
-        with patch("app.services.wecom.access_token.get_access_token", new_callable=AsyncMock) as mock_token:
+        with patch(
+            "app.services.wecom.access_token.get_access_token", new_callable=AsyncMock
+        ) as mock_token:
             mock_token.return_value = "tok"
             with patch("httpx.AsyncClient") as mock_client_cls:
                 mock_client = AsyncMock()
@@ -128,7 +132,10 @@ class TestSendNewsMessage:
                     session=session,
                 )
 
-                payload = mock_client.post.call_args.kwargs.get("json") or mock_client.post.call_args[1]["json"]
+                payload = (
+                    mock_client.post.call_args.kwargs.get("json")
+                    or mock_client.post.call_args[1]["json"]
+                )
                 assert payload["news"]["articles"][0]["picurl"] == "https://example.com/thumb.png"
 
     @pytest.mark.asyncio()
@@ -139,7 +146,9 @@ class TestSendNewsMessage:
         conn = _make_connection()
         session = AsyncMock()
 
-        with patch("app.services.wecom.access_token.get_access_token", new_callable=AsyncMock) as mock_token:
+        with patch(
+            "app.services.wecom.access_token.get_access_token", new_callable=AsyncMock
+        ) as mock_token:
             mock_token.return_value = "tok"
             with patch("httpx.AsyncClient") as mock_client_cls:
                 mock_client = AsyncMock()
@@ -150,11 +159,18 @@ class TestSendNewsMessage:
                 mock_client.post.return_value = mock_resp
 
                 await send_news_message(
-                    to_user="u1", title="T", description="D",
-                    url="https://example.com", connection=conn, session=session,
+                    to_user="u1",
+                    title="T",
+                    description="D",
+                    url="https://example.com",
+                    connection=conn,
+                    session=session,
                 )
 
-                payload = mock_client.post.call_args.kwargs.get("json") or mock_client.post.call_args[1]["json"]
+                payload = (
+                    mock_client.post.call_args.kwargs.get("json")
+                    or mock_client.post.call_args[1]["json"]
+                )
                 assert "picurl" not in payload["news"]["articles"][0]
 
     @pytest.mark.asyncio()
@@ -165,7 +181,9 @@ class TestSendNewsMessage:
         conn = _make_connection()
         session = AsyncMock()
 
-        with patch("app.services.wecom.access_token.get_access_token", new_callable=AsyncMock) as mock_token:
+        with patch(
+            "app.services.wecom.access_token.get_access_token", new_callable=AsyncMock
+        ) as mock_token:
             mock_token.return_value = "tok"
             with patch("httpx.AsyncClient") as mock_client_cls:
                 mock_client = AsyncMock()
@@ -176,8 +194,12 @@ class TestSendNewsMessage:
                 mock_client.post.return_value = mock_resp
 
                 result = await send_news_message(
-                    to_user="u1", title="T", description="D",
-                    url="https://example.com", connection=conn, session=session,
+                    to_user="u1",
+                    title="T",
+                    description="D",
+                    url="https://example.com",
+                    connection=conn,
+                    session=session,
                 )
                 assert result is False
 
@@ -190,11 +212,17 @@ class TestSendNewsMessage:
         conn = _make_connection()
         session = AsyncMock()
 
-        with patch("app.services.wecom.access_token.get_access_token", new_callable=AsyncMock) as mock_token:
+        with patch(
+            "app.services.wecom.access_token.get_access_token", new_callable=AsyncMock
+        ) as mock_token:
             mock_token.side_effect = WeComTokenError("Token expired")
             result = await send_news_message(
-                to_user="u1", title="T", description="D",
-                url="https://example.com", connection=conn, session=session,
+                to_user="u1",
+                title="T",
+                description="D",
+                url="https://example.com",
+                connection=conn,
+                session=session,
             )
             assert result is False
 
@@ -213,7 +241,9 @@ class TestSendFileMessage:
         conn = _make_connection()
         session = AsyncMock()
 
-        with patch("app.services.wecom.access_token.get_access_token", new_callable=AsyncMock) as mock_token:
+        with patch(
+            "app.services.wecom.access_token.get_access_token", new_callable=AsyncMock
+        ) as mock_token:
             mock_token.return_value = "tok"
             with patch("httpx.AsyncClient") as mock_client_cls:
                 mock_client = AsyncMock()
@@ -257,7 +287,9 @@ class TestSendFileMessage:
         conn = _make_connection()
         session = AsyncMock()
 
-        with patch("app.services.wecom.access_token.get_access_token", new_callable=AsyncMock) as mock_token:
+        with patch(
+            "app.services.wecom.access_token.get_access_token", new_callable=AsyncMock
+        ) as mock_token:
             mock_token.return_value = "tok"
             with patch("httpx.AsyncClient") as mock_client_cls:
                 mock_client = AsyncMock()
@@ -269,8 +301,11 @@ class TestSendFileMessage:
                 mock_client.post.return_value = upload_resp
 
                 result = await send_file_message(
-                    to_user="u1", file_bytes=b"data", filename="f.pdf",
-                    connection=conn, session=session,
+                    to_user="u1",
+                    file_bytes=b"data",
+                    filename="f.pdf",
+                    connection=conn,
+                    session=session,
                 )
                 assert result is False
 

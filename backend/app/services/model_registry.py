@@ -145,9 +145,7 @@ class ModelRegistry:
                 headers = {}
                 if api_key:
                     headers["Authorization"] = f"Bearer {api_key}"
-                resp = await client.get(
-                    "https://openrouter.ai/api/v1/models", headers=headers
-                )
+                resp = await client.get("https://openrouter.ai/api/v1/models", headers=headers)
                 resp.raise_for_status()
                 raw_models = resp.json().get("data", [])
         except Exception as exc:
@@ -270,22 +268,26 @@ class ModelRegistry:
                     family = _extract_family(model_id)
                     versions = self.get_family_versions(family)
                     replacement = versions[0].model_id if versions else None
-                    warnings.append(DeprecationWarning(
-                        pinned_model_id=model_id,
-                        pin_key=pin_key,
-                        status="removed",
-                        suggested_replacement=replacement,
-                    ))
+                    warnings.append(
+                        DeprecationWarning(
+                            pinned_model_id=model_id,
+                            pin_key=pin_key,
+                            status="removed",
+                            suggested_replacement=replacement,
+                        )
+                    )
             elif entry.status == "deprecated":
                 family_versions = self.get_family_versions(entry.family)
                 active_versions = [v for v in family_versions if v.status == "active"]
                 replacement = active_versions[0].model_id if active_versions else None
-                warnings.append(DeprecationWarning(
-                    pinned_model_id=model_id,
-                    pin_key=pin_key,
-                    status="deprecated",
-                    suggested_replacement=replacement,
-                ))
+                warnings.append(
+                    DeprecationWarning(
+                        pinned_model_id=model_id,
+                        pin_key=pin_key,
+                        status="deprecated",
+                        suggested_replacement=replacement,
+                    )
+                )
         return warnings
 
     def get_context_window(self, model_name: str) -> int | None:

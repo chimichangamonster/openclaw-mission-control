@@ -48,7 +48,7 @@ async def process_trade_execution_queue(*, block: bool = False, block_timeout: f
                     "error": str(exc),
                 },
             )
-            delay = float(settings.rq_dispatch_retry_base_seconds) * (2 ** item.attempts)
+            delay = float(settings.rq_dispatch_retry_base_seconds) * (2**item.attempts)
             delay = min(delay, float(settings.rq_dispatch_retry_max_seconds))
             try:
                 requeue_if_failed(item, delay_seconds=delay)

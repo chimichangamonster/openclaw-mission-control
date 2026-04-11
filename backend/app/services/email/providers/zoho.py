@@ -51,22 +51,25 @@ async def fetch_messages(
         if isinstance(raw_to, str):
             # Parse email from string like "&lt;info@example.com&gt;" or "user@example.com"
             import re
-            emails = re.findall(r'[\w.+-]+@[\w.-]+', raw_to.replace("&lt;", "<").replace("&gt;", ">"))
+
+            emails = re.findall(
+                r"[\w.+-]+@[\w.-]+", raw_to.replace("&lt;", "<").replace("&gt;", ">")
+            )
             recipients_to = [{"email": e, "name": ""} for e in emails]
         else:
             recipients_to = [
-                {"email": r.get("address", ""), "name": r.get("name", "")}
-                for r in raw_to
+                {"email": r.get("address", ""), "name": r.get("name", "")} for r in raw_to
             ]
 
         raw_cc = msg.get("ccAddress", "")
         if isinstance(raw_cc, str) and raw_cc and raw_cc != "Not Provided":
-            emails = re.findall(r'[\w.+-]+@[\w.-]+', raw_cc.replace("&lt;", "<").replace("&gt;", ">"))
+            emails = re.findall(
+                r"[\w.+-]+@[\w.-]+", raw_cc.replace("&lt;", "<").replace("&gt;", ">")
+            )
             recipients_cc = [{"email": e, "name": ""} for e in emails] or None
         elif isinstance(raw_cc, list):
             recipients_cc = [
-                {"email": r.get("address", ""), "name": r.get("name", "")}
-                for r in raw_cc
+                {"email": r.get("address", ""), "name": r.get("name", "")} for r in raw_cc
             ] or None
         else:
             recipients_cc = None

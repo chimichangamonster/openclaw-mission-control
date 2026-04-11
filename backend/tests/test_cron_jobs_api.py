@@ -3,19 +3,17 @@
 
 from __future__ import annotations
 
+from typing import Any, Literal
+from uuid import uuid4
+
 import pytest
 from pydantic import ValidationError
-
+from sqlmodel import SQLModel
 
 # ---------------------------------------------------------------------------
 # Re-implement the param-building helpers here to avoid triggering the
 # psycopg/DB import chain that comes with importing from app.api.cron_jobs.
 # ---------------------------------------------------------------------------
-
-from typing import Any, Literal
-from uuid import uuid4
-
-from sqlmodel import SQLModel
 
 
 class _NonEmpty(str):
@@ -165,6 +163,7 @@ def normalize_job(j: dict) -> dict:
 # Tests: Schema validation
 # ---------------------------------------------------------------------------
 
+
 class TestCronJobCreateValidation:
     """Validate CronJobCreate schema constraints."""
 
@@ -181,8 +180,10 @@ class TestCronJobCreateValidation:
 
     def test_defaults_are_sensible(self) -> None:
         job = CronJobCreate(
-            name="test", agent_id="the-claw",
-            schedule_type="every", schedule_expr="6h",
+            name="test",
+            agent_id="the-claw",
+            schedule_type="every",
+            schedule_expr="6h",
         )
         assert job.timeout_seconds == 300
         assert job.announce is False
@@ -191,7 +192,8 @@ class TestCronJobCreateValidation:
     def test_invalid_schedule_type_rejected(self) -> None:
         with pytest.raises(ValidationError):
             CronJobCreate(
-                name="bad", agent_id="the-claw",
+                name="bad",
+                agent_id="the-claw",
                 schedule_type="weekly",  # type: ignore[arg-type]
                 schedule_expr="monday",
             )
@@ -199,7 +201,8 @@ class TestCronJobCreateValidation:
     def test_all_schedule_types_accepted(self) -> None:
         for stype in ("cron", "every", "at"):
             job = CronJobCreate(
-                name="test", agent_id="the-claw",
+                name="test",
+                agent_id="the-claw",
                 schedule_type=stype,  # type: ignore[arg-type]
                 schedule_expr="0 9 * * *",
             )
@@ -229,13 +232,16 @@ class TestCronJobUpdateValidation:
 # Tests: Param mapping (snake_case → camelCase gateway format)
 # ---------------------------------------------------------------------------
 
+
 class TestBuildAddParams:
     """Verify snake_case → camelCase mapping for cron.add."""
 
     def test_cron_schedule_maps_to_expr(self) -> None:
         job = CronJobCreate(
-            name="morning-scan", agent_id="stock-analyst",
-            schedule_type="cron", schedule_expr="0 9 * * 1-5",
+            name="morning-scan",
+            agent_id="stock-analyst",
+            schedule_type="cron",
+            schedule_expr="0 9 * * 1-5",
         )
         params = build_add_params(job)
         assert params["schedule"]["kind"] == "cron"
@@ -244,8 +250,10 @@ class TestBuildAddParams:
 
     def test_every_schedule_maps_to_every(self) -> None:
         job = CronJobCreate(
-            name="check-prices", agent_id="stock-analyst",
-            schedule_type="every", schedule_expr="6h",
+            name="check-prices",
+            agent_id="stock-analyst",
+            schedule_type="every",
+            schedule_expr="6h",
         )
         params = build_add_params(job)
         assert params["schedule"]["kind"] == "every"
@@ -254,8 +262,10 @@ class TestBuildAddParams:
 
     def test_at_schedule_maps_to_at(self) -> None:
         job = CronJobCreate(
-            name="one-time", agent_id="the-claw",
-            schedule_type="at", schedule_expr="+30m",
+            name="one-time",
+            agent_id="the-claw",
+            schedule_type="at",
+            schedule_expr="+30m",
         )
         params = build_add_params(job)
         assert params["schedule"]["kind"] == "at"
@@ -263,8 +273,10 @@ class TestBuildAddParams:
 
     def test_agent_id_becomes_camel_case(self) -> None:
         job = CronJobCreate(
-            name="test", agent_id="sports-analyst",
-            schedule_type="cron", schedule_expr="0 9 * * *",
+            name="test",
+            agent_id="sports-analyst",
+            schedule_type="cron",
+            schedule_expr="0 9 * * *",
         )
         params = build_add_params(job)
         assert params["agentId"] == "sports-analyst"
@@ -272,8 +284,10 @@ class TestBuildAddParams:
 
     def test_announce_maps_to_delivery_mode(self) -> None:
         job = CronJobCreate(
-            name="test", agent_id="the-claw",
-            schedule_type="cron", schedule_expr="0 9 * * *",
+            name="test",
+            agent_id="the-claw",
+            schedule_type="cron",
+            schedule_expr="0 9 * * *",
             announce=True,
         )
         params = build_add_params(job)
@@ -281,17 +295,22 @@ class TestBuildAddParams:
 
     def test_silent_delivery_default(self) -> None:
         job = CronJobCreate(
-            name="test", agent_id="the-claw",
-            schedule_type="cron", schedule_expr="0 9 * * *",
+            name="test",
+            agent_id="the-claw",
+            schedule_type="cron",
+            schedule_expr="0 9 * * *",
         )
         params = build_add_params(job)
         assert params["delivery"]["mode"] == "silent"
 
     def test_thinking_and_timeout_in_payload(self) -> None:
         job = CronJobCreate(
-            name="test", agent_id="the-claw",
-            schedule_type="cron", schedule_expr="0 9 * * *",
-            thinking="low", timeout_seconds=600,
+            name="test",
+            agent_id="the-claw",
+            schedule_type="cron",
+            schedule_expr="0 9 * * *",
+            thinking="low",
+            timeout_seconds=600,
         )
         params = build_add_params(job)
         assert params["payload"]["thinking"] == "low"
@@ -299,8 +318,10 @@ class TestBuildAddParams:
 
     def test_session_target_maps_correctly(self) -> None:
         job = CronJobCreate(
-            name="test", agent_id="the-claw",
-            schedule_type="cron", schedule_expr="0 9 * * *",
+            name="test",
+            agent_id="the-claw",
+            schedule_type="cron",
+            schedule_expr="0 9 * * *",
             session_target="isolated",
         )
         params = build_add_params(job)
@@ -308,8 +329,10 @@ class TestBuildAddParams:
 
     def test_timezone_in_schedule(self) -> None:
         job = CronJobCreate(
-            name="test", agent_id="the-claw",
-            schedule_type="cron", schedule_expr="0 9 * * *",
+            name="test",
+            agent_id="the-claw",
+            schedule_type="cron",
+            schedule_expr="0 9 * * *",
             timezone="America/New_York",
         )
         params = build_add_params(job)
@@ -317,8 +340,10 @@ class TestBuildAddParams:
 
     def test_description_included_when_set(self) -> None:
         job = CronJobCreate(
-            name="test", agent_id="the-claw",
-            schedule_type="cron", schedule_expr="0 9 * * *",
+            name="test",
+            agent_id="the-claw",
+            schedule_type="cron",
+            schedule_expr="0 9 * * *",
             description="Weekly scan",
         )
         params = build_add_params(job)
@@ -326,8 +351,10 @@ class TestBuildAddParams:
 
     def test_description_excluded_when_empty(self) -> None:
         job = CronJobCreate(
-            name="test", agent_id="the-claw",
-            schedule_type="cron", schedule_expr="0 9 * * *",
+            name="test",
+            agent_id="the-claw",
+            schedule_type="cron",
+            schedule_expr="0 9 * * *",
         )
         params = build_add_params(job)
         assert "description" not in params
@@ -378,6 +405,7 @@ class TestBuildUpdateParams:
 # ---------------------------------------------------------------------------
 # Tests: Job normalization
 # ---------------------------------------------------------------------------
+
 
 class TestNormalizeJob:
     """Verify raw gateway job dict → API response shape."""

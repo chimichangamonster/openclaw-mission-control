@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import pytest
 
-
 FLAT_FEE = 9.99
 
 

@@ -35,7 +35,7 @@ async def process_crypto_trade_queue(*, block: bool = False, block_timeout: floa
                 "binance.worker.failed",
                 extra={"trade_proposal_id": str(item.trade_proposal_id), "error": str(exc)},
             )
-            delay = float(settings.rq_dispatch_retry_base_seconds) * (2 ** item.attempts)
+            delay = float(settings.rq_dispatch_retry_base_seconds) * (2**item.attempts)
             delay = min(delay, float(settings.rq_dispatch_retry_max_seconds))
             try:
                 requeue_if_failed(item, delay_seconds=delay)

@@ -12,10 +12,7 @@ from app.core.logging import get_logger
 
 logger = get_logger(__name__)
 
-GOOGLE_CALENDAR_SCOPES = (
-    "openid email profile "
-    "https://www.googleapis.com/auth/calendar"
-)
+GOOGLE_CALENDAR_SCOPES = "openid email profile " "https://www.googleapis.com/auth/calendar"
 
 
 @dataclass(frozen=True)

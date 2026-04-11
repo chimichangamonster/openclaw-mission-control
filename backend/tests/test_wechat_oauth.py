@@ -13,7 +13,6 @@ from app.services.wechat_oauth import (
     build_authorize_url,
 )
 
-
 # ---------------------------------------------------------------------------
 # build_authorize_url
 # ---------------------------------------------------------------------------
@@ -77,6 +76,7 @@ class TestWeChatTokens:
 
     def test_sign_and_verify(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Token roundtrip: sign → verify → get claims back."""
+
         # Mock the settings to provide a secret
         class MockSettings:
             wechat_app_secret = "test-secret-for-hmac-signing-tokens"
@@ -99,6 +99,7 @@ class TestWeChatTokens:
 
     def test_expired_token(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Expired tokens should return None."""
+
         class MockSettings:
             wechat_app_secret = "test-secret-for-hmac-signing-tokens"
 
@@ -112,6 +113,7 @@ class TestWeChatTokens:
 
     def test_tampered_token(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Tampered tokens should return None."""
+
         class MockSettings:
             wechat_app_secret = "test-secret-for-hmac-signing-tokens"
 
@@ -126,6 +128,7 @@ class TestWeChatTokens:
 
     def test_garbage_token(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Garbage input should return None."""
+
         class MockSettings:
             wechat_app_secret = "test-secret"
 
@@ -138,6 +141,7 @@ class TestWeChatTokens:
 
     def test_wrong_secret(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Token signed with different secret should fail verification."""
+
         class MockSettings1:
             wechat_app_secret = "secret-one"
 

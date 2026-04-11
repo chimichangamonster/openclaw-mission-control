@@ -112,13 +112,17 @@ async def migrate(dry_run: bool = False) -> None:
                             {"ct": new_ct, "id": row_id},
                         )
                     stats.migrated += 1
-                    print(f"  {'[DRY RUN] ' if dry_run else ''}Migrated {table}.{column} id={row_id}")
+                    print(
+                        f"  {'[DRY RUN] ' if dry_run else ''}Migrated {table}.{column} id={row_id}"
+                    )
                 except Exception as e:
                     stats.errors += 1
                     print(f"  ERROR {table}.{column} id={row_id}: {e}")
 
     await engine.dispose()
-    print(f"\nDone. Migrated={stats.migrated} Skipped={stats.skipped} Errors={stats.errors} Empty={stats.empty}")
+    print(
+        f"\nDone. Migrated={stats.migrated} Skipped={stats.skipped} Errors={stats.errors} Empty={stats.empty}"
+    )
     if stats.errors:
         sys.exit(1)
 

@@ -30,7 +30,9 @@ class TxAuditRecord(QueryModel, table=True):
     action: str = Field(index=True)  # wifi_deauth, replay, ble_write, etc.
     endpoint: str = Field(default="")  # bridge endpoint path
     parameters_json: str = Field(default="{}", sa_column=Column(JSON))
-    rf_details_json: str = Field(default="{}", sa_column=Column(JSON))  # frequency, power, modulation, duration
+    rf_details_json: str = Field(
+        default="{}", sa_column=Column(JSON)
+    )  # frequency, power, modulation, duration
     target_json: str = Field(default="{}", sa_column=Column(JSON))  # device type, identifier, name
 
     # Authorization

@@ -12,7 +12,7 @@ from app.api.deps import ORG_ACTOR_DEP
 from app.core.config import settings
 from app.core.logging import get_logger
 from app.db.session import async_session_maker
-from app.models.bookkeeping import BkInvoice, BkInvoiceLine, BkClient
+from app.models.bookkeeping import BkClient, BkInvoice, BkInvoiceLine
 from app.services.invoice_pdf import generate_invoice_pdf
 from app.services.organizations import OrganizationContext
 
@@ -80,9 +80,7 @@ async def get_invoice_pdf(
 
     async with async_session_maker() as session:
         # Fetch invoice
-        inv_result = await session.execute(
-            select(BkInvoice).where(BkInvoice.id == invoice_id)
-        )
+        inv_result = await session.execute(select(BkInvoice).where(BkInvoice.id == invoice_id))
         invoice = inv_result.scalars().first()
         if not invoice:
             raise HTTPException(status_code=404, detail="Invoice not found")
@@ -120,15 +118,19 @@ async def get_invoice_pdf(
         "address": client.address if client else "",
     }
 
-    line_items = [
-        {
-            "description": l.description,
-            "quantity": l.quantity,
-            "unit_price": l.unit_price,
-            "amount": l.amount,
-        }
-        for l in lines
-    ] if lines else None
+    line_items = (
+        [
+            {
+                "description": l.description,
+                "quantity": l.quantity,
+                "unit_price": l.unit_price,
+                "amount": l.amount,
+            }
+            for l in lines
+        ]
+        if lines
+        else None
+    )
 
     company = DEFAULT_COMPANY.copy()
     if company_name:

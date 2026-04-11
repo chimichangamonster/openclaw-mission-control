@@ -56,9 +56,13 @@ async def list_events(
         "orderBy": "startTime",
     }
     if time_min:
-        params["timeMin"] = time_min.isoformat() + "Z" if not time_min.tzinfo else time_min.isoformat()
+        params["timeMin"] = (
+            time_min.isoformat() + "Z" if not time_min.tzinfo else time_min.isoformat()
+        )
     if time_max:
-        params["timeMax"] = time_max.isoformat() + "Z" if not time_max.tzinfo else time_max.isoformat()
+        params["timeMax"] = (
+            time_max.isoformat() + "Z" if not time_max.tzinfo else time_max.isoformat()
+        )
     if q:
         params["q"] = q
 

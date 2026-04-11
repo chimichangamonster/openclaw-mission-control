@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+
 from fastapi import APIRouter
 from pydantic import BaseModel
 
@@ -37,12 +38,8 @@ async def get_live_feed(
 ) -> LiveFeedResponse:
     """Return current agent sessions with activity status."""
     from sqlmodel import select
-    from sqlmodel.ext.asyncio.session import AsyncSession
-
-    from app.db.session import async_session_maker
-    from app.models.gateways import Gateway
-
     from sqlmodel import select as sql_select
+    from sqlmodel.ext.asyncio.session import AsyncSession
 
     from app.db.session import async_session_maker
     from app.models.gateways import Gateway
@@ -66,7 +63,9 @@ async def get_live_feed(
     now_ms = datetime.now(UTC).timestamp() * 1000
     sessions = []
 
-    for s in sessions_data if isinstance(sessions_data, list) else sessions_data.get("sessions", []):
+    for s in (
+        sessions_data if isinstance(sessions_data, list) else sessions_data.get("sessions", [])
+    ):
         key = s.get("key", "")
         if "heartbeat" in key or "mc-gateway" in key:
             continue  # Skip internal sessions
@@ -88,16 +87,18 @@ async def get_live_feed(
         if updated_ms:
             last_active = datetime.fromtimestamp(updated_ms / 1000, tz=UTC).strftime("%H:%M:%S")
 
-        sessions.append(AgentSession(
-            agent_id=agent_id,
-            channel=channel,
-            model=model,
-            last_active=last_active,
-            seconds_ago=seconds_ago,
-            input_tokens=s.get("inputTokens", 0),
-            output_tokens=s.get("outputTokens", 0),
-            status=status,
-        ))
+        sessions.append(
+            AgentSession(
+                agent_id=agent_id,
+                channel=channel,
+                model=model,
+                last_active=last_active,
+                seconds_ago=seconds_ago,
+                input_tokens=s.get("inputTokens", 0),
+                output_tokens=s.get("outputTokens", 0),
+                status=status,
+            )
+        )
 
     # Sort by most recently active
     sessions.sort(key=lambda x: x.seconds_ago)

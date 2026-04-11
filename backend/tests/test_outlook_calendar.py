@@ -114,8 +114,18 @@ class TestEventFormatCompatibility:
 
     def test_same_keys_as_google(self):
         google_keys = {
-            "id", "summary", "description", "location", "start", "end",
-            "time_zone", "status", "html_link", "attendees", "created", "updated",
+            "id",
+            "summary",
+            "description",
+            "location",
+            "start",
+            "end",
+            "time_zone",
+            "status",
+            "html_link",
+            "attendees",
+            "created",
+            "updated",
         }
         raw = {
             "id": "test",

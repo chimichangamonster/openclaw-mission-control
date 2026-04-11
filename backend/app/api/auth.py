@@ -81,7 +81,9 @@ async def terms_status(auth: AuthContext = AUTH_CONTEXT_DEP) -> dict[str, Any]:
         "current_version": CURRENT_TERMS_VERSION,
         "accepted_version": user.terms_accepted_version,
         "accepted_at": user.terms_accepted_at.isoformat() if user.terms_accepted_at else None,
-        "privacy_accepted_at": user.privacy_accepted_at.isoformat() if user.privacy_accepted_at else None,
+        "privacy_accepted_at": (
+            user.privacy_accepted_at.isoformat() if user.privacy_accepted_at else None
+        ),
     }
 
 
@@ -94,11 +96,10 @@ async def accept_terms(auth: AuthContext = AUTH_CONTEXT_DEP) -> dict[str, Any]:
     now = utcnow()
     async with async_session_maker() as session:
         from sqlmodel import select
+
         from app.models.users import User
 
-        user = (await session.execute(
-            select(User).where(User.id == auth.user.id)
-        )).scalar_one()
+        user = (await session.execute(select(User).where(User.id == auth.user.id))).scalar_one()
 
         user.terms_accepted_version = CURRENT_TERMS_VERSION
         user.terms_accepted_at = now

@@ -74,7 +74,9 @@ async def list_clients(org_ctx: OrganizationContext = ORG_ACTOR_DEP):
 async def get_client(client_id: str, org_ctx: OrganizationContext = ORG_ACTOR_DEP):
     async with async_session_maker() as session:
         result = await session.execute(
-            select(BkClient).where(BkClient.id == client_id, BkClient.organization_id == org_ctx.organization.id)
+            select(BkClient).where(
+                BkClient.id == client_id, BkClient.organization_id == org_ctx.organization.id
+            )
         )
         client = result.scalars().first()
         if not client:
@@ -83,10 +85,14 @@ async def get_client(client_id: str, org_ctx: OrganizationContext = ORG_ACTOR_DE
 
 
 @router.put("/{client_id}")
-async def update_client(client_id: str, payload: ClientUpdate, org_ctx: OrganizationContext = ORG_ACTOR_DEP):
+async def update_client(
+    client_id: str, payload: ClientUpdate, org_ctx: OrganizationContext = ORG_ACTOR_DEP
+):
     async with async_session_maker() as session:
         result = await session.execute(
-            select(BkClient).where(BkClient.id == client_id, BkClient.organization_id == org_ctx.organization.id)
+            select(BkClient).where(
+                BkClient.id == client_id, BkClient.organization_id == org_ctx.organization.id
+            )
         )
         client = result.scalars().first()
         if not client:

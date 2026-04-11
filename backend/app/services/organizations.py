@@ -17,8 +17,8 @@ from app.core.time import utcnow
 from app.db import crud
 from app.models.boards import Board
 from app.models.organization_board_access import OrganizationBoardAccess
-from app.models.organization_invite_board_access import OrganizationInviteBoardAccess
 from app.models.organization_domains import PERSONAL_EMAIL_DOMAINS, OrganizationDomain
+from app.models.organization_invite_board_access import OrganizationInviteBoardAccess
 from app.models.organization_invites import OrganizationInvite
 from app.models.organization_members import OrganizationMember
 from app.models.organizations import Organization

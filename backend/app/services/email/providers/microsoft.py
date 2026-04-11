@@ -49,7 +49,12 @@ async def fetch_messages(
     if delta_link:
         url = delta_link
     else:
-        folder_map = {"inbox": "inbox", "sent": "sentItems", "archive": "archive", "trash": "deletedItems"}
+        folder_map = {
+            "inbox": "inbox",
+            "sent": "sentItems",
+            "archive": "archive",
+            "trash": "deletedItems",
+        }
         graph_folder = folder_map.get(folder, folder)
         url = f"{GRAPH_URL}/me/mailFolders/{graph_folder}/messages/delta"
 
@@ -64,7 +69,9 @@ async def fetch_messages(
                 "body,receivedDateTime,isRead,parentFolderId,hasAttachments"
             )
 
-        resp = await client.get(url, headers=_headers(access_token), params=params if not delta_link else {})
+        resp = await client.get(
+            url, headers=_headers(access_token), params=params if not delta_link else {}
+        )
         resp.raise_for_status()
         data = resp.json()
 
@@ -88,7 +95,11 @@ async def fetch_messages(
                 recipients_cc=_extract_recipients(msg.get("ccRecipients")) or None,
                 body_text=body.get("content", "") if body.get("contentType") == "text" else "",
                 body_html=body.get("content", "") if body.get("contentType") == "html" else None,
-                received_at=_parse_graph_date(msg["receivedDateTime"]) if "receivedDateTime" in msg else datetime.utcnow(),
+                received_at=(
+                    _parse_graph_date(msg["receivedDateTime"])
+                    if "receivedDateTime" in msg
+                    else datetime.utcnow()
+                ),
                 is_read=msg.get("isRead", False),
                 folder=folder,
                 labels=None,
@@ -135,8 +146,13 @@ async def download_attachment(
         resp.raise_for_status()
         data = resp.json()
     import base64
+
     content = base64.b64decode(data.get("contentBytes", ""))
-    return content, data.get("name", "attachment"), data.get("contentType", "application/octet-stream")
+    return (
+        content,
+        data.get("name", "attachment"),
+        data.get("contentType", "application/octet-stream"),
+    )
 
 
 async def send_message(

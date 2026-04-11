@@ -5,10 +5,16 @@ from __future__ import annotations
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.api.deps import ORG_RATE_LIMIT_DEP, PORTFOLIO_DEP, get_session, require_feature, require_org_member
+from app.api.deps import (
+    ORG_RATE_LIMIT_DEP,
+    PORTFOLIO_DEP,
+    get_session,
+    require_feature,
+    require_org_member,
+)
 from app.core.logging import get_logger
 from app.core.time import utcnow
 from app.models.paper_trading import PaperPortfolio
@@ -84,23 +90,27 @@ async def add_watchlist_item(
     notes: str | None = None,
 ) -> dict:
     # Verify portfolio exists
-    portfolio = (await session.execute(
-        select(PaperPortfolio).where(
-            PaperPortfolio.id == portfolio_id,
-            PaperPortfolio.organization_id == org_ctx.organization.id,
+    portfolio = (
+        await session.execute(
+            select(PaperPortfolio).where(
+                PaperPortfolio.id == portfolio_id,
+                PaperPortfolio.organization_id == org_ctx.organization.id,
+            )
         )
-    )).scalar_one_or_none()
+    ).scalar_one_or_none()
     if not portfolio:
         raise HTTPException(status_code=404, detail="Portfolio not found")
 
     # Check for duplicate
-    existing = (await session.execute(
-        select(WatchlistItem).where(
-            WatchlistItem.portfolio_id == portfolio_id,
-            WatchlistItem.symbol == symbol,
-            WatchlistItem.status.in_(["watching", "alerting"]),
+    existing = (
+        await session.execute(
+            select(WatchlistItem).where(
+                WatchlistItem.portfolio_id == portfolio_id,
+                WatchlistItem.symbol == symbol,
+                WatchlistItem.status.in_(["watching", "alerting"]),
+            )
         )
-    )).scalar_one_or_none()
+    ).scalar_one_or_none()
     if existing:
         raise HTTPException(status_code=409, detail=f"{symbol} is already on the watchlist")
 
@@ -201,32 +211,42 @@ async def watchlist_summary(
     portfolio: PaperPortfolio = PORTFOLIO_DEP,
 ) -> dict:
     """Quick summary: counts by status, any active alerts."""
-    watching = (await session.execute(
-        select(func.count()).where(
-            WatchlistItem.portfolio_id == portfolio.id,
-            WatchlistItem.status == "watching",
+    watching = (
+        await session.execute(
+            select(func.count()).where(
+                WatchlistItem.portfolio_id == portfolio.id,
+                WatchlistItem.status == "watching",
+            )
         )
-    )).scalar() or 0
+    ).scalar() or 0
 
-    alerting = (await session.execute(
-        select(func.count()).where(
+    alerting = (
+        await session.execute(
+            select(func.count()).where(
+                WatchlistItem.portfolio_id == portfolio.id,
+                WatchlistItem.status == "alerting",
+            )
+        )
+    ).scalar() or 0
+
+    bought = (
+        await session.execute(
+            select(func.count()).where(
+                WatchlistItem.portfolio_id == portfolio.id,
+                WatchlistItem.status == "bought",
+            )
+        )
+    ).scalar() or 0
+
+    # Get alerting items for quick view
+    alert_stmt = (
+        select(WatchlistItem)
+        .where(
             WatchlistItem.portfolio_id == portfolio.id,
             WatchlistItem.status == "alerting",
         )
-    )).scalar() or 0
-
-    bought = (await session.execute(
-        select(func.count()).where(
-            WatchlistItem.portfolio_id == portfolio.id,
-            WatchlistItem.status == "bought",
-        )
-    )).scalar() or 0
-
-    # Get alerting items for quick view
-    alert_stmt = select(WatchlistItem).where(
-        WatchlistItem.portfolio_id == portfolio.id,
-        WatchlistItem.status == "alerting",
-    ).order_by(WatchlistItem.rsi.asc())
+        .order_by(WatchlistItem.rsi.asc())
+    )
     alerts = (await session.execute(alert_stmt)).scalars().all()
 
     return {
@@ -247,12 +267,14 @@ async def bulk_add_watchlist(
 ) -> dict:
     """Bulk add watchlist items from a report scan."""
     # Verify portfolio
-    portfolio = (await session.execute(
-        select(PaperPortfolio).where(
-            PaperPortfolio.id == portfolio_id,
-            PaperPortfolio.organization_id == org_ctx.organization.id,
+    portfolio = (
+        await session.execute(
+            select(PaperPortfolio).where(
+                PaperPortfolio.id == portfolio_id,
+                PaperPortfolio.organization_id == org_ctx.organization.id,
+            )
         )
-    )).scalar_one_or_none()
+    ).scalar_one_or_none()
     if not portfolio:
         raise HTTPException(status_code=404, detail="Portfolio not found")
 
@@ -261,13 +283,15 @@ async def bulk_add_watchlist(
     for data in items:
         symbol = data.get("symbol", "")
         # Skip duplicates
-        existing = (await session.execute(
-            select(WatchlistItem).where(
-                WatchlistItem.portfolio_id == portfolio_id,
-                WatchlistItem.symbol == symbol,
-                WatchlistItem.status.in_(["watching", "alerting"]),
+        existing = (
+            await session.execute(
+                select(WatchlistItem).where(
+                    WatchlistItem.portfolio_id == portfolio_id,
+                    WatchlistItem.symbol == symbol,
+                    WatchlistItem.status.in_(["watching", "alerting"]),
+                )
             )
-        )).scalar_one_or_none()
+        ).scalar_one_or_none()
         if existing:
             skipped += 1
             continue

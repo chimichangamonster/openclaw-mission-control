@@ -40,7 +40,9 @@ async def _make_session():
     return maker
 
 
-async def _seed_client(session: AsyncSession, *, email: str | None = "client@example.com") -> BkClient:
+async def _seed_client(
+    session: AsyncSession, *, email: str | None = "client@example.com"
+) -> BkClient:
     client = BkClient(
         id=uuid4(),
         organization_id=ORG_ID,
@@ -146,13 +148,27 @@ class TestEmailSendService:
             await session.commit()
 
         async with maker() as session:
-            account = (await session.execute(
-                select(EmailAccount).where(EmailAccount.organization_id == ORG_ID)
-            )).scalars().first()
+            account = (
+                (
+                    await session.execute(
+                        select(EmailAccount).where(EmailAccount.organization_id == ORG_ID)
+                    )
+                )
+                .scalars()
+                .first()
+            )
 
             with (
-                patch("app.services.email_send.get_valid_access_token", new_callable=AsyncMock, return_value="fake-token"),
-                patch("app.services.email.providers.microsoft.send_message", new_callable=AsyncMock, return_value={"ok": True}) as mock_send,
+                patch(
+                    "app.services.email_send.get_valid_access_token",
+                    new_callable=AsyncMock,
+                    return_value="fake-token",
+                ),
+                patch(
+                    "app.services.email.providers.microsoft.send_message",
+                    new_callable=AsyncMock,
+                    return_value={"ok": True},
+                ) as mock_send,
             ):
                 result = await send_email(
                     session,
@@ -160,7 +176,13 @@ class TestEmailSendService:
                     to="client@example.com",
                     subject="Test",
                     body="Hello",
-                    attachments=[{"filename": "test.pdf", "content_bytes": b"PDF", "content_type": "application/pdf"}],
+                    attachments=[
+                        {
+                            "filename": "test.pdf",
+                            "content_bytes": b"PDF",
+                            "content_type": "application/pdf",
+                        }
+                    ],
                 )
                 assert result == {"ok": True}
                 mock_send.assert_called_once()
@@ -189,13 +211,23 @@ class TestEmailSendService:
             await session.commit()
 
         async with maker() as session:
-            account = (await session.execute(
-                select(EmailAccount).where(EmailAccount.provider == "zoho")
-            )).scalars().first()
+            account = (
+                (await session.execute(select(EmailAccount).where(EmailAccount.provider == "zoho")))
+                .scalars()
+                .first()
+            )
 
             with (
-                patch("app.services.email_send.get_valid_access_token", new_callable=AsyncMock, return_value="fake-token"),
-                patch("app.services.email.providers.zoho.send_message", new_callable=AsyncMock, return_value={"data": {}}) as mock_send,
+                patch(
+                    "app.services.email_send.get_valid_access_token",
+                    new_callable=AsyncMock,
+                    return_value="fake-token",
+                ),
+                patch(
+                    "app.services.email.providers.zoho.send_message",
+                    new_callable=AsyncMock,
+                    return_value={"data": {}},
+                ) as mock_send,
             ):
                 result = await send_email(
                     session,
@@ -217,13 +249,27 @@ class TestEmailSendService:
             await session.commit()
 
         async with maker() as session:
-            account = (await session.execute(
-                select(EmailAccount).where(EmailAccount.organization_id == ORG_ID)
-            )).scalars().first()
+            account = (
+                (
+                    await session.execute(
+                        select(EmailAccount).where(EmailAccount.organization_id == ORG_ID)
+                    )
+                )
+                .scalars()
+                .first()
+            )
 
             with (
-                patch("app.services.email_send.get_valid_access_token", new_callable=AsyncMock, return_value="fake-token"),
-                patch("app.services.email.providers.microsoft.send_message", new_callable=AsyncMock, return_value={"ok": True}) as mock_send,
+                patch(
+                    "app.services.email_send.get_valid_access_token",
+                    new_callable=AsyncMock,
+                    return_value="fake-token",
+                ),
+                patch(
+                    "app.services.email.providers.microsoft.send_message",
+                    new_callable=AsyncMock,
+                    return_value={"ok": True},
+                ) as mock_send,
             ):
                 await send_email(
                     session,
@@ -256,9 +302,11 @@ class TestInvoiceSendValidation:
             await session.commit()
 
         async with maker() as session:
-            client = (await session.execute(
-                select(BkClient).where(BkClient.organization_id == ORG_ID)
-            )).scalars().first()
+            client = (
+                (await session.execute(select(BkClient).where(BkClient.organization_id == ORG_ID)))
+                .scalars()
+                .first()
+            )
             assert client.contact_email is None, "Test setup: client should have no email"
 
     @pytest.mark.asyncio()
@@ -274,9 +322,7 @@ class TestInvoiceSendValidation:
 
         # Simulate status update that happens on successful send
         async with maker() as session:
-            result = await session.execute(
-                select(BkInvoice).where(BkInvoice.id == invoice_id)
-            )
+            result = await session.execute(select(BkInvoice).where(BkInvoice.id == invoice_id))
             invoice = result.scalars().first()
             invoice.status = "sent"
             invoice.issued_date = date.today()
@@ -285,9 +331,7 @@ class TestInvoiceSendValidation:
             await session.commit()
 
         async with maker() as session:
-            result = await session.execute(
-                select(BkInvoice).where(BkInvoice.id == invoice_id)
-            )
+            result = await session.execute(select(BkInvoice).where(BkInvoice.id == invoice_id))
             invoice = result.scalars().first()
             assert invoice.status == "sent"
             assert invoice.issued_date is not None

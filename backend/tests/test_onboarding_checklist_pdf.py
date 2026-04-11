@@ -50,7 +50,8 @@ async def _make_engine():
 
 @pytest_asyncio.fixture
 async def legal_app():
-    from fastapi import FastAPI, APIRouter
+    from fastapi import APIRouter, FastAPI
+
     from app.api.legal import router as legal_router
 
     @asynccontextmanager
@@ -81,7 +82,10 @@ async def test_onboarding_checklist_pdf_generic(legal_app):
         resp = await c.get("/api/v1/legal/onboarding-checklist.pdf")
     assert resp.status_code == 200
     assert resp.headers["content-type"] == "application/pdf"
-    assert resp.headers["content-disposition"] == 'inline; filename="vantageclaw-onboarding-checklist.pdf"'
+    assert (
+        resp.headers["content-disposition"]
+        == 'inline; filename="vantageclaw-onboarding-checklist.pdf"'
+    )
     assert resp.content[:5] == b"%PDF-"
     assert len(resp.content) > 2000
 
@@ -128,7 +132,10 @@ async def readiness_app():
         session.add(user)
 
         member = OrganizationMember(
-            id=uuid4(), organization_id=ORG_ID, user_id=USER_ID, role="owner",
+            id=uuid4(),
+            organization_id=ORG_ID,
+            user_id=USER_ID,
+            role="owner",
         )
         session.add(member)
 
@@ -141,9 +148,10 @@ async def readiness_app():
         session.add(settings)
         await session.commit()
 
-    from fastapi import FastAPI, APIRouter
-    from app.api.platform_admin import router as platform_router
+    from fastapi import APIRouter, FastAPI
+
     from app.api.deps import get_session
+    from app.api.platform_admin import router as platform_router
     from app.core.platform_auth import require_platform_admin
 
     @asynccontextmanager
@@ -164,6 +172,7 @@ async def readiness_app():
 
     # Monkeypatch audit to use test DB
     import app.services.audit as audit_mod
+
     audit_mod.async_session_maker = session_maker
 
     yield app, session_maker

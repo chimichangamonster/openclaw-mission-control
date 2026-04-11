@@ -103,7 +103,10 @@ async def upload_file(
 
     logger.info(
         "onedrive.upload path=%s/%s size=%d id=%s",
-        folder_path, filename, len(content), item.get("id"),
+        folder_path,
+        filename,
+        len(content),
+        item.get("id"),
     )
     return item
 
@@ -162,15 +165,17 @@ async def list_files(
 
     items = []
     for item in data.get("value", []):
-        items.append({
-            "id": item.get("id"),
-            "name": item.get("name"),
-            "size": item.get("size"),
-            "is_folder": "folder" in item,
-            "web_url": item.get("webUrl"),
-            "last_modified": item.get("lastModifiedDateTime"),
-            "mime_type": item.get("file", {}).get("mimeType"),
-        })
+        items.append(
+            {
+                "id": item.get("id"),
+                "name": item.get("name"),
+                "size": item.get("size"),
+                "is_folder": "folder" in item,
+                "web_url": item.get("webUrl"),
+                "last_modified": item.get("lastModifiedDateTime"),
+                "mime_type": item.get("file", {}).get("mimeType"),
+            }
+        )
     return items
 
 

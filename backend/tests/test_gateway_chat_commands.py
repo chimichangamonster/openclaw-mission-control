@@ -18,10 +18,9 @@ from app.services.openclaw.gateway_rpc import (
     OpenClawGatewayError,
     abort_chat,
     compact_session,
-    reset_session,
     delete_session,
+    reset_session,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

@@ -80,21 +80,35 @@ def generate_simple_pdf(
     elements: list[Any] = []
 
     title_style = ParagraphStyle(
-        "DocTitle", parent=styles["Heading1"], fontSize=20,
-        textColor=accent, spaceAfter=4, fontName="Helvetica-Bold",
+        "DocTitle",
+        parent=styles["Heading1"],
+        fontSize=20,
+        textColor=accent,
+        spaceAfter=4,
+        fontName="Helvetica-Bold",
     )
     subtitle_style = ParagraphStyle(
-        "DocSubtitle", parent=styles["Normal"], fontSize=9,
-        textColor=colors.HexColor("#666666"), spaceAfter=2,
+        "DocSubtitle",
+        parent=styles["Normal"],
+        fontSize=9,
+        textColor=colors.HexColor("#666666"),
+        spaceAfter=2,
     )
     heading_style = ParagraphStyle(
-        "DocHeading", parent=styles["Heading2"], fontSize=13,
-        textColor=accent, spaceAfter=6, spaceBefore=16,
+        "DocHeading",
+        parent=styles["Heading2"],
+        fontSize=13,
+        textColor=accent,
+        spaceAfter=6,
+        spaceBefore=16,
         fontName="Helvetica-Bold",
         borderPadding=(0, 0, 2, 0),
     )
     normal_style = ParagraphStyle(
-        "DocNormal", parent=styles["Normal"], fontSize=10, leading=14,
+        "DocNormal",
+        parent=styles["Normal"],
+        fontSize=10,
+        leading=14,
     )
 
     # --- Header block: logo + title + company info ---
@@ -112,13 +126,17 @@ def generate_simple_pdf(
             [[logo_img, right_content]],
             colWidths=[logo_img.drawWidth + 12, content_width - logo_img.drawWidth - 12],
         )
-        header_table.setStyle(TableStyle([
-            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("LEFTPADDING", (0, 0), (-1, -1), 0),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-            ("TOPPADDING", (0, 0), (-1, -1), 0),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
-        ]))
+        header_table.setStyle(
+            TableStyle(
+                [
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                    ("TOPPADDING", (0, 0), (-1, -1), 0),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+                ]
+            )
+        )
         elements.append(header_table)
     else:
         # No logo — title + company text
@@ -132,10 +150,14 @@ def generate_simple_pdf(
 
     # Accent divider bar
     divider = Table([[""]], colWidths=[content_width], rowHeights=[3])
-    divider.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), accent),
-        ("LINEBELOW", (0, 0), (-1, -1), 0, accent),
-    ]))
+    divider.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, -1), accent),
+                ("LINEBELOW", (0, 0), (-1, -1), 0, accent),
+            ]
+        )
+    )
     elements.append(divider)
     elements.append(Spacer(1, 0.2 * inch))
 
@@ -150,12 +172,16 @@ def generate_simple_pdf(
                 [[Paragraph(heading, heading_style)]],
                 colWidths=[content_width],
             )
-            heading_with_bar.setStyle(TableStyle([
-                ("LEFTPADDING", (0, 0), (-1, -1), 8),
-                ("TOPPADDING", (0, 0), (-1, -1), 4),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-                ("LINEBEFOREDECOR", (0, 0), (0, -1), 3, accent),
-            ]))
+            heading_with_bar.setStyle(
+                TableStyle(
+                    [
+                        ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                        ("TOPPADDING", (0, 0), (-1, -1), 4),
+                        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                        ("LINEBEFOREDECOR", (0, 0), (0, -1), 3, accent),
+                    ]
+                )
+            )
             elements.append(heading_with_bar)
 
         if isinstance(content, str):
@@ -173,19 +199,23 @@ def generate_simple_pdf(
 
                 col_width = content_width / len(headers)
                 t = Table(table_data, colWidths=[col_width] * len(headers))
-                t.setStyle(TableStyle([
-                    ("BACKGROUND", (0, 0), (-1, 0), accent),
-                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                    ("FONTSIZE", (0, 0), (-1, -1), 9),
-                    ("TOPPADDING", (0, 0), (-1, -1), 6),
-                    ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-                    ("LEFTPADDING", (0, 0), (-1, -1), 6),
-                    ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, accent_light]),
-                    ("LINEBELOW", (0, 0), (-1, -2), 0.5, colors.HexColor("#dddddd")),
-                    ("LINEBELOW", (0, -1), (-1, -1), 1, accent),
-                ]))
+                t.setStyle(
+                    TableStyle(
+                        [
+                            ("BACKGROUND", (0, 0), (-1, 0), accent),
+                            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                            ("FONTSIZE", (0, 0), (-1, -1), 9),
+                            ("TOPPADDING", (0, 0), (-1, -1), 6),
+                            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+                            ("LEFTPADDING", (0, 0), (-1, -1), 6),
+                            ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, accent_light]),
+                            ("LINEBELOW", (0, 0), (-1, -2), 0.5, colors.HexColor("#dddddd")),
+                            ("LINEBELOW", (0, -1), (-1, -1), 1, accent),
+                        ]
+                    )
+                )
                 elements.append(t)
                 elements.append(Spacer(1, 0.12 * inch))
 
@@ -331,9 +361,7 @@ async def generate_complex_pdf_adobe(
         zf.writestr("index.html", html_content)
     zip_bytes = zip_buf.getvalue()
 
-    input_asset = pdf_services.upload(
-        input_stream=zip_bytes, mime_type=PDFServicesMediaType.ZIP
-    )
+    input_asset = pdf_services.upload(input_stream=zip_bytes, mime_type=PDFServicesMediaType.ZIP)
 
     page_layout = PageLayout(page_height=page_height, page_width=page_width)
     params = HTMLtoPDFParams(page_layout=page_layout, include_header_footer=True)
