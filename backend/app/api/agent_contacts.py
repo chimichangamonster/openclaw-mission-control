@@ -49,7 +49,7 @@ async def agent_list_org_members(
     org_id = await _get_org_id(agent_ctx, session)
 
     stmt = (
-        select(User.email, User.name, User.preferred_name, OrganizationMember.role)
+        select(User.email, User.name, User.preferred_name, OrganizationMember.role)  # type: ignore[call-overload]
         .join(OrganizationMember, OrganizationMember.user_id == User.id)
         .where(OrganizationMember.organization_id == org_id)
         .order_by(User.name)
@@ -87,7 +87,7 @@ async def agent_search_contacts(
 
     # 1. Org members
     member_stmt = (
-        select(User.email, User.name, User.preferred_name)
+        select(User.email, User.name, User.preferred_name)  # type: ignore[call-overload]
         .join(OrganizationMember, OrganizationMember.user_id == User.id)
         .where(
             OrganizationMember.organization_id == org_id,
@@ -132,7 +132,7 @@ async def agent_search_contacts(
             }
 
     # 3. Email history — senders and recipients from shared accounts only
-    shared_account_ids = select(EmailAccount.id).where(
+    shared_account_ids = select(EmailAccount.id).where(  # type: ignore[call-overload]
         EmailAccount.organization_id == org_id,
         EmailAccount.visibility == "shared",
     )
@@ -140,9 +140,9 @@ async def agent_search_contacts(
     # Search senders
     sender_stmt = (
         select(
-            distinct(EmailMessage.sender_email),
+            distinct(EmailMessage.sender_email),  # type: ignore[arg-type]
             EmailMessage.sender_name,
-        )
+        )  # type: ignore[call-overload]
         .where(
             EmailMessage.organization_id == org_id,
             EmailMessage.email_account_id.in_(shared_account_ids),  # type: ignore[attr-defined]

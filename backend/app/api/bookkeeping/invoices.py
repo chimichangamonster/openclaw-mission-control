@@ -101,8 +101,8 @@ async def create_from_timesheets(
         # Get approved timesheets with placements and worker names
         stmt = (
             select(BkTimesheet, BkPlacement, BkWorker)
-            .join(BkPlacement, BkTimesheet.placement_id == BkPlacement.id)
-            .join(BkWorker, BkTimesheet.worker_id == BkWorker.id)
+            .join(BkPlacement, BkTimesheet.placement_id == BkPlacement.id)  # type: ignore[arg-type]
+            .join(BkWorker, BkTimesheet.worker_id == BkWorker.id)  # type: ignore[arg-type]
             .where(
                 BkTimesheet.organization_id == org_id,
                 BkTimesheet.job_id == payload.job_id,
@@ -204,7 +204,7 @@ async def list_invoices(
     async with async_session_maker() as session:
         stmt = (
             select(BkInvoice, BkClient.name)
-            .join(BkClient, BkInvoice.client_id == BkClient.id)
+            .join(BkClient, BkInvoice.client_id == BkClient.id)  # type: ignore[arg-type]
             .where(BkInvoice.organization_id == org_ctx.organization.id)
         )
         if status:
@@ -221,7 +221,7 @@ async def get_invoice(invoice_id: str, org_ctx: OrganizationContext = ORG_ACTOR_
     async with async_session_maker() as session:
         inv_result = await session.execute(
             select(BkInvoice, BkClient.name)
-            .join(BkClient, BkInvoice.client_id == BkClient.id)
+            .join(BkClient, BkInvoice.client_id == BkClient.id)  # type: ignore[arg-type]
             .where(BkInvoice.id == invoice_id, BkInvoice.organization_id == org_ctx.organization.id)
         )
         row = inv_result.first()

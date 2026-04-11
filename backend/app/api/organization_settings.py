@@ -185,7 +185,7 @@ async def update_settings(
             )
             session.add(settings)
 
-        changes = {}
+        changes: dict[str, Any] = {}
         if payload.default_model_tier_max is not None:
             changes["default_model_tier_max"] = {
                 "old": settings.default_model_tier_max,
