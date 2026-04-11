@@ -84,7 +84,7 @@ export function DashboardSidebar() {
       <div className="border-b border-[color:var(--border)] px-4 py-3 md:hidden">
         <OrgSwitcher />
       </div>
-      <div className="flex-1 px-3 py-4">
+      <div className="flex-1 overflow-y-auto px-3 py-4">
         <p className="px-3 text-xs font-semibold uppercase tracking-wider text-[color:var(--text-muted)]">
           Navigation
         </p>
