@@ -60,6 +60,7 @@ from app.models.trade_history import TradeHistory
 from app.models.trade_proposals import TradeProposal
 from app.models.tx_audit_records import TxAuditRecord
 from app.models.users import User
+from app.models.vector_memory import VectorMemory
 from app.models.watchlist import WatchlistItem
 
 __all__ = [
@@ -126,4 +127,5 @@ __all__ = [
     "OrgConfigData",
     "OrgContact",
     "OrgOnboardingStep",
+    "VectorMemory",
 ]

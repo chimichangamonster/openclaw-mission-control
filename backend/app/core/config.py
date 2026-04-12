@@ -62,6 +62,11 @@ class Settings(BaseSettings):
     # WeChat as secondary login alongside Clerk (dual-mode)
     wechat_login_enabled: bool = False
 
+    # Langfuse observability (self-hosted)
+    langfuse_public_key: str = ""
+    langfuse_secret_key: str = ""
+    langfuse_host: str = "http://langfuse:3000"
+
     cors_origins: str = ""
     base_url: str = ""
 

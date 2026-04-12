@@ -38,6 +38,8 @@ dependencies = [
     "prometheus-client>=0.22.0",
     "prometheus-fastapi-instrumentator>=7.0.0",
     "pypdf>=5.0",
+    "pgvector>=0.3.6",
+    "langfuse>=2.0",
 ]
 
 [project.optional-dependencies]

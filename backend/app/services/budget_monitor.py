@@ -88,6 +88,7 @@ async def _get_or_create_budget_config(org_id: UUID) -> BudgetConfig:
 async def _proactive_compaction(
     raw_sessions: list[dict[str, Any]],
     gw_config: GatewayConfig,
+    org_id: UUID | None = None,
 ) -> None:
     """Check session token usage and compact sessions approaching context limits.
 
@@ -127,6 +128,23 @@ async def _proactive_compaction(
                 if compacted:
                     logger.info("budget_monitor.compact_ok session=%s", channel)
                     _compact_fail_counts.pop(key, None)
+                    # Auto-embed compaction summary as vector memory
+                    if org_id and isinstance(result, dict) and result.get("summary"):
+                        try:
+                            from app.services.embedding import store_memory
+
+                            await store_memory(
+                                org_id=org_id,
+                                content=result["summary"],
+                                source="compaction",
+                                agent_id=s.get("agentId"),
+                                metadata={"session_key": key, "model": full_model},
+                            )
+                        except Exception:
+                            logger.debug(
+                                "budget_monitor.auto_embed_skipped session=%s",
+                                channel,
+                            )
                 else:
                     fails = _compact_fail_counts.get(key, 0) + 1
                     _compact_fail_counts[key] = fails
@@ -439,7 +457,7 @@ async def check_budgets() -> None:
 
         # Proactive context compaction — runs every cycle
         if raw_sessions:
-            await _proactive_compaction(raw_sessions, gw_config)
+            await _proactive_compaction(raw_sessions, gw_config, org_id=org_id)
 
         if not agent_agg:
             continue

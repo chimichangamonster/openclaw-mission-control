@@ -15,6 +15,7 @@ from app.api.activity import router as activity_router
 from app.api.agent import router as agent_router
 from app.api.agent_contacts import router as agent_contacts_router
 from app.api.agent_email import router as agent_email_router
+from app.api.agent_memory_vector import router as agent_memory_vector_router
 from app.api.agent_polymarket import router as agent_polymarket_router
 from app.api.agents import router as agents_router
 from app.api.approvals import router as approvals_router
@@ -929,6 +930,7 @@ api_v1.include_router(email_router)
 api_v1.include_router(email_inline_router)
 api_v1.include_router(email_oauth_router)
 api_v1.include_router(agent_email_router)
+api_v1.include_router(agent_memory_vector_router)
 api_v1.include_router(agent_contacts_router)
 api_v1.include_router(contacts_router)
 api_v1.include_router(polymarket_router)
