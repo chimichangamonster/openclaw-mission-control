@@ -128,6 +128,13 @@ async def _proactive_compaction(
                 if compacted:
                     logger.info("budget_monitor.compact_ok session=%s", channel)
                     _compact_fail_counts.pop(key, None)
+                    from app.services.langfuse_client import trace_compaction
+
+                    trace_compaction(
+                        org_id=str(org_id) if org_id else "unknown",
+                        session_key=key, agent_name=s.get("agentId", ""),
+                        context_pct=ratio * 100, action="compact", success=True,
+                    )
                     # Auto-embed compaction summary as vector memory
                     if org_id and isinstance(result, dict) and result.get("summary"):
                         try:
@@ -433,6 +440,10 @@ async def check_budgets() -> None:
     Iterates over all organizations with a configured gateway and checks
     each org's budget independently.
     """
+    from time import perf_counter
+
+    cycle_start = perf_counter()
+
     # Get all orgs that have a gateway configured
     async with async_session_maker() as session:
         result = await session.execute(
@@ -445,6 +456,8 @@ async def check_budgets() -> None:
 
     total_agents = 0
     total_monthly = 0.0
+    total_compactions = 0
+    total_alerts = 0
 
     for org_id in org_ids:
         gw_config = await _get_gateway_config_for_org(org_id)
@@ -482,9 +495,23 @@ async def check_budgets() -> None:
         total_agents += len(agent_agg)
         total_monthly += monthly_total
 
+    cycle_duration = int((perf_counter() - cycle_start) * 1000)
+
     logger.info(
         "budget_monitor.check_complete orgs=%d agents=%d monthly=%.4f",
         len(org_ids),
         total_agents,
         total_monthly,
+    )
+
+    # Trace the full cycle to Langfuse
+    from app.services.langfuse_client import trace_budget_cycle
+
+    trace_budget_cycle(
+        org_count=len(org_ids),
+        agent_count=total_agents,
+        monthly_total=total_monthly,
+        duration_ms=cycle_duration,
+        compactions=total_compactions,
+        alerts_sent=total_alerts,
     )

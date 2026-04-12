@@ -53,6 +53,10 @@ async def resolve_llm_endpoint(
     2. Per-org OpenRouter BYOK key
     3. Platform OpenRouter key (owner org only)
     """
+    from time import perf_counter
+
+    started_at = perf_counter()
+
     result = await session.execute(
         select(OrganizationSettings).where(OrganizationSettings.organization_id == org_id)
     )
@@ -69,7 +73,7 @@ async def resolve_llm_endpoint(
                 except Exception:
                     logger.warning("llm_routing.custom_key_decrypt_failed org_id=%s", org_id)
 
-            return LLMEndpoint(
+            endpoint = LLMEndpoint(
                 api_url=endpoint_config["api_url"].rstrip("/"),
                 api_key=api_key,
                 source="custom",
@@ -77,12 +81,14 @@ async def resolve_llm_endpoint(
                 models=endpoint_config.get("models", []),
                 is_openrouter=False,
             )
+            _trace_resolve(org_id, endpoint, started_at)
+            return endpoint
 
     # 2. Per-org BYOK OpenRouter key
     if org_settings and org_settings.openrouter_api_key_encrypted:
         try:
             key = decrypt_token(org_settings.openrouter_api_key_encrypted)
-            return LLMEndpoint(
+            endpoint = LLMEndpoint(
                 api_url=OPENROUTER_BASE_URL,
                 api_key=key,
                 source="byok_openrouter",
@@ -90,6 +96,8 @@ async def resolve_llm_endpoint(
                 models=[],
                 is_openrouter=True,
             )
+            _trace_resolve(org_id, endpoint, started_at)
+            return endpoint
         except Exception:
             logger.warning("llm_routing.byok_key_decrypt_failed org_id=%s", org_id)
 
@@ -97,7 +105,7 @@ async def resolve_llm_endpoint(
     from app.services.openrouter_keys import _is_platform_owner
 
     if settings.openrouter_api_key and await _is_platform_owner(session, org_id):
-        return LLMEndpoint(
+        endpoint = LLMEndpoint(
             api_url=OPENROUTER_BASE_URL,
             api_key=settings.openrouter_api_key,
             source="platform_openrouter",
@@ -105,8 +113,27 @@ async def resolve_llm_endpoint(
             models=[],
             is_openrouter=True,
         )
+        _trace_resolve(org_id, endpoint, started_at)
+        return endpoint
 
+    _trace_resolve(org_id, None, started_at)
     return None
+
+
+def _trace_resolve(
+    org_id: UUID, endpoint: LLMEndpoint | None, started_at: float
+) -> None:
+    """Trace LLM endpoint resolution to Langfuse (best-effort)."""
+    from time import perf_counter
+
+    from app.services.langfuse_client import trace_llm_resolve
+
+    trace_llm_resolve(
+        org_id=str(org_id),
+        source=endpoint.source if endpoint else "none",
+        endpoint_url=endpoint.api_url if endpoint else None,
+        duration_ms=int((perf_counter() - started_at) * 1000),
+    )
 
 
 async def check_endpoint_health(

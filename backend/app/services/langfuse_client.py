@@ -50,6 +50,9 @@ def get_langfuse() -> Langfuse | None:
     return _langfuse
 
 
+# ── Embedding traces ──────────────────────────────────────────────────
+
+
 def trace_embedding(
     *,
     org_id: str,
@@ -76,6 +79,201 @@ def trace_embedding(
         )
     except Exception:
         logger.debug("langfuse.trace_embedding_failed", exc_info=True)
+
+
+# ── Gateway RPC traces ────────────────────────────────────────────────
+
+
+def trace_rpc_call(
+    *,
+    method: str,
+    duration_ms: int,
+    success: bool,
+    error_type: str | None = None,
+    org_id: str | None = None,
+    metadata: dict[str, Any] | None = None,
+) -> None:
+    """Log a gateway WebSocket RPC call to Langfuse."""
+    client = get_langfuse()
+    if not client:
+        return
+
+    try:
+        trace = client.trace(
+            name="gateway_rpc",
+            metadata={
+                "method": method,
+                "org_id": org_id or "unknown",
+                **(metadata or {}),
+            },
+        )
+        trace.span(
+            name=f"rpc.{method}",
+            metadata={
+                "duration_ms": duration_ms,
+                "success": success,
+                "error_type": error_type,
+            },
+            level="DEFAULT" if success else "ERROR",
+        )
+    except Exception:
+        logger.debug("langfuse.trace_rpc_failed", exc_info=True)
+
+
+# ── Budget monitor traces ─────────────────────────────────────────────
+
+
+def trace_budget_cycle(
+    *,
+    org_count: int,
+    agent_count: int,
+    monthly_total: float,
+    duration_ms: int,
+    compactions: int = 0,
+    alerts_sent: int = 0,
+) -> None:
+    """Log a full budget check cycle to Langfuse."""
+    client = get_langfuse()
+    if not client:
+        return
+
+    try:
+        trace = client.trace(
+            name="budget_check_cycle",
+            metadata={
+                "org_count": org_count,
+                "agent_count": agent_count,
+                "monthly_total_usd": round(monthly_total, 4),
+                "duration_ms": duration_ms,
+                "compactions_triggered": compactions,
+                "alerts_sent": alerts_sent,
+            },
+        )
+        # Score the cycle with spend data for dashboarding
+        trace.score(
+            name="monthly_spend_usd",
+            value=round(monthly_total, 4),
+        )
+    except Exception:
+        logger.debug("langfuse.trace_budget_cycle_failed", exc_info=True)
+
+
+def trace_compaction(
+    *,
+    org_id: str,
+    session_key: str,
+    agent_name: str,
+    context_pct: float,
+    action: str,
+    success: bool,
+) -> None:
+    """Log a proactive compaction attempt to Langfuse."""
+    client = get_langfuse()
+    if not client:
+        return
+
+    try:
+        client.trace(
+            name="session_compaction",
+            metadata={
+                "org_id": org_id,
+                "session_key": session_key,
+                "agent_name": agent_name,
+                "context_pct": round(context_pct, 1),
+                "action": action,
+                "success": success,
+            },
+        )
+    except Exception:
+        logger.debug("langfuse.trace_compaction_failed", exc_info=True)
+
+
+# ── LLM routing traces ────────────────────────────────────────────────
+
+
+def trace_llm_resolve(
+    *,
+    org_id: str,
+    source: str,
+    endpoint_url: str | None = None,
+    duration_ms: int = 0,
+) -> None:
+    """Log an LLM endpoint resolution to Langfuse."""
+    client = get_langfuse()
+    if not client:
+        return
+
+    try:
+        client.trace(
+            name="llm_endpoint_resolve",
+            metadata={
+                "org_id": org_id,
+                "source": source,
+                "endpoint_url": endpoint_url or "none",
+                "duration_ms": duration_ms,
+            },
+        )
+    except Exception:
+        logger.debug("langfuse.trace_llm_resolve_failed", exc_info=True)
+
+
+# ── Data retention traces ─────────────────────────────────────────────
+
+
+def trace_retention_cleanup(
+    *,
+    results: dict[str, int],
+    duration_ms: int,
+) -> None:
+    """Log a data retention cleanup cycle to Langfuse."""
+    client = get_langfuse()
+    if not client:
+        return
+
+    try:
+        total = sum(results.values())
+        client.trace(
+            name="data_retention_cleanup",
+            metadata={
+                "total_deleted": total,
+                "duration_ms": duration_ms,
+                **{f"deleted_{k}": v for k, v in results.items()},
+            },
+        )
+    except Exception:
+        logger.debug("langfuse.trace_retention_failed", exc_info=True)
+
+
+# ── Quality scoring ───────────────────────────────────────────────────
+
+
+def score_trace(
+    *,
+    trace_id: str,
+    name: str,
+    value: float,
+    comment: str | None = None,
+) -> None:
+    """Submit a quality score for an existing trace.
+
+    Used by the quality scoring API to attach human or automated feedback.
+    """
+    client = get_langfuse()
+    if not client:
+        return
+
+    try:
+        client.score(
+            trace_id=trace_id,
+            name=name,
+            value=value,
+            comment=comment,
+        )
+    except Exception:
+        logger.debug("langfuse.score_trace_failed", exc_info=True)
+
+
+# ── Shutdown ──────────────────────────────────────────────────────────
 
 
 def flush() -> None:

@@ -124,6 +124,9 @@ async def run_retention_cleanup() -> dict[str, int]:
 
     Returns a dict mapping table names to the number of rows deleted.
     """
+    from time import perf_counter
+
+    cleanup_start = perf_counter()
     results: dict[str, int] = {}
 
     # ── Platform-wide tables (not org-scoped) ───────────────────────
@@ -203,7 +206,22 @@ async def run_retention_cleanup() -> dict[str, int]:
     results["audit_logs"] = audit_total
     results["daily_agent_spends"] = spend_total
 
+    # ── Vector memories — TTL-based expiry ──────────────────────────
+    # Memories with expires_at in the past are cleaned up regardless of org
+    # settings (TTL is set per-memory at store time).
+    vector_deleted = await _cleanup_expired_vector_memories()
+    results["vector_memories"] = vector_deleted
+
     total_deleted = sum(results.values())
+
+    # Trace to Langfuse
+    from app.services.langfuse_client import trace_retention_cleanup
+
+    trace_retention_cleanup(
+        results=results,
+        duration_ms=int((perf_counter() - cleanup_start) * 1000),
+    )
+
     if total_deleted > 0:
         logger.info(
             "data_retention.complete",
@@ -213,3 +231,32 @@ async def run_retention_cleanup() -> dict[str, int]:
         logger.info("data_retention.complete", extra={"total_deleted": 0})
 
     return results
+
+
+async def _cleanup_expired_vector_memories() -> int:
+    """Delete vector memories that have passed their TTL (expires_at)."""
+    now = utcnow()
+    total = 0
+    async with async_session_maker() as session:
+        while True:
+            result = await session.execute(
+                text(
+                    "DELETE FROM vector_memories WHERE id IN "
+                    "(SELECT id FROM vector_memories "
+                    "WHERE expires_at IS NOT NULL AND expires_at < :now "
+                    "LIMIT :batch_size)"
+                ),
+                {"now": now, "batch_size": BATCH_SIZE},
+            )
+            deleted = result.rowcount  # type: ignore[attr-defined]
+            total += deleted
+            await session.commit()
+            if deleted < BATCH_SIZE:
+                break
+
+    if total > 0:
+        logger.info(
+            "data_retention.cleaned",
+            extra={"table": "vector_memories", "deleted": total, "type": "ttl_expiry"},
+        )
+    return total

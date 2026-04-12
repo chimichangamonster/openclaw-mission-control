@@ -48,6 +48,7 @@ from app.api.memory import router as memory_router
 from app.api.metrics import router as metrics_router
 from app.api.microsoft_graph import router as microsoft_graph_router
 from app.api.model_registry import router as model_registry_router
+from app.api.observability import router as observability_router
 from app.api.org_config import router as org_config_router
 from app.api.organization_settings import router as org_settings_router
 from app.api.organizations import router as organizations_router
@@ -968,6 +969,7 @@ api_v1.include_router(platform_admin_router)
 api_v1.include_router(wechat_auth_router)
 api_v1.include_router(wecom_router)
 api_v1.include_router(document_intake_router)
+api_v1.include_router(observability_router)
 app.include_router(api_v1)
 
 add_pagination(app)

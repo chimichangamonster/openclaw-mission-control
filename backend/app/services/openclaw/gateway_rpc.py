@@ -461,17 +461,28 @@ async def openclaw_call(
             config=config,
             gateway_url=gateway_url,
         )
+        duration_ms = int((perf_counter() - started_at) * 1000)
         logger.debug(
             "gateway.rpc.call.success method=%s duration_ms=%s",
             method,
-            int((perf_counter() - started_at) * 1000),
+            duration_ms,
         )
+        from app.services.langfuse_client import trace_rpc_call
+
+        trace_rpc_call(method=method, duration_ms=duration_ms, success=True)
         return payload
     except OpenClawGatewayError:
+        duration_ms = int((perf_counter() - started_at) * 1000)
         logger.warning(
             "gateway.rpc.call.gateway_error method=%s duration_ms=%s",
             method,
-            int((perf_counter() - started_at) * 1000),
+            duration_ms,
+        )
+        from app.services.langfuse_client import trace_rpc_call
+
+        trace_rpc_call(
+            method=method, duration_ms=duration_ms, success=False,
+            error_type="gateway_error",
         )
         raise
     except (
@@ -481,11 +492,18 @@ async def openclaw_call(
         ValueError,
         WebSocketException,
     ) as exc:  # pragma: no cover - network/protocol errors
+        duration_ms = int((perf_counter() - started_at) * 1000)
         logger.error(
             "gateway.rpc.call.transport_error method=%s duration_ms=%s error_type=%s",
             method,
-            int((perf_counter() - started_at) * 1000),
+            duration_ms,
             exc.__class__.__name__,
+        )
+        from app.services.langfuse_client import trace_rpc_call
+
+        trace_rpc_call(
+            method=method, duration_ms=duration_ms, success=False,
+            error_type=exc.__class__.__name__,
         )
         raise OpenClawGatewayError(str(exc)) from exc
 
