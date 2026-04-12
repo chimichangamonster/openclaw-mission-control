@@ -1,5 +1,7 @@
 """Langfuse observability client — lazy singleton for tracing agent operations.
 
+Uses Langfuse SDK v4 with the self-hosted Langfuse v3 server (OTLP transport).
+
 Returns None when observability is not configured, so callers can safely
 check ``if client:`` before instrumenting. Zero overhead when disabled.
 """
@@ -66,16 +68,19 @@ def trace_embedding(
         return
 
     try:
-        trace = client.trace(
+        span = client.start_observation(
             name="embedding",
             metadata={"org_id": org_id, **(metadata or {})},
         )
-        trace.generation(
+        gen = span.start_observation(
             name="get_embedding",
+            as_type="generation",
             model=model,
             input=input_text[:500],
-            usage={"input": token_count} if token_count else None,
+            usage_details={"input": token_count} if token_count else None,
         )
+        gen.end()
+        span.end()
     except Exception:
         logger.debug("langfuse.trace_embedding_failed", exc_info=True)
 
@@ -98,7 +103,7 @@ def trace_rpc_call(
         return
 
     try:
-        trace = client.trace(
+        span = client.start_observation(
             name="gateway_rpc",
             metadata={
                 "method": method,
@@ -106,7 +111,7 @@ def trace_rpc_call(
                 **(metadata or {}),
             },
         )
-        trace.span(
+        child = span.start_observation(
             name=f"rpc.{method}",
             metadata={
                 "duration_ms": duration_ms,
@@ -115,6 +120,8 @@ def trace_rpc_call(
             },
             level="DEFAULT" if success else "ERROR",
         )
+        child.end()
+        span.end()
     except Exception:
         logger.debug("langfuse.trace_rpc_failed", exc_info=True)
 
@@ -137,7 +144,7 @@ def trace_budget_cycle(
         return
 
     try:
-        trace = client.trace(
+        span = client.start_observation(
             name="budget_check_cycle",
             metadata={
                 "org_count": org_count,
@@ -148,11 +155,11 @@ def trace_budget_cycle(
                 "alerts_sent": alerts_sent,
             },
         )
-        # Score the cycle with spend data for dashboarding
-        trace.score(
+        span.score(
             name="monthly_spend_usd",
             value=round(monthly_total, 4),
         )
+        span.end()
     except Exception:
         logger.debug("langfuse.trace_budget_cycle_failed", exc_info=True)
 
@@ -172,7 +179,7 @@ def trace_compaction(
         return
 
     try:
-        client.trace(
+        client.create_event(
             name="session_compaction",
             metadata={
                 "org_id": org_id,
@@ -203,7 +210,7 @@ def trace_llm_resolve(
         return
 
     try:
-        client.trace(
+        client.create_event(
             name="llm_endpoint_resolve",
             metadata={
                 "org_id": org_id,
@@ -231,7 +238,7 @@ def trace_retention_cleanup(
 
     try:
         total = sum(results.values())
-        client.trace(
+        client.create_event(
             name="data_retention_cleanup",
             metadata={
                 "total_deleted": total,
@@ -262,7 +269,7 @@ def score_trace(
         return
 
     try:
-        client.score(
+        client.create_score(
             trace_id=trace_id,
             name=name,
             value=value,

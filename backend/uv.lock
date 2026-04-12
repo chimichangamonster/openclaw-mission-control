@@ -1689,7 +1689,7 @@ requires-dist = [
     { name = "httpx", marker = "extra == 'dev'", specifier = "==0.28.1" },
     { name = "isort", marker = "extra == 'dev'", specifier = "==7.0.0" },
     { name = "jinja2", specifier = "==3.1.6" },
-    { name = "langfuse", specifier = ">=2.0" },
+    { name = "langfuse", specifier = ">=4.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = "==1.19.1" },
     { name = "pdfservices-sdk", specifier = ">=4.2.0" },
     { name = "pgvector", specifier = ">=0.3.6" },
