@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import sqlalchemy as sa
 from alembic import op
+from pgvector.sqlalchemy import Vector
 
 revision = "x8y9z0a1b2c3"
 down_revision = "w7q8r9s0t1u2"
@@ -32,7 +33,7 @@ def upgrade() -> None:
             index=True,
         ),
         sa.Column("content", sa.Text(), nullable=False),
-        sa.Column("embedding", sa.text("vector(1536)").type, nullable=False),
+        sa.Column("embedding", Vector(1536), nullable=False),
         sa.Column("source", sa.String(), nullable=False, index=True),
         sa.Column("agent_id", sa.String(), nullable=True),
         sa.Column("metadata_json", sa.String(), nullable=False, server_default="{}"),
