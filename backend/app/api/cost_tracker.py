@@ -20,7 +20,6 @@ from app.api.deps import (
     require_org_member,
     require_org_role,
 )
-from app.core.config import settings
 from app.core.logging import get_logger
 from app.core.resilience import openrouter_breaker, retry_async
 from app.core.time import utcnow
@@ -724,7 +723,6 @@ async def get_cost_estimate(
     estimate based on their own expected usage patterns.
     """
     org_id = org_ctx.organization.id
-    today = date.today()
 
     # Check for real spend data
     async with async_session_maker() as session:

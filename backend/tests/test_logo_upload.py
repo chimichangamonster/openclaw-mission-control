@@ -5,8 +5,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 LOGO_ALLOWED_TYPES = {
     "image/png": ".png",
     "image/jpeg": ".jpg",

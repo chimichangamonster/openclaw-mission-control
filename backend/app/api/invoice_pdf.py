@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import Response
 from sqlmodel import select
 
@@ -126,7 +126,7 @@ async def get_invoice_pdf(
                 "unit_price": l.unit_price,
                 "amount": l.amount,
             }
-            for l in lines
+            for l in lines  # noqa: E741
         ]
         if lines
         else None

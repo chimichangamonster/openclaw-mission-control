@@ -3,8 +3,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from app.services.microsoft.outlook_calendar import (
     GRAPH_URL,
     _event_to_dict,

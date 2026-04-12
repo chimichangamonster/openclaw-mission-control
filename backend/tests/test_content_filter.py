@@ -3,10 +3,7 @@
 
 from __future__ import annotations
 
-import pytest
-
 from app.services.content_filter import (
-    ContentFilterRegion,
     ContentFilterResult,
     filter_content,
     get_org_filter_region,

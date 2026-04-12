@@ -229,7 +229,7 @@ class TestEmailSendService:
                     return_value={"data": {}},
                 ) as mock_send,
             ):
-                result = await send_email(
+                await send_email(
                     session,
                     account,
                     to="client@example.com",

@@ -3,8 +3,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 
 class TestSystemHealthResponse:
     """Verify the shape and logic of the system health aggregation."""

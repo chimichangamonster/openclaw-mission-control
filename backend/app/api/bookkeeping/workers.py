@@ -7,9 +7,9 @@ from datetime import date, timedelta
 from typing import Any
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
-from sqlmodel import col, select
+from sqlmodel import select
 
 from app.api.deps import ORG_ACTOR_DEP
 from app.core.time import utcnow

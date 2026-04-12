@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import date, timedelta
+from datetime import timedelta
 from unittest.mock import patch
 from uuid import uuid4
 
@@ -13,23 +13,22 @@ import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
-from sqlmodel import SQLModel, select, text
+from sqlmodel import SQLModel, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite://")
 
-from app.core.time import utcnow
+from app.core.time import utcnow  # noqa: E402
 
 # Import all models we test so SQLModel.metadata.create_all creates their tables
-from app.models.activity_events import ActivityEvent  # noqa: F401
-from app.models.audit_log import AuditLog  # noqa: F401
-from app.models.board_webhook_payloads import BoardWebhookPayload  # noqa: F401
-from app.models.budget import DailyAgentSpend  # noqa: F401
-from app.models.email_messages import EmailMessage  # noqa: F401
-from app.services.data_retention import (
+from app.models.activity_events import ActivityEvent  # noqa: E402, F401
+from app.models.audit_log import AuditLog  # noqa: E402, F401
+from app.models.board_webhook_payloads import BoardWebhookPayload  # noqa: E402, F401
+from app.models.budget import DailyAgentSpend  # noqa: E402, F401
+from app.models.email_messages import EmailMessage  # noqa: E402, F401
+from app.services.data_retention import (  # noqa: E402
     DEFAULT_RETENTION,
     _cleanup_table,
-    run_retention_cleanup,
 )
 
 # ---------------------------------------------------------------------------

@@ -16,7 +16,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite://")
 
-from app.models.wecom_connection import WeComConnection
+from app.models.wecom_connection import WeComConnection  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # DB fixtures

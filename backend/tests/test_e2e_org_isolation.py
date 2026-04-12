@@ -37,7 +37,6 @@ from app.api.organization_settings import router as org_settings_router
 from app.api.paper_bets import router as paper_bets_router
 from app.api.paper_trading import router as paper_trading_router
 from app.api.watchlist import router as watchlist_router
-from app.core.auth import AuthContext
 from app.models.bookkeeping import BkClient
 from app.models.organization_members import OrganizationMember
 from app.models.organization_settings import DEFAULT_FEATURE_FLAGS, OrganizationSettings
@@ -46,7 +45,7 @@ from app.models.paper_bets import PaperBet
 from app.models.paper_trading import PaperPortfolio, PaperPosition, PaperTrade
 from app.models.users import User
 from app.models.watchlist import WatchlistItem
-from app.services.organizations import ROLE_RANK, OrganizationContext
+from app.services.organizations import OrganizationContext
 
 # ---------------------------------------------------------------------------
 # Test IDs

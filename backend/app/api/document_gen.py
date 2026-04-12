@@ -657,9 +657,9 @@ async def generate_complex_with_rehydration(
 # Generated documents listing & management
 # ---------------------------------------------------------------------------
 
-from app.api.deps import require_org_member
-from app.db.session import get_session
-from app.services.organizations import OrganizationContext
+from app.api.deps import require_org_member  # noqa: E402
+from app.db.session import get_session  # noqa: E402
+from app.services.organizations import OrganizationContext  # noqa: E402
 
 _ORG_DEP = Depends(require_org_member)
 _SESSION_DEP = Depends(get_session)

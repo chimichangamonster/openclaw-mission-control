@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import distinct, func, or_, select, union_all
+from sqlalchemy import distinct, func, or_, select
 
 from app.core.agent_auth import AgentAuthContext, get_agent_auth_context
 from app.core.logging import get_logger

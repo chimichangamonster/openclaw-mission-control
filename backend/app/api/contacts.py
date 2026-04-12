@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import select
 
 from app.api.deps import ORG_MEMBER_DEP, ORG_RATE_LIMIT_DEP, SESSION_DEP

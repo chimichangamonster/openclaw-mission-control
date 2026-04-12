@@ -7,7 +7,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import Response
-from sqlalchemy import func, select
+from sqlalchemy import select
 
 from app.api.deps import ORG_MEMBER_DEP, ORG_RATE_LIMIT_DEP, SESSION_DEP, require_feature
 from app.core.logging import get_logger

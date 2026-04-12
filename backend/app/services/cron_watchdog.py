@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 from uuid import UUID
 
 from sqlalchemy import text
@@ -12,7 +12,6 @@ from app.core.logging import get_logger
 from app.core.time import utcnow
 from app.db.session import async_session_maker
 from app.models.gateways import Gateway
-from app.models.tasks import Task
 from app.services.error_tracker import track_error
 from app.services.openclaw.gateway_rpc import GatewayConfig, send_message
 

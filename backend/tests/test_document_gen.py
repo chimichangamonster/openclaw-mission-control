@@ -379,7 +379,7 @@ class TestRedactionVault:
         from app.core.redact import RedactionVault
 
         vault = RedactionVault()
-        result = vault.redact("Server 10.0.0.5 responds. Confirmed 10.0.0.5 is alive.")
+        vault.redact("Server 10.0.0.5 responds. Confirmed 10.0.0.5 is alive.")
         # Same IP should get the same tag
         tags = [e["tag"] for e in vault.entries if e["original"] == "10.0.0.5"]
         assert len(tags) == 1  # one entry, reused

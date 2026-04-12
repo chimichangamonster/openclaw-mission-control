@@ -11,8 +11,6 @@ Covers:
 
 from __future__ import annotations
 
-import pytest
-
 from app.schemas.gateway_api import ChatAttachment, GatewaySessionMessageRequest
 from app.services.openclaw.session_service import GatewaySessionService
 

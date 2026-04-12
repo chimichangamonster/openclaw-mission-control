@@ -5,8 +5,6 @@ from __future__ import annotations
 
 import json
 
-import pytest
-
 
 class TestOrgConfigModel:
     """Test OrgConfigData model."""

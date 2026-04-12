@@ -226,7 +226,7 @@ async def test_connection(
     try:
         from app.services.wecom.access_token import get_access_token
 
-        token = await get_access_token(conn, session)
+        await get_access_token(conn, session)
         await session.commit()
         return WeComTestResult(
             success=True,

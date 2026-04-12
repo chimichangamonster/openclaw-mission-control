@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import json
 
-from app.models.organization_settings import DEFAULT_FEATURE_FLAGS, OrganizationSettings
+from app.models.organization_settings import DEFAULT_FEATURE_FLAGS
 
 
 class TestDefaultFeatureFlags:

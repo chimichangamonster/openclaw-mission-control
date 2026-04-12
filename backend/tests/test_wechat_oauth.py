@@ -3,12 +3,9 @@
 
 from __future__ import annotations
 
-import time
-
 import pytest
 
 from app.services.wechat_oauth import (
-    WeComOAuthError,
     WeComUserInfo,
     build_authorize_url,
 )

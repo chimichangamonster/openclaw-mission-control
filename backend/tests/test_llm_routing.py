@@ -3,8 +3,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from app.services.llm_routing import OPENROUTER_BASE_URL, LLMEndpoint
 
 

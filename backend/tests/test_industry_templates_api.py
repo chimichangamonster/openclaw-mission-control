@@ -23,7 +23,6 @@ from app.api.industry_templates import router as templates_router
 from app.models.organization_members import OrganizationMember
 from app.models.organization_settings import OrganizationSettings
 from app.models.organizations import Organization
-from app.models.users import User
 from app.services.organizations import OrganizationContext
 
 # ---------------------------------------------------------------------------

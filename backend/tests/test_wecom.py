@@ -193,7 +193,7 @@ class TestBuildReply:
 
 class TestWeComConnectionModel:
     def test_defaults(self) -> None:
-        from app.models.wecom_connection import WeComConnection
+        from app.models.wecom_connection import WeComConnection  # noqa: F811
 
         conn = WeComConnection(
             organization_id=uuid4(),
@@ -228,14 +228,14 @@ ORG_ID = uuid4()
 USER_ID = uuid4()
 
 
-from app.models.gateways import Gateway  # noqa: E402
+from app.models.gateways import Gateway  # noqa: E402, F401
 from app.models.organization_members import OrganizationMember  # noqa: E402
 from app.models.organization_settings import OrganizationSettings  # noqa: E402
 
 # Import all models so SQLModel.metadata knows about the tables
 from app.models.organizations import Organization  # noqa: E402
 from app.models.users import User  # noqa: E402
-from app.models.wecom_connection import WeComConnection  # noqa: E402
+from app.models.wecom_connection import WeComConnection  # noqa: E402, F401
 from app.services.organizations import OrganizationContext  # noqa: E402
 
 

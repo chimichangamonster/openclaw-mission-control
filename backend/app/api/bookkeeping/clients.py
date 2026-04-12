@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from sqlmodel import select
 

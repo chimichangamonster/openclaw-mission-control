@@ -16,7 +16,7 @@ from app.db.session import async_session_maker
 from app.models.org_config import OrgConfigData, OrgOnboardingStep
 from app.models.organization_settings import OrganizationSettings
 from app.services.audit import log_audit
-from app.services.industry_templates import TEMPLATES, detect_industry, get_template, list_templates
+from app.services.industry_templates import detect_industry, get_template, list_templates
 from app.services.organizations import OrganizationContext
 
 router = APIRouter(prefix="/industry-templates", tags=["industry-templates"])

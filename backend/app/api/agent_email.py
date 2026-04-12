@@ -80,8 +80,6 @@ async def _get_org_id(agent_ctx: AgentAuthContext) -> UUID:
     if agent.board_id is None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Agent has no board.")
     # The agent's board has an organization_id; fetch it via the board.
-    from app.models.boards import Board
-
     # Agent already has board loaded in context — but let's just import and query.
     return agent.board_id  # We'll load org from accounts below.
 

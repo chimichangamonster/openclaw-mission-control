@@ -6,8 +6,6 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
-import pytest
-
 
 class TestMicrosoftConnectionModel:
     """MicrosoftConnection model defaults and structure."""

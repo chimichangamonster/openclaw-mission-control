@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 from typing import Any, Literal
-from uuid import uuid4
 
 import pytest
 from pydantic import ValidationError
@@ -139,7 +138,6 @@ def build_update_params(job_id: str, payload: CronJobUpdate) -> dict[str, Any]:
 def normalize_job(j: dict) -> dict:
     """Minimal normalize matching the API helper."""
     schedule = j.get("schedule", {})
-    state = j.get("state", {})
     payload = j.get("payload", {})
     delivery = j.get("delivery", {})
     return {

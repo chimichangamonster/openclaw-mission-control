@@ -37,9 +37,7 @@ async def get_live_feed(
     ctx: OrganizationContext = ORG_MEMBER_DEP,
 ) -> LiveFeedResponse:
     """Return current agent sessions with activity status."""
-    from sqlmodel import select
     from sqlmodel import select as sql_select
-    from sqlmodel.ext.asyncio.session import AsyncSession
 
     from app.db.session import async_session_maker
     from app.models.gateways import Gateway

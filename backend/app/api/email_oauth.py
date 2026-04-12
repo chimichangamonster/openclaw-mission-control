@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Literal
 from uuid import uuid4
 
 import redis
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.responses import RedirectResponse
 
 from app.api.deps import ORG_MEMBER_DEP, SESSION_DEP

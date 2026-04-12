@@ -10,7 +10,7 @@ from uuid import UUID, uuid4
 from sqlalchemy import text
 from sqlmodel import select
 
-from app.api.cost_tracker import _classify_tier, _get_model_price
+from app.api.cost_tracker import _get_model_price
 from app.core.logging import get_logger
 from app.core.resilience import gateway_rpc_breaker, retry_async
 from app.core.time import utcnow
@@ -183,7 +183,7 @@ async def _aggregate_agent_spend(
     If *_raw_sessions_out* is provided (an empty list), the raw session dicts
     are appended so the caller can pass them to ``_proactive_compaction``.
     """
-    global _session_max_tokens, _session_max_date
+    global _session_max_tokens, _session_max_date  # noqa: F824
 
     today = date.today().isoformat()
     if _session_max_date != today:
@@ -415,8 +415,6 @@ async def check_budgets() -> None:
     Iterates over all organizations with a configured gateway and checks
     each org's budget independently.
     """
-    from app.models.organizations import Organization
-
     # Get all orgs that have a gateway configured
     async with async_session_maker() as session:
         result = await session.execute(

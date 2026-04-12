@@ -6,8 +6,6 @@ from __future__ import annotations
 import json
 from datetime import date
 
-import pytest
-
 # --- Model Tests ---
 
 

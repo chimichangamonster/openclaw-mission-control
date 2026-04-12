@@ -273,8 +273,7 @@ async def test_email_derived_contacts_deduplicated():
     """Email senders are deduplicated (Dave sent 2 emails but appears once)."""
     maker = await _make_session()
     async with maker() as session:
-        data = await _seed(session)
-        email_account = data["email_account"]
+        await _seed(session)
 
         # Query distinct senders from shared accounts
         from sqlalchemy import distinct as sa_distinct
@@ -373,7 +372,7 @@ async def test_private_email_contacts_excluded():
     """Email senders from private accounts are not returned."""
     maker = await _make_session()
     async with maker() as session:
-        data = await _seed(session)
+        await _seed(session)
 
         # Add a private email account with a message
         private_account = EmailAccount(

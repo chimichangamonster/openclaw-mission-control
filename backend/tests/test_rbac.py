@@ -3,8 +3,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 
 class TestRoleHierarchy:
     """Role rank ordering and constants."""

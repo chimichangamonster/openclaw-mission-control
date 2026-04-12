@@ -91,7 +91,7 @@ async def test_multiple_connections_per_org():
     """Multiple users can connect their own Google accounts to the same org."""
     maker = await _make_session()
     async with maker() as session:
-        data = await _seed(session)
+        await _seed(session)
         stmt = select(GoogleCalendarConnection).where(
             GoogleCalendarConnection.organization_id == ORG_ID,
             GoogleCalendarConnection.is_active == True,  # noqa: E712

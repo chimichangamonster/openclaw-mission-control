@@ -6,8 +6,6 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
-import pytest
-
 # Replicate the watchdog constants here to avoid importing from app
 # (which triggers psycopg/DB import chain)
 CRON_TASK_PREFIXES = [

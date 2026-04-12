@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-import datetime as _dt
 import json
 from datetime import date as _date_type
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import Column, UniqueConstraint
-from sqlalchemy.types import JSON
+from sqlalchemy import UniqueConstraint
 from sqlmodel import Field
 
 from app.core.time import utcnow

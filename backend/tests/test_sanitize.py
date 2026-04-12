@@ -3,8 +3,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from app.core.sanitize import (
     contains_injection,
     sanitize_extracted_document,

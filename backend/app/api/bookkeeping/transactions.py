@@ -6,7 +6,7 @@ from datetime import date, timedelta
 from typing import Any
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from sqlmodel import select
 

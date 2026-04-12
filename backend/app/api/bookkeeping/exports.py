@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date
 from typing import Any
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Query
 from fastapi.responses import Response
 from sqlmodel import select
 
@@ -121,15 +121,15 @@ async def export_expense_report(
     )
 
     lines = [
-        f"EXPENSE REPORT",
+        "EXPENSE REPORT",
         f"Period: {from_date or 'all'} to {to_date or 'present'}",
-        f"",
-        f"SUMMARY",
+        "",
+        "SUMMARY",
         f"  Total: ${summary['total']:,.2f}",
         f"  GST:   ${summary['total_gst']:,.2f}",
         f"  Count: {len(expenses)}",
-        f"",
-        f"BY CATEGORY",
+        "",
+        "BY CATEGORY",
     ]
     for cat, data in summary["by_category"].items():
         lines.append(

@@ -40,7 +40,7 @@ class TestExtractTextFromPdf:
         from pypdf import PdfWriter
 
         writer = PdfWriter()
-        page = writer.add_blank_page(width=72, height=72)
+        writer.add_blank_page(width=72, height=72)
         # pypdf writer doesn't easily add text, so we test with reportlab
         from reportlab.lib.pagesizes import letter
         from reportlab.pdfgen import canvas

@@ -3,8 +3,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from app.services.industry_templates import detect_industry, list_templates
 
 

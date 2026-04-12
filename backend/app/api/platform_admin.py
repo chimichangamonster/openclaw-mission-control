@@ -18,8 +18,6 @@ from sqlmodel import func, select
 
 from app.core.logging import get_logger
 from app.core.platform_auth import (
-    PLATFORM_OPERATOR,
-    PLATFORM_OWNER,
     require_platform_admin,
     require_platform_owner,
 )

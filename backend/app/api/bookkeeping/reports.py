@@ -5,12 +5,12 @@ from __future__ import annotations
 from datetime import date
 from typing import Any
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Query
 from sqlmodel import select
 
 from app.api.deps import ORG_ACTOR_DEP
 from app.db.session import async_session_maker
-from app.models.bookkeeping import BkExpense, BkPlacement, BkTimesheet, BkWorker
+from app.models.bookkeeping import BkExpense, BkPlacement, BkTimesheet
 from app.services.organizations import OrganizationContext
 
 router = APIRouter(prefix="/reports")

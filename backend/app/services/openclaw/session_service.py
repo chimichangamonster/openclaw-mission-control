@@ -37,7 +37,6 @@ from app.services.openclaw.gateway_rpc import (
     ensure_session,
     get_chat_history,
     openclaw_call,
-    reset_session,
     send_message,
 )
 from app.services.openclaw.policies import OpenClawAuthorizationPolicy

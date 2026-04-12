@@ -16,7 +16,7 @@ from __future__ import annotations
 from datetime import timedelta
 from typing import Any
 
-from sqlalchemy import delete, select, text
+from sqlalchemy import select, text
 
 from app.core.logging import get_logger
 from app.core.time import utcnow
@@ -41,7 +41,7 @@ async def _delete_batched(session: Any, stmt: Any, label: str) -> int:
     """Execute a DELETE statement in batches. Returns total rows deleted."""
     total = 0
     while True:
-        result = await session.execute(stmt.limit(BATCH_SIZE))
+        await session.execute(stmt.limit(BATCH_SIZE))
         # For bulk deletes we need a different approach — use subquery
         break  # will use subquery pattern below
     return total

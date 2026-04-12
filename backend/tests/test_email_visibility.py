@@ -128,7 +128,7 @@ async def test_shared_accounts_visible_to_all():
     """Shared accounts should be visible in unfiltered queries."""
     maker = await _make_session()
     async with maker() as session:
-        data = await _seed(session)
+        await _seed(session)
         stmt = select(EmailAccount).where(
             EmailAccount.organization_id == ORG_ID,
             EmailAccount.visibility == "shared",
@@ -144,7 +144,7 @@ async def test_private_accounts_hidden_from_non_owner():
     """Non-owner, non-admin query should not return private accounts from other users."""
     maker = await _make_session()
     async with maker() as session:
-        data = await _seed(session)
+        await _seed(session)
         from sqlalchemy import or_
 
         # Simulate non-admin member query (only shared + own)
@@ -167,7 +167,7 @@ async def test_private_account_visible_to_owner():
     """Account owner should see their own private account."""
     maker = await _make_session()
     async with maker() as session:
-        data = await _seed(session)
+        await _seed(session)
         from sqlalchemy import or_
 
         # Simulate member query for MEMBER_USER_ID (Samir)
@@ -191,7 +191,7 @@ async def test_admin_sees_all_accounts():
     """Admin/owner sees all accounts regardless of visibility."""
     maker = await _make_session()
     async with maker() as session:
-        data = await _seed(session)
+        await _seed(session)
         # Admin query — no visibility filter
         stmt = select(EmailAccount).where(
             EmailAccount.organization_id == ORG_ID,
@@ -211,7 +211,7 @@ async def test_agent_only_sees_shared_accounts():
     """Agent account listing should exclude private accounts."""
     maker = await _make_session()
     async with maker() as session:
-        data = await _seed(session)
+        await _seed(session)
         stmt = select(EmailAccount).where(
             EmailAccount.organization_id == ORG_ID,
             EmailAccount.sync_enabled == True,  # noqa: E712
@@ -228,7 +228,7 @@ async def test_agent_messages_exclude_private_accounts():
     """Agent message listing should exclude messages from private accounts."""
     maker = await _make_session()
     async with maker() as session:
-        data = await _seed(session)
+        await _seed(session)
         shared_account_ids = select(EmailAccount.id).where(
             EmailAccount.organization_id == ORG_ID,
             EmailAccount.visibility == "shared",

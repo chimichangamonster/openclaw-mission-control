@@ -7,7 +7,7 @@ from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import Date, cast, func, select
+from sqlalchemy import func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.deps import (  # type: ignore[attr-defined]

@@ -7,7 +7,6 @@ by name instead of hardcoding them.
 
 from __future__ import annotations
 
-import json
 from contextlib import asynccontextmanager
 from uuid import uuid4
 
@@ -25,7 +24,6 @@ from app.models.boards import Board
 from app.models.organization_members import OrganizationMember
 from app.models.organizations import Organization
 from app.models.paper_trading import PaperPortfolio
-from app.models.users import User
 from app.services.organizations import OrganizationContext
 
 # ---------------------------------------------------------------------------

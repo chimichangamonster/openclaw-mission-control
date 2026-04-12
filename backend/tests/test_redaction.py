@@ -3,11 +3,8 @@
 
 from __future__ import annotations
 
-import pytest
-
 from app.core.redact import (
     RedactionLevel,
-    RedactionResult,
     RedactionVault,
     redact_email_content,
     redact_sensitive,
@@ -351,7 +348,7 @@ at /home/admin/.ssh/id_rsa"""
         """Same IP appearing twice gets the same tag."""
         vault = RedactionVault()
         text = "Scan 192.168.1.1 then rescan 192.168.1.1"
-        redacted = vault.redact(text)
+        vault.redact(text)
         # Should only have one entry for the IP
         ip_entries = [e for e in vault.entries if e["original"] == "192.168.1.1"]
         assert len(ip_entries) == 1

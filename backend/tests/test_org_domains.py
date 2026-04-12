@@ -14,14 +14,13 @@ from uuid import uuid4
 
 import pytest
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
-from sqlmodel import SQLModel, col, select
+from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.models.organization_domains import (
     PERSONAL_EMAIL_DOMAINS,
     OrganizationDomain,
 )
-from app.models.organization_members import OrganizationMember
 from app.models.organizations import Organization
 from app.models.users import User
 from app.services.organizations import (
@@ -210,7 +209,7 @@ async def test_invite_takes_precedence_over_domain():
     maker = await _make_session()
     async with maker() as session:
         # Set up org with domain
-        org_domain = await _seed_org_with_domain(session, "example.com")
+        await _seed_org_with_domain(session, "example.com")
 
         # Set up a different org with an invite
         org_invite = Organization(id=uuid4(), name="Invite Org", slug="invite-org")

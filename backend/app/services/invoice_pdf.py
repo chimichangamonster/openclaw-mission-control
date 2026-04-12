@@ -57,9 +57,9 @@ def generate_invoice_pdf(
         spaceAfter=2,
     )
     normal_style = ParagraphStyle("InvNormal", parent=styles["Normal"], fontSize=10, leading=14)
-    bold_style = ParagraphStyle(
+    ParagraphStyle(
         "InvBold", parent=styles["Normal"], fontSize=10, leading=14, fontName="Helvetica-Bold"
-    )
+    )  # registered in stylesheet, not referenced directly
     small_style = ParagraphStyle(
         "InvSmall",
         parent=styles["Normal"],
@@ -74,7 +74,7 @@ def generate_invoice_pdf(
         [
             Paragraph(company.get("name", ""), title_style),
             Paragraph(
-                f"INVOICE",
+                "INVOICE",
                 ParagraphStyle(
                     "InvLabel",
                     parent=styles["Heading1"],
@@ -237,7 +237,7 @@ def generate_invoice_pdf(
     # Footer
     elements.append(
         Paragraph(
-            f"Thank you for your business!",
+            "Thank you for your business!",
             ParagraphStyle(
                 "Thanks",
                 parent=styles["Normal"],

@@ -6,7 +6,7 @@ from datetime import date, timedelta
 from typing import Any
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from sqlmodel import select
 
@@ -243,7 +243,7 @@ async def get_invoice(invoice_id: str, org_ctx: OrganizationContext = ORG_ACTOR_
                 "amount": l.amount,
                 "timesheet_id": str(l.timesheet_id) if l.timesheet_id else None,
             }
-            for l in lines_result.scalars().all()
+            for l in lines_result.scalars().all()  # noqa: E741
         ]
 
         return {**_serialize_invoice(invoice), "client_name": client_name, "lines": lines}
@@ -343,7 +343,7 @@ async def send_invoice_email(
                     "unit_price": l.unit_price,
                     "amount": l.amount,
                 }
-                for l in lines
+                for l in lines  # noqa: E741
             ]
             if lines
             else None
