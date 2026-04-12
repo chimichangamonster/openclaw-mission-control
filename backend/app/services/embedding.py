@@ -150,12 +150,14 @@ async def search_memory(
 
     where_sql = " AND ".join(where_clauses)
 
+    # Use $N-style parameters to avoid conflict between SQLAlchemy's :param
+    # syntax and PostgreSQL's ::type cast syntax
     sql = text(f"""
         SELECT id, content, source, agent_id, metadata_json, created_at,
-               1 - (embedding <=> :query_embedding::vector) AS similarity
+               1 - (embedding <=> cast(:query_embedding AS vector)) AS similarity
         FROM vector_memories
         WHERE {where_sql}
-        ORDER BY embedding <=> :query_embedding::vector
+        ORDER BY embedding <=> cast(:query_embedding AS vector)
         LIMIT :limit
     """)
     params["query_embedding"] = str(query_embedding)
