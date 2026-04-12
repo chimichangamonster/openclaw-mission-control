@@ -4,7 +4,6 @@ Skills call GET /skill-config/resolve at startup to get org-specific IDs
 instead of hardcoding UUIDs. This makes skills portable across tenants.
 """
 
-
 from __future__ import annotations
 
 from typing import Any

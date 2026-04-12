@@ -1,12 +1,10 @@
 """Audit log for security-sensitive operations."""
 
-
 from __future__ import annotations
-
-from typing import Any
 
 import json
 from datetime import datetime
+from typing import Any
 from uuid import UUID, uuid4
 
 from sqlmodel import Field

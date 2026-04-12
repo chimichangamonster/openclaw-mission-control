@@ -1,12 +1,10 @@
 """Organization settings API — BYOK keys, feature flags, branding, logo upload."""
 
-
 from __future__ import annotations
-
-from typing import Any
 
 import json
 from pathlib import Path
+from typing import Any
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile

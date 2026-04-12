@@ -1,11 +1,9 @@
 """Legal document endpoints — terms of service, privacy policy, data trust page."""
 
-
 from __future__ import annotations
 
-from typing import Any
-
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse, Response

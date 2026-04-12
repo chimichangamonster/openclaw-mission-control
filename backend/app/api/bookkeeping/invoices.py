@@ -1,11 +1,9 @@
 """Bookkeeping invoices — CRUD, generate from timesheets, status updates, email send."""
 
-
 from __future__ import annotations
 
-from typing import Any
-
 from datetime import date, timedelta
+from typing import Any
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -64,7 +62,9 @@ class InvoiceSendRequest(BaseModel):
 
 
 @router.post("", status_code=201)
-async def create_invoice(payload: InvoiceCreate, org_ctx: OrganizationContext = ORG_ACTOR_DEP) -> Any:
+async def create_invoice(
+    payload: InvoiceCreate, org_ctx: OrganizationContext = ORG_ACTOR_DEP
+) -> Any:
     async with async_session_maker() as session:
         invoice = BkInvoice(
             id=uuid4(),

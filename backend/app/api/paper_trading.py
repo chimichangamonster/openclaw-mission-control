@@ -1,11 +1,9 @@
 """Paper trading API — portfolios, positions, trades, and performance."""
 
-
 from __future__ import annotations
 
-from typing import Any
-
 from collections import defaultdict
+from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status

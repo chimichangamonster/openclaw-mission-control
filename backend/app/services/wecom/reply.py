@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import time
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import httpx
 

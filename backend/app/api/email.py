@@ -463,9 +463,7 @@ async def archive_email(
     elif account.provider == "microsoft":
         from app.services.email.providers.microsoft import move_message as msft_move_message
 
-        await msft_move_message(
-            access_token, msg.provider_message_id, target_folder="archive"
-        )
+        await msft_move_message(access_token, msg.provider_message_id, target_folder="archive")
 
     msg.folder = "archive"
     msg.updated_at = utcnow()

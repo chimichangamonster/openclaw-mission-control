@@ -1,11 +1,9 @@
 """Bookkeeping placements — assign workers to jobs with bill/pay rates."""
 
-
 from __future__ import annotations
 
-from typing import Any
-
 from datetime import date
+from typing import Any
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -31,7 +29,9 @@ class PlacementCreate(BaseModel):
 
 
 @router.post("", status_code=201)
-async def create_placement(payload: PlacementCreate, org_ctx: OrganizationContext = ORG_ACTOR_DEP) -> Any:
+async def create_placement(
+    payload: PlacementCreate, org_ctx: OrganizationContext = ORG_ACTOR_DEP
+) -> Any:
     org_id = org_ctx.organization.id
     async with async_session_maker() as session:
         placement = BkPlacement(

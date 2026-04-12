@@ -871,9 +871,7 @@ async def system_health() -> Any:
                 cron_total += len(jobs)
                 for job in jobs:
                     raw_state = job.get("state") if isinstance(job, dict) else None
-                    job_state: dict[str, Any] = (
-                        raw_state if isinstance(raw_state, dict) else {}
-                    )
+                    job_state: dict[str, Any] = raw_state if isinstance(raw_state, dict) else {}
                     last_status = job_state.get("lastRunStatus") or (
                         job.get("last_status") if isinstance(job, dict) else None
                     )

@@ -18,7 +18,7 @@ import hashlib
 import hmac
 import json
 import time
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter, HTTPException, status
 

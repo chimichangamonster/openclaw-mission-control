@@ -1,6 +1,5 @@
 """Document intake API — upload, extract text, classify."""
 
-
 from __future__ import annotations
 
 from typing import Any

@@ -11,12 +11,10 @@ Default retention periods (used when orgs don't override):
 - daily_agent_spends: 365 days
 """
 
-
 from __future__ import annotations
 
-from typing import Any
-
 from datetime import timedelta
+from typing import Any
 
 from sqlalchemy import delete, select, text
 

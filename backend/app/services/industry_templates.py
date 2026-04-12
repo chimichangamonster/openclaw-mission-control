@@ -7,12 +7,10 @@ OrgOnboardingStep records with sensible defaults the client can then customize.
 Templates are defined in code (not DB) — they're platform operator knowledge.
 """
 
-
 from __future__ import annotations
 
-from typing import Any
-
 from dataclasses import dataclass, field
+from typing import Any
 
 
 @dataclass

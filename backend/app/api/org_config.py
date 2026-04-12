@@ -4,12 +4,10 @@ Agents call GET /{category} at runtime to fetch org-specific config.
 Admins manage config via POST/PUT/DELETE.
 """
 
-
 from __future__ import annotations
 
-from typing import Any
-
 import json
+from typing import Any
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -63,7 +61,9 @@ async def list_config(category: str, org_ctx: OrganizationContext = ORG_ACTOR_DE
 
 
 @router.get("/{category}/{key}")
-async def get_config_item(category: str, key: str, org_ctx: OrganizationContext = ORG_ACTOR_DEP) -> Any:
+async def get_config_item(
+    category: str, key: str, org_ctx: OrganizationContext = ORG_ACTOR_DEP
+) -> Any:
     """Get a single config item."""
     async with async_session_maker() as session:
         result = await session.execute(

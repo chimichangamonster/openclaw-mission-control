@@ -46,7 +46,7 @@ def splice_any(path: Path) -> bool:
         if "Any" not in parts:
             parts.insert(0, "Any")
             new_line = f"{m.group(1)}{', '.join(parts)}"
-            src = src[: m.start()] + new_line + src[m.end():]
+            src = src[: m.start()] + new_line + src[m.end() :]
             path.write_text(src, encoding="utf-8")
             return True
         return False

@@ -4,12 +4,10 @@ Dual-write: persists to PostgreSQL (primary) and emits structured JSON to
 stdout (picked up by Promtail → Loki as a tamper-independent second copy).
 """
 
-
 from __future__ import annotations
 
-from typing import Any
-
 import json
+from typing import Any
 from uuid import UUID, uuid4
 
 from app.core.logging import get_logger

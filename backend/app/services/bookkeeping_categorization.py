@@ -1,11 +1,9 @@
 """Expense categorization — regex-based rules for vendor and item matching."""
 
-
 from __future__ import annotations
 
-from typing import Any
-
 import re
+from typing import Any
 
 # Vendor-based category rules (case-insensitive partial match)
 _VENDOR_RULES: list[tuple[re.Pattern[str], str]] = [

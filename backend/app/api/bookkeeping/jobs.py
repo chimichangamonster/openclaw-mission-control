@@ -1,11 +1,9 @@
 """Bookkeeping jobs CRUD + cost breakdown."""
 
-
 from __future__ import annotations
 
-from typing import Any
-
 from datetime import date
+from typing import Any
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -153,7 +151,9 @@ async def get_job_costs(job_id: str, org_ctx: OrganizationContext = ORG_ACTOR_DE
 
 
 @router.put("/{job_id}")
-async def update_job(job_id: str, payload: JobUpdate, org_ctx: OrganizationContext = ORG_ACTOR_DEP) -> Any:
+async def update_job(
+    job_id: str, payload: JobUpdate, org_ctx: OrganizationContext = ORG_ACTOR_DEP
+) -> Any:
     async with async_session_maker() as session:
         result = await session.execute(
             select(BkJob).where(

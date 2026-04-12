@@ -1,13 +1,11 @@
 """Cost tracking endpoints — OpenRouter usage, live model pricing, gateway session data, budget controls."""
 
-
 from __future__ import annotations
-
-from typing import Any
 
 import json
 import time
 from datetime import UTC, date, datetime
+from typing import Any
 
 import httpx
 from fastapi import APIRouter, Depends, Query

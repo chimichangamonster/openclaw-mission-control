@@ -1,12 +1,10 @@
 """Bookkeeping workers CRUD + safety cert tracking."""
 
-
 from __future__ import annotations
-
-from typing import Any
 
 import json
 from datetime import date, timedelta
+from typing import Any
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -80,7 +78,9 @@ async def create_worker(payload: WorkerCreate, org_ctx: OrganizationContext = OR
 
 
 @router.get("")
-async def list_workers(status: str | None = None, org_ctx: OrganizationContext = ORG_ACTOR_DEP) -> Any:
+async def list_workers(
+    status: str | None = None, org_ctx: OrganizationContext = ORG_ACTOR_DEP
+) -> Any:
     async with async_session_maker() as session:
         stmt = select(BkWorker).where(BkWorker.organization_id == org_ctx.organization.id)
         if status:

@@ -1,11 +1,9 @@
 """Bookkeeping expenses — CRUD + receipt upload + summaries."""
 
-
 from __future__ import annotations
 
-from typing import Any
-
 from datetime import date
+from typing import Any
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile
@@ -44,7 +42,9 @@ class ExpenseUpdate(BaseModel):
 
 
 @router.post("", status_code=201)
-async def create_expense(payload: ExpenseCreate, org_ctx: OrganizationContext = ORG_ACTOR_DEP) -> Any:
+async def create_expense(
+    payload: ExpenseCreate, org_ctx: OrganizationContext = ORG_ACTOR_DEP
+) -> Any:
     async with async_session_maker() as session:
         expense = BkExpense(
             id=uuid4(),

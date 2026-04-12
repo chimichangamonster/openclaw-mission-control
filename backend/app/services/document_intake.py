@@ -6,17 +6,15 @@ Processes uploaded documents (PDF, images, text) through:
 3. LLM-based classification into document types
 """
 
-
 from __future__ import annotations
-
-from typing import Any
-from uuid import UUID
 
 import base64
 import io
 import json
 import logging
 from enum import Enum
+from typing import Any
+from uuid import UUID
 
 from pypdf import PdfReader
 

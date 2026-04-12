@@ -287,9 +287,7 @@ async def send_wecom_message(
         select(OrganizationSettings).where(OrganizationSettings.organization_id == org_id)
     )
     org_settings = settings_result.scalars().first()
-    filter_region = (
-        get_org_filter_region(org_settings.data_policy) if org_settings else "none"
-    )
+    filter_region = get_org_filter_region(org_settings.data_policy) if org_settings else "none"
     filtered_content = filter_content(payload.content, region=filter_region).text
 
     if payload.msg_type == "news":

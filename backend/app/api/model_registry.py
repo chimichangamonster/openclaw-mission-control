@@ -1,13 +1,11 @@
 """Model registry API — browse models, refresh from OpenRouter, manage version pins."""
 
-
 from __future__ import annotations
-
-from typing import Any
 
 import json
 from dataclasses import asdict
 from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel

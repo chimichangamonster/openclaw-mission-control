@@ -1,11 +1,9 @@
 """Microsoft Graph Mail API client for message fetching and actions."""
 
-
 from __future__ import annotations
 
-from typing import Any
-
 from datetime import datetime
+from typing import Any
 
 import httpx
 

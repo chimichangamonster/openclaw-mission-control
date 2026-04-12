@@ -1,11 +1,9 @@
 """Industry templates API — list, apply, and track onboarding progress."""
 
-
 from __future__ import annotations
 
-from typing import Any
-
 import json
+from typing import Any
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -54,7 +52,9 @@ async def auto_detect_template(org_ctx: OrganizationContext = ORG_MEMBER_DEP) ->
 
 
 @router.get("/{template_id}")
-async def get_template_detail(template_id: str, org_ctx: OrganizationContext = ORG_MEMBER_DEP) -> Any:
+async def get_template_detail(
+    template_id: str, org_ctx: OrganizationContext = ORG_MEMBER_DEP
+) -> Any:
     """Get full template details including default config and onboarding steps."""
     template = get_template(template_id)
     if not template:

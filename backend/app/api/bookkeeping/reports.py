@@ -1,11 +1,9 @@
 """Bookkeeping reports — daily snapshot, margin analysis, worker performance."""
 
-
 from __future__ import annotations
 
-from typing import Any
-
 from datetime import date
+from typing import Any
 
 from fastapi import APIRouter, Depends, Query
 from sqlmodel import select

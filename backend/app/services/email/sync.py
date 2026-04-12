@@ -150,9 +150,7 @@ async def _fetch_from_provider(
             from_message_id=account.sync_cursor,
         )
     elif account.provider == "microsoft":
-        from app.services.email.providers.microsoft import (
-            fetch_messages as msft_fetch_messages,
-        )
+        from app.services.email.providers.microsoft import fetch_messages as msft_fetch_messages
 
         messages, next_delta = await msft_fetch_messages(
             access_token,
