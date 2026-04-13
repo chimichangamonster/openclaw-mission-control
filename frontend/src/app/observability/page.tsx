@@ -24,6 +24,7 @@ import {
   getObservabilityStatus,
   listTraces,
   listScores,
+  getTrace,
   type LangfuseTrace,
   type LangfuseScore,
   type ObservabilityStatus,
@@ -50,6 +51,7 @@ export default function ObservabilityPage() {
   const [tracePage, setTracePage] = useState(1);
   const [traceFilter, setTraceFilter] = useState("");
   const [expandedTrace, setExpandedTrace] = useState<string | null>(null);
+  const [expandedDetails, setExpandedDetails] = useState<Record<string, LangfuseTrace>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -125,17 +127,40 @@ export default function ObservabilityPage() {
   };
 
   const getTraceColor = (trace: LangfuseTrace) => {
-    const obs = trace.observations || [];
-    const hasError = obs.some((o) => o.level === "ERROR");
+    const detail = expandedDetails[trace.id];
+    if (!detail) return "text-green-500";
+    const obs = detail.observations || [];
+    const hasError = obs.some((o: any) => o.level === "ERROR");
     if (hasError) return "text-red-500";
     return "text-green-500";
   };
 
+  const handleExpandTrace = useCallback(
+    async (traceId: string) => {
+      if (expandedTrace === traceId) {
+        setExpandedTrace(null);
+        return;
+      }
+      setExpandedTrace(traceId);
+      if (!expandedDetails[traceId]) {
+        try {
+          const detail = await getTrace(traceId);
+          setExpandedDetails((prev) => ({ ...prev, [traceId]: detail }));
+        } catch {
+          // Detail fetch failed — expanded view will show "no observations"
+        }
+      }
+    },
+    [expandedTrace, expandedDetails],
+  );
+
   // Compute summary stats from loaded traces
   const tracesByName: Record<string, number> = {};
-  const errorCount = traces.filter((t) =>
-    (t.observations || []).some((o) => o.level === "ERROR"),
-  ).length;
+  const errorCount = traces.filter((t) => {
+    const detail = expandedDetails[t.id];
+    const obs = detail?.observations || [];
+    return obs.some((o: any) => o.level === "ERROR");
+  }).length;
   for (const t of traces) {
     tracesByName[t.name] = (tracesByName[t.name] || 0) + 1;
   }
@@ -271,7 +296,7 @@ export default function ObservabilityPage() {
           <div className="space-y-1">
             {traces.map((trace) => {
               const isExpanded = expandedTrace === trace.id;
-              const obs = trace.observations || [];
+              const obsCount = (trace.observations || []).length;
               const traceScores = (trace.scores || []) as LangfuseScore[];
               return (
                 <div
@@ -279,9 +304,7 @@ export default function ObservabilityPage() {
                   className="rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] transition hover:border-[color:var(--accent-soft)]"
                 >
                   <button
-                    onClick={() =>
-                      setExpandedTrace(isExpanded ? null : trace.id)
-                    }
+                    onClick={() => handleExpandTrace(trace.id)}
                     className="flex w-full items-center gap-3 px-4 py-2.5 text-left"
                   >
                     {isExpanded ? (
@@ -301,7 +324,7 @@ export default function ObservabilityPage() {
                       {trace.name}
                     </span>
                     <span className="shrink-0 text-xs text-[color:var(--text-quiet)]">
-                      {obs.length} obs
+                      {obsCount} obs
                     </span>
                     {traceScores.length > 0 && (
                       <span className="shrink-0 text-xs text-amber-600">
@@ -313,21 +336,25 @@ export default function ObservabilityPage() {
                     </span>
                   </button>
 
-                  {isExpanded && (
+                  {isExpanded && (() => {
+                    const detail = expandedDetails[trace.id];
+                    const detailObs = (detail?.observations || []) as any[];
+                    const detailMeta = detail?.metadata || trace.metadata;
+                    return (
                     <div className="border-t border-[color:var(--border)] px-4 py-3">
                       <div className="mb-2 text-xs text-[color:var(--text-quiet)]">
                         ID: {trace.id}
                       </div>
 
                       {/* Metadata */}
-                      {trace.metadata &&
-                        Object.keys(trace.metadata).length > 0 && (
+                      {detailMeta &&
+                        Object.keys(detailMeta).length > 0 && (
                           <div className="mb-3">
                             <p className="mb-1 text-xs font-semibold text-[color:var(--text-quiet)]">
                               Metadata
                             </p>
                             <div className="flex flex-wrap gap-2">
-                              {Object.entries(trace.metadata).map(
+                              {Object.entries(detailMeta).map(
                                 ([k, v]) => (
                                   <span
                                     key={k}
@@ -343,13 +370,13 @@ export default function ObservabilityPage() {
                         )}
 
                       {/* Observations */}
-                      {obs.length > 0 && (
+                      {detailObs.length > 0 ? (
                         <div className="mb-3">
                           <p className="mb-1 text-xs font-semibold text-[color:var(--text-quiet)]">
-                            Observations
+                            Observations ({detailObs.length})
                           </p>
                           <div className="space-y-1">
-                            {obs.map((o) => (
+                            {detailObs.map((o: any) => (
                               <div
                                 key={o.id}
                                 className="flex items-center gap-2 rounded bg-[color:var(--surface-muted)] px-3 py-1.5 text-xs"
@@ -364,6 +391,11 @@ export default function ObservabilityPage() {
                                 >
                                   {o.name}
                                 </span>
+                                {o.type && (
+                                  <span className="rounded bg-[color:var(--surface-muted)] px-1 text-[color:var(--text-quiet)]">
+                                    {o.type}
+                                  </span>
+                                )}
                                 {o.model && (
                                   <span className="text-[color:var(--text-quiet)]">
                                     model: {o.model}
@@ -383,7 +415,11 @@ export default function ObservabilityPage() {
                             ))}
                           </div>
                         </div>
-                      )}
+                      ) : !detail ? (
+                        <div className="mb-3 text-xs text-[color:var(--text-quiet)]">
+                          Loading observations...
+                        </div>
+                      ) : null}
 
                       {/* Scores */}
                       {traceScores.length > 0 && (
@@ -414,7 +450,8 @@ export default function ObservabilityPage() {
                         </div>
                       )}
                     </div>
-                  )}
+                    );
+                  })()}
                 </div>
               );
             })}

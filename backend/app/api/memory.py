@@ -103,3 +103,70 @@ async def update_memory_file(
     logger.info("memory.file.updated", extra={"filename": filename})
 
     return MemoryFile(name=filename, description=desc, content=body.content)
+
+
+# ── Knowledge base (read-only, compiled by knowledge-compile skill) ──
+
+
+class KnowledgeArticle(BaseModel):
+    path: str
+    title: str
+    category: str
+
+
+@router.get("/knowledge", summary="List knowledge base articles")
+async def list_knowledge_articles(
+    ctx: OrganizationContext = ORG_MEMBER_DEP,
+) -> list[KnowledgeArticle]:
+    """List compiled knowledge articles under workspace/knowledge/."""
+    workspace = resolve_org_workspace(ctx.organization)
+    kb_dir = workspace / "knowledge"
+    if not kb_dir.is_dir():
+        return []
+
+    articles: list[KnowledgeArticle] = []
+    for md_file in sorted(kb_dir.rglob("*.md")):
+        rel = md_file.relative_to(kb_dir)
+        parts = rel.parts
+        category = parts[0] if len(parts) > 1 else "general"
+        # Derive title from first heading or filename
+        title = rel.stem.replace("-", " ").title()
+        try:
+            first_line = md_file.read_text(encoding="utf-8", errors="replace").split("\n", 1)[0]
+            if first_line.startswith("# "):
+                title = first_line[2:].strip()
+        except OSError:
+            pass
+        articles.append(
+            KnowledgeArticle(
+                path=str(rel).replace("\\", "/"),
+                title=title,
+                category=category,
+            )
+        )
+    return articles
+
+
+@router.get("/knowledge/{article_path:path}", summary="Read a knowledge article")
+async def read_knowledge_article(
+    article_path: str,
+    ctx: OrganizationContext = ORG_MEMBER_DEP,
+) -> MemoryFile:
+    """Read a single knowledge base article. Path is relative to knowledge/."""
+    workspace = resolve_org_workspace(ctx.organization)
+    kb_dir = workspace / "knowledge"
+    target = (kb_dir / article_path).resolve()
+
+    # Path traversal guard
+    if not str(target).startswith(str(kb_dir.resolve())):
+        raise HTTPException(status_code=400, detail="Invalid path")
+    if not target.is_file():
+        raise HTTPException(status_code=404, detail="Article not found")
+
+    content = target.read_text(encoding="utf-8", errors="replace")
+    result = redact_sensitive(content)
+    return MemoryFile(
+        name=article_path,
+        description="Knowledge base article",
+        content=result.text,
+    )
