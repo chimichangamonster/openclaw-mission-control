@@ -66,7 +66,7 @@ export function DashboardPageLayout({
         <DashboardSidebar />
         <main
           ref={mainRef}
-          className={cn("flex-1 overflow-y-auto bg-[color:var(--bg)]", mainClassName)}
+          className={cn("flex-1 overflow-y-auto bg-[color:var(--bg)] flex flex-col", mainClassName)}
         >
           <div
             className={cn(
@@ -103,7 +103,7 @@ export function DashboardPageLayout({
             </div>
           </div>
 
-          <div className={cn("p-3 sm:p-4 md:p-8", contentClassName)}>
+          <div className={cn("p-3 sm:p-4 md:p-8 flex-1 overflow-y-auto", contentClassName)}>
             {showAdminOnlyNotice ? (
               <AdminOnlyNotice message={adminOnlyMessage ?? ""} />
             ) : (

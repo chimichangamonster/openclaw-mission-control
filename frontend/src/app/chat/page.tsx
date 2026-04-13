@@ -741,7 +741,7 @@ export default function ChatPage() {
       title="Chat"
       description="Talk to The Claw — your AI assistant that coordinates all agents"
       mainClassName="!overflow-hidden"
-      contentClassName="!p-0 h-[calc(100vh-130px)]"
+      contentClassName="!p-0 h-full overflow-hidden"
     >
       <div className="flex h-full">
         {/* ─── Session sidebar ───────────────────────────────────────── */}
