@@ -29,6 +29,7 @@ import {
   Clock,
   Tags,
   Star,
+  Brain,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 
@@ -254,7 +255,7 @@ export function DashboardSidebar() {
                 href="/memory"
                 className={cn(
                   "flex items-center gap-3 rounded-lg px-3 py-2.5 text-[color:var(--text)] transition",
-                  pathname.startsWith("/memory")
+                  pathname === "/memory"
                     ? "bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)] font-medium"
                     : "hover:bg-[color:var(--surface-muted)]",
                 )}
@@ -262,6 +263,34 @@ export function DashboardSidebar() {
                 <Folder className="h-4 w-4" />
                 Memory
               </Link>
+              {isFeatureEnabled("agent_memory") ? (
+              <Link
+                href="/memory/vector"
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-[color:var(--text)] transition",
+                  pathname.startsWith("/memory/vector")
+                    ? "bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)] font-medium"
+                    : "hover:bg-[color:var(--surface-muted)]",
+                )}
+              >
+                <Brain className="h-4 w-4" />
+                Vector Memory
+              </Link>
+              ) : null}
+              {isFeatureEnabled("observability") ? (
+              <Link
+                href="/observability"
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-[color:var(--text)] transition",
+                  pathname.startsWith("/observability")
+                    ? "bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)] font-medium"
+                    : "hover:bg-[color:var(--surface-muted)]",
+                )}
+              >
+                <Activity className="h-4 w-4" />
+                Observability
+              </Link>
+              ) : null}
               {isFeatureEnabled("cron_jobs") ? (
               <Link
                 href="/cron-jobs"
