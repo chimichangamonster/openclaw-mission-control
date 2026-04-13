@@ -30,8 +30,8 @@ DEFAULT_FEATURE_FLAGS = {
     "bookkeeping": True,
     "wechat": False,
     "pentest": False,
-    "agent_memory": False,
-    "observability": False,
+    "agent_memory": True,
+    "observability": True,
 }
 
 

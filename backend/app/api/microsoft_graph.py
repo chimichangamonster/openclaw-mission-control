@@ -278,6 +278,7 @@ async def upload_workspace_to_onedrive(
     workspace_path: str = Query(..., description="Relative path in gateway workspace"),
     folder_path: str = Query(default="", description="OneDrive folder (defaults to org default)"),
     sharing_scope: str = Query(default="organization"),
+    org_ctx: OrganizationContext = ORG_MEMBER_DEP,
     session: AsyncSession = SESSION_DEP,
 ) -> dict[str, Any]:
     """Upload a file from the gateway workspace to OneDrive. For agent use."""
@@ -288,11 +289,12 @@ async def upload_workspace_to_onedrive(
     if token != settings.local_auth_token:
         raise HTTPException(status_code=401, detail="Invalid token")
 
-    # Get the first active connection (platform-level call)
+    # Get the first active connection scoped to this org
     stmt = (
         select(MicrosoftConnection)
         .where(
             col(MicrosoftConnection.is_active).is_(True),
+            MicrosoftConnection.organization_id == org_ctx.organization.id,
         )
         .limit(1)
     )
@@ -303,11 +305,19 @@ async def upload_workspace_to_onedrive(
     graph_token = await get_valid_graph_token(session, conn)
     await session.commit()
 
-    # Read file from workspace
+    # Read file from workspace — validate path belongs to the requesting org
     workspace_root = Path(settings.gateway_workspaces_root or settings.gateway_workspace_path)
     file_path = (workspace_root / workspace_path).resolve()
     if not str(file_path).startswith(str(workspace_root.resolve())):
         raise HTTPException(status_code=403, detail="Path outside workspace.")
+
+    # Org isolation: file must be within this org's workspace subtree
+    org_slug = org_ctx.organization.slug
+    if org_slug:
+        org_workspace = (workspace_root / org_slug).resolve()
+        if not str(file_path).startswith(str(org_workspace)):
+            raise HTTPException(status_code=403, detail="File does not belong to your organization.")
+
     if not file_path.is_file():
         raise HTTPException(status_code=404, detail="File not found in workspace.")
 

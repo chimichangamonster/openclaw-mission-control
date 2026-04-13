@@ -62,6 +62,9 @@ class ComplexDocRequest(BaseModel):
     filename: str = Field(default="document.pdf", description="Output filename")
     page_width: float = Field(default=8.5, description="Page width in inches")
     page_height: float = Field(default=11.0, description="Page height in inches")
+    org_id: str | None = Field(
+        default=None, description="Organization ID — scopes file storage to org workspace"
+    )
 
 
 class DocumentResponse(BaseModel):
@@ -101,6 +104,26 @@ async def _get_adobe_credentials(org_id: UUID | None) -> tuple[str, str] | None:
         return (env_id, env_secret)
 
     return None
+
+
+async def _resolve_org_slug(org_id_str: str | None) -> str | None:
+    """Look up the org slug for an org_id string.  Returns *None* on bad/missing input."""
+    if not org_id_str:
+        return None
+    try:
+        from uuid import UUID
+
+        from sqlmodel import select as sel
+
+        from app.models.organizations import Organization
+
+        oid = UUID(org_id_str)
+    except (ValueError, TypeError):
+        return None
+    async with async_session_maker() as session:
+        result = await session.execute(sel(Organization).where(Organization.id == oid))
+        org = result.scalars().first()
+    return org.slug if org else None
 
 
 async def _resolve_org_branding(org_id_str: str | None) -> dict[str, str | None]:
@@ -158,16 +181,28 @@ async def _resolve_org_branding(org_id_str: str | None) -> dict[str, str | None]
     }
 
 
-def _save_to_workspace(content: bytes, filename: str, extension: str) -> str:
-    """Save generated content to the gateway workspaces root and return relative path."""
-    workspace = settings.gateway_workspaces_root or settings.gateway_workspace_path
-    if not workspace:
+def _save_to_workspace(
+    content: bytes, filename: str, extension: str, *, org_slug: str | None = None
+) -> str:
+    """Save generated content to an org-scoped workspace and return relative path.
+
+    When *org_slug* is provided the file lands under
+    ``{GATEWAY_WORKSPACES_ROOT}/{slug}/.openclaw/workspace/documents/``,
+    keeping each org's documents isolated.  Falls back to a shared
+    ``documents/`` dir at the workspaces root when no slug is available
+    (shouldn't happen in practice — all callers should pass a slug).
+    """
+    root = settings.gateway_workspaces_root or settings.gateway_workspace_path
+    if not root:
         raise HTTPException(
             status_code=503,
             detail="GATEWAY_WORKSPACES_ROOT not configured.",
         )
 
-    docs_dir = Path(workspace) / "documents"
+    if org_slug:
+        docs_dir = Path(root) / org_slug / ".openclaw" / "workspace" / "documents"
+    else:
+        docs_dir = Path(root) / "documents"
     docs_dir.mkdir(parents=True, exist_ok=True)
 
     # Unique filename to avoid collisions
@@ -176,8 +211,8 @@ def _save_to_workspace(content: bytes, filename: str, extension: str) -> str:
     output_path = docs_dir / unique_name
     output_path.write_bytes(content)
 
-    # Return path relative to workspace root
-    return f"documents/{unique_name}"
+    # Return path relative to workspaces root (file_serve resolves from there)
+    return str(output_path.relative_to(root))
 
 
 async def _try_onedrive_upload(
@@ -320,7 +355,8 @@ async def generate_simple(
         accent_color=accent_color,
     )
 
-    relative_path = _save_to_workspace(pdf_bytes, body.filename, ".pdf")
+    org_slug = await _resolve_org_slug(body.org_id)
+    relative_path = _save_to_workspace(pdf_bytes, body.filename, ".pdf", org_slug=org_slug)
     file_token = create_file_token(relative_path, expires_hours=48)
     download_url = f"{settings.base_url}/api/v1/files/download?token={file_token}"
 
@@ -328,7 +364,7 @@ async def generate_simple(
     od = await _try_onedrive_upload(pdf_bytes, Path(relative_path).name, "application/pdf")
 
     actual_filename = Path(relative_path).name
-    logger.info("document_gen.simple filename=%s size=%d", body.filename, len(pdf_bytes))
+    logger.info("document_gen.simple filename=%s org=%s size=%d", body.filename, org_slug, len(pdf_bytes))
 
     await _persist_document(
         filename=actual_filename,
@@ -408,7 +444,8 @@ async def generate_complex(
         engine = "html_fallback"
         extension = ".html"
 
-    relative_path = _save_to_workspace(pdf_bytes, body.filename, extension)
+    org_slug = await _resolve_org_slug(body.org_id)
+    relative_path = _save_to_workspace(pdf_bytes, body.filename, extension, org_slug=org_slug)
     file_token = create_file_token(relative_path, expires_hours=48)
     download_url = f"{settings.base_url}/api/v1/files/download?token={file_token}"
 
@@ -419,8 +456,9 @@ async def generate_complex(
     actual_filename = Path(relative_path).name
     mime = "application/pdf" if extension == ".pdf" else "text/html"
     logger.info(
-        "document_gen.complex filename=%s engine=%s size=%d",
+        "document_gen.complex filename=%s org=%s engine=%s size=%d",
         body.filename,
+        org_slug,
         engine,
         len(pdf_bytes),
     )
@@ -488,6 +526,9 @@ class GenerateWithRehydrationRequest(BaseModel):
     filename: str = Field(default="security-assessment.pdf")
     page_width: float = Field(default=8.5)
     page_height: float = Field(default=11.0)
+    org_id: str | None = Field(
+        default=None, description="Organization ID — scopes file storage to org workspace"
+    )
 
 
 def _redact_recursive(obj: Any, vault: RedactionVault) -> Any:
@@ -610,7 +651,8 @@ async def generate_complex_with_rehydration(
         engine = "html_fallback"
         extension = ".html"
 
-    relative_path = _save_to_workspace(pdf_bytes, body.filename, extension)
+    org_slug = await _resolve_org_slug(body.org_id)
+    relative_path = _save_to_workspace(pdf_bytes, body.filename, extension, org_slug=org_slug)
     file_token = create_file_token(relative_path, expires_hours=48)
     download_url = f"{settings.base_url}/api/v1/files/download?token={file_token}"
 
