@@ -66,8 +66,12 @@ VantageClaw fork of abhi1693/openclaw-mission-control. Separate git repo (not a 
 - `POST /gateways/sessions/{id}/compact` — summarise and trim session history
 - `POST /gateways/sessions/{id}/reset` — clear session conversation history
 - `GET/PUT /memory/files/{filename}` — read/write agent memory files (SOUL.md, IDENTITY.md, etc.) — org-scoped via `resolve_org_workspace()`
+- `GET /memory/knowledge` — list compiled knowledge articles from `workspace/knowledge/` (category from subdirectory)
+- `GET /memory/knowledge/{path}` — read single knowledge article (redacted)
+- `GET /memory/reports` — list cron-generated reports from `workspace/reports/` (newest-first, category from filename prefix)
+- `GET /memory/reports/{path}` — read single cron report (redacted)
 - Frontend chat page at `/chat` — single-conversation interface with The Claw, auto-resolves session, file upload (paperclip + paste), SSE real-time typing indicators with fallback polling, markdown rendering, context meter, abort/compact/clear controls
-- Frontend memory page at `/memory` — view/edit agent memory files per org
+- Frontend memory page at `/memory` — three tabs: Memory Files (editable), Knowledge Base (compiled articles), Reports (cron skill outputs)
 
 ## Contacts & Email Visibility Endpoints
 - `GET/POST /contacts` — list/create org contacts (manual external contacts)

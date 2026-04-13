@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import re
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -168,5 +171,84 @@ async def read_knowledge_article(
     return MemoryFile(
         name=article_path,
         description="Knowledge base article",
+        content=result.text,
+    )
+
+
+# ── Cron reports (read-only, written by cron skills to workspace/reports/) ──
+
+_DATE_SUFFIX_RE = re.compile(r"-\d{4}-\d{2}-\d{2}$")
+
+
+def _report_category(stem: str) -> str:
+    """Derive category from report filename stem.
+
+    ``competitor-scan-2026-04-13`` → ``Competitor Scan``
+    """
+    name = _DATE_SUFFIX_RE.sub("", stem)
+    return name.replace("-", " ").title()
+
+
+class Report(BaseModel):
+    path: str
+    title: str
+    category: str
+    file_size: int
+    created_at: str
+
+
+@router.get("/reports", summary="List cron-generated reports")
+async def list_reports(
+    ctx: OrganizationContext = ORG_MEMBER_DEP,
+) -> list[Report]:
+    """List cron-generated markdown reports under workspace/reports/."""
+    workspace = resolve_org_workspace(ctx.organization)
+    reports_dir = workspace / "reports"
+    if not reports_dir.is_dir():
+        return []
+
+    reports: list[Report] = []
+    for md_file in sorted(reports_dir.glob("*.md"), reverse=True):
+        stat = md_file.stat()
+        title = md_file.stem.replace("-", " ").title()
+        try:
+            first_line = md_file.read_text(encoding="utf-8", errors="replace").split("\n", 1)[0]
+            if first_line.startswith("# "):
+                title = first_line[2:].strip()
+        except OSError:
+            pass
+        reports.append(
+            Report(
+                path=md_file.name,
+                title=title,
+                category=_report_category(md_file.stem),
+                file_size=stat.st_size,
+                created_at=datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(),
+            )
+        )
+    return reports
+
+
+@router.get("/reports/{report_path:path}", summary="Read a cron-generated report")
+async def read_report(
+    report_path: str,
+    ctx: OrganizationContext = ORG_MEMBER_DEP,
+) -> MemoryFile:
+    """Read a single cron report. Path is relative to reports/."""
+    workspace = resolve_org_workspace(ctx.organization)
+    reports_dir = workspace / "reports"
+    target = (reports_dir / report_path).resolve()
+
+    # Path traversal guard
+    if not str(target).startswith(str(reports_dir.resolve())):
+        raise HTTPException(status_code=400, detail="Invalid path")
+    if not target.is_file():
+        raise HTTPException(status_code=404, detail="Report not found")
+
+    content = target.read_text(encoding="utf-8", errors="replace")
+    result = redact_sensitive(content)
+    return MemoryFile(
+        name=report_path,
+        description="Cron-generated report",
         content=result.text,
     )

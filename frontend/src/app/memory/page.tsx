@@ -11,6 +11,7 @@ import {
   ChevronRight,
   Edit3,
   FolderOpen,
+  Newspaper,
   RefreshCw,
   Save,
   X,
@@ -32,6 +33,14 @@ interface KnowledgeArticle {
   path: string;
   title: string;
   category: string;
+}
+
+interface Report {
+  path: string;
+  title: string;
+  category: string;
+  file_size: number;
+  created_at: string;
 }
 
 async function fetchMemoryFiles(): Promise<MemoryFile[]> {
@@ -74,9 +83,24 @@ async function fetchKnowledgeArticle(path: string): Promise<MemoryFile> {
   return res?.data ?? res;
 }
 
+async function fetchReports(): Promise<Report[]> {
+  const res: any = await customFetch("/api/v1/memory/reports", {
+    method: "GET",
+  });
+  const data = res?.data ?? res;
+  return Array.isArray(data) ? data : [];
+}
+
+async function fetchReport(path: string): Promise<MemoryFile> {
+  const res: any = await customFetch(`/api/v1/memory/reports/${path}`, {
+    method: "GET",
+  });
+  return res?.data ?? res;
+}
+
 export default function MemoryPage() {
   const { isSignedIn } = useAuth();
-  const [tab, setTab] = useState<"files" | "knowledge">("files");
+  const [tab, setTab] = useState<"files" | "knowledge" | "reports">("files");
 
   // Memory files state
   const [files, setFiles] = useState<MemoryFile[]>([]);
@@ -95,6 +119,13 @@ export default function MemoryPage() {
   const [selectedArticle, setSelectedArticle] = useState<string | null>(null);
   const [articleContent, setArticleContent] = useState("");
   const [loadingArticle, setLoadingArticle] = useState(false);
+
+  // Reports state
+  const [reports, setReports] = useState<Report[]>([]);
+  const [reportsLoading, setReportsLoading] = useState(false);
+  const [selectedReport, setSelectedReport] = useState<string | null>(null);
+  const [reportContent, setReportContent] = useState("");
+  const [loadingReport, setLoadingReport] = useState(false);
 
   const loadFiles = useCallback(async () => {
     try {
@@ -120,12 +151,25 @@ export default function MemoryPage() {
     }
   }, []);
 
+  const loadReports = useCallback(async () => {
+    try {
+      setReportsLoading(true);
+      const data = await fetchReports();
+      setReports(data);
+    } catch {
+      setReports([]);
+    } finally {
+      setReportsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (isSignedIn) {
       loadFiles();
       loadKnowledge();
+      loadReports();
     }
-  }, [isSignedIn, loadFiles, loadKnowledge]);
+  }, [isSignedIn, loadFiles, loadKnowledge, loadReports]);
 
   const openFile = async (name: string) => {
     try {
@@ -156,6 +200,19 @@ export default function MemoryPage() {
     }
   };
 
+  const openReport = async (path: string) => {
+    try {
+      setLoadingReport(true);
+      setSelectedReport(path);
+      const file = await fetchReport(path);
+      setReportContent(file.content || "");
+    } catch {
+      setReportContent("Error loading report");
+    } finally {
+      setLoadingReport(false);
+    }
+  };
+
   const saveFile = async () => {
     if (!selectedFile) return;
     try {
@@ -176,6 +233,15 @@ export default function MemoryPage() {
   const categories = articles.reduce<Record<string, KnowledgeArticle[]>>(
     (acc, a) => {
       (acc[a.category] ||= []).push(a);
+      return acc;
+    },
+    {},
+  );
+
+  // Group reports by category
+  const reportCategories = reports.reduce<Record<string, Report[]>>(
+    (acc, r) => {
+      (acc[r.category] ||= []).push(r);
       return acc;
     },
     {},
@@ -219,6 +285,23 @@ export default function MemoryPage() {
           {articles.length > 0 && (
             <span className="ml-1 rounded-full bg-[color:var(--accent-soft)] px-1.5 py-0.5 text-[10px] font-semibold">
               {articles.length}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setTab("reports")}
+          className={cn(
+            "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition",
+            tab === "reports"
+              ? "bg-[color:var(--surface)] text-[color:var(--text)] shadow-sm"
+              : "text-[color:var(--text-quiet)] hover:text-[color:var(--text)]",
+          )}
+        >
+          <Newspaper className="h-3.5 w-3.5" />
+          Reports
+          {reports.length > 0 && (
+            <span className="ml-1 rounded-full bg-[color:var(--accent-soft)] px-1.5 py-0.5 text-[10px] font-semibold">
+              {reports.length}
             </span>
           )}
         </button>
@@ -339,7 +422,7 @@ export default function MemoryPage() {
             )}
           </div>
         </div>
-      ) : (
+      ) : tab === "knowledge" ? (
         /* Knowledge Base tab */
         <div className="flex flex-col gap-6 md:flex-row">
           {/* Article list by category */}
@@ -418,6 +501,110 @@ export default function MemoryPage() {
                 </h3>
                 <pre className="max-h-[600px] w-full overflow-auto whitespace-pre-wrap rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-muted)] p-4 font-mono text-sm leading-relaxed text-[color:var(--text)]">
                   {articleContent || "(empty article)"}
+                </pre>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        /* Reports tab */
+        <div className="flex flex-col gap-6 md:flex-row">
+          {/* Report list by category */}
+          <div className="w-full md:w-72 md:shrink-0">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-[color:var(--text)]">
+                Reports
+              </h3>
+              <button
+                onClick={loadReports}
+                className="text-[color:var(--text-quiet)] hover:text-[color:var(--text)]"
+              >
+                <RefreshCw
+                  className={cn(
+                    "h-3.5 w-3.5",
+                    reportsLoading && "animate-spin",
+                  )}
+                />
+              </button>
+            </div>
+            {reports.length === 0 && !reportsLoading ? (
+              <p className="text-sm text-[color:var(--text-quiet)]">
+                No reports yet. Cron skills (competitor-intel, frontier-watch)
+                generate reports automatically on their weekly schedule.
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {Object.entries(reportCategories)
+                  .sort(([a], [b]) => a.localeCompare(b))
+                  .map(([cat, items]) => (
+                    <div key={cat}>
+                      <div className="mb-1 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-[color:var(--text-quiet)]">
+                        <FolderOpen className="h-3 w-3" />
+                        {cat}
+                      </div>
+                      <div className="space-y-0.5">
+                        {items.map((r) => (
+                          <button
+                            key={r.path}
+                            onClick={() => openReport(r.path)}
+                            className={cn(
+                              "flex w-full flex-col rounded-md px-2.5 py-1.5 text-left transition",
+                              selectedReport === r.path
+                                ? "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
+                                : "text-[color:var(--text)] hover:bg-[color:var(--surface-muted)]",
+                            )}
+                          >
+                            <span
+                              className={cn(
+                                "truncate text-sm",
+                                selectedReport === r.path && "font-medium",
+                              )}
+                            >
+                              {r.title}
+                            </span>
+                            <span className="text-xs text-[color:var(--text-quiet)]">
+                              {new Date(r.created_at).toLocaleDateString(
+                                "en-US",
+                                {
+                                  month: "short",
+                                  day: "numeric",
+                                  year: "numeric",
+                                },
+                              )}{" "}
+                              &middot; {(r.file_size / 1024).toFixed(1)} KB
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+
+          {/* Report content */}
+          <div className="min-w-0 flex-1">
+            {!selectedReport ? (
+              <div className="flex flex-col items-center justify-center py-16 text-[color:var(--text-quiet)]">
+                <Newspaper className="mb-3 h-10 w-10 opacity-30" />
+                <p>Select a report to read</p>
+                <p className="mt-1 text-xs">
+                  Raw outputs from weekly cron scans. Compiled into the
+                  Knowledge Base monthly.
+                </p>
+              </div>
+            ) : loadingReport ? (
+              <div className="flex items-center justify-center py-16 text-[color:var(--text-quiet)]">
+                Loading...
+              </div>
+            ) : (
+              <div>
+                <h3 className="mb-3 text-lg font-semibold text-[color:var(--text)]">
+                  {reports.find((r) => r.path === selectedReport)?.title ||
+                    selectedReport}
+                </h3>
+                <pre className="max-h-[600px] w-full overflow-auto whitespace-pre-wrap rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-muted)] p-4 font-mono text-sm leading-relaxed text-[color:var(--text)]">
+                  {reportContent || "(empty report)"}
                 </pre>
               </div>
             )}
