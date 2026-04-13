@@ -53,6 +53,7 @@ async def test_abort_chat_calls_correct_method() -> None:
         "chat.abort",
         {"sessionKey": SESSION_KEY},
         config=FAKE_CONFIG,
+        org_id=None,
     )
     assert result == {"ok": True}
 
@@ -70,6 +71,7 @@ async def test_compact_session_calls_correct_method() -> None:
         "sessions.compact",
         {"key": SESSION_KEY},
         config=FAKE_CONFIG,
+        org_id=None,
     )
     assert result == {"ok": True}
 
@@ -87,6 +89,7 @@ async def test_reset_session_calls_correct_method() -> None:
         "sessions.reset",
         {"key": SESSION_KEY},
         config=FAKE_CONFIG,
+        org_id=None,
     )
     assert result == {"ok": True}
 
@@ -104,6 +107,7 @@ async def test_delete_session_calls_correct_method() -> None:
         "sessions.delete",
         {"key": SESSION_KEY},
         config=FAKE_CONFIG,
+        org_id=None,
     )
     assert result == {"ok": True}
 

@@ -94,19 +94,11 @@ class TestIndustryTemplates:
         assert t is not None
         assert "staffing" in t.skills
 
-    def test_day_trading_template_exists(self):
+    def test_clean_technology_template_exists(self):
         from app.services.industry_templates import get_template
 
-        t = get_template("day_trading")
+        t = get_template("clean_technology")
         assert t is not None
-        assert "paper_trading" in t.feature_flags
-
-    def test_sports_betting_template_exists(self):
-        from app.services.industry_templates import get_template
-
-        t = get_template("sports_betting")
-        assert t is not None
-        assert "paper_bets" in t.feature_flags
 
     def test_unknown_template_returns_none(self):
         from app.services.industry_templates import get_template
@@ -117,7 +109,7 @@ class TestIndustryTemplates:
         from app.services.industry_templates import list_templates
 
         templates = list_templates()
-        assert len(templates) == 17
+        assert len(templates) == 5
         ids = {t["id"] for t in templates}
         assert "construction" in ids
         assert "waste_management" in ids

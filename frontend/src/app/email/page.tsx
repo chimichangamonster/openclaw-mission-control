@@ -8,6 +8,7 @@ import {
   AlertTriangle,
   Archive,
   CheckCircle2,
+  ChevronDown,
   Clock,
   Inbox,
   Mail,
@@ -75,6 +76,18 @@ function triageCategoryBadge(category: string) {
   const colors = TRIAGE_CATEGORY_COLORS[category] ?? "bg-slate-100 text-slate-600";
   return colors;
 }
+
+const TRIAGE_CATEGORIES = [
+  "inquiry",
+  "invoice",
+  "regulatory",
+  "stakeholder",
+  "follow_up",
+  "vendor",
+  "scheduling",
+  "spam",
+  "fyi",
+] as const;
 
 /** Infer priority from category for the dot indicator. */
 function inferPriority(msg: EmailMessage): string | null {
@@ -149,6 +162,15 @@ export default function EmailPage() {
   const handleMarkRead = async (msg: EmailMessage) => {
     const updated = await updateEmailMessage(msg.email_account_id, msg.id, {
       is_read: !msg.is_read,
+    });
+    setMessages((prev) => prev.map((m) => (m.id === updated.id ? updated : m)));
+  };
+
+  const handleRecategorize = async (msg: EmailMessage, newCategory: string) => {
+    if (newCategory === msg.triage_category) return;
+    const updated = await updateEmailMessage(msg.email_account_id, msg.id, {
+      triage_category: newCategory,
+      triage_status: "triaged",
     });
     setMessages((prev) => prev.map((m) => (m.id === updated.id ? updated : m)));
   };
@@ -441,11 +463,53 @@ export default function EmailPage() {
                               {msg.triage_status.replace("_", " ")}
                             </span>
                           )}
-                          {msg.triage_category && (
-                            <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-medium", triageCategoryBadge(msg.triage_category))}>
-                              {msg.triage_category.replace("_", " ")}
-                            </span>
-                          )}
+                          {/* Re-categorization dropdown */}
+                          <span className="relative" onClick={(e) => e.preventDefault()}>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const menu = e.currentTarget.nextElementSibling;
+                                if (menu instanceof HTMLElement) {
+                                  menu.classList.toggle("hidden");
+                                }
+                              }}
+                              className={cn(
+                                "flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium transition hover:ring-1 hover:ring-slate-300",
+                                msg.triage_category
+                                  ? triageCategoryBadge(msg.triage_category)
+                                  : "bg-slate-50 text-slate-400",
+                              )}
+                              title="Change category"
+                            >
+                              {msg.triage_category
+                                ? msg.triage_category.replace("_", " ")
+                                : "categorize"}
+                              <ChevronDown className="h-2.5 w-2.5" />
+                            </button>
+                            <div className="absolute left-0 top-full z-50 mt-1 hidden min-w-[120px] rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
+                              {TRIAGE_CATEGORIES.map((cat) => (
+                                <button
+                                  key={cat}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRecategorize(msg, cat);
+                                    const menu = e.currentTarget.parentElement;
+                                    if (menu instanceof HTMLElement) {
+                                      menu.classList.add("hidden");
+                                    }
+                                  }}
+                                  className={cn(
+                                    "block w-full px-3 py-1.5 text-left text-xs transition hover:bg-slate-50",
+                                    msg.triage_category === cat
+                                      ? "font-medium text-blue-700"
+                                      : "text-slate-600",
+                                  )}
+                                >
+                                  {cat.replace("_", " ")}
+                                </button>
+                              ))}
+                            </div>
+                          </span>
                           {msg.has_attachments ? (
                             <span className="text-xs text-slate-400">📎</span>
                           ) : null}

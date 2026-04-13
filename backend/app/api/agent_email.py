@@ -205,7 +205,10 @@ async def agent_update_email_message(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
     await _require_shared_account(session, msg)
 
-    for field in ("is_read", "is_starred", "triage_status", "triage_category", "linked_task_id"):
+    for field in (
+        "is_read", "is_starred", "triage_status", "triage_category",
+        "triage_trace_id", "linked_task_id",
+    ):
         value = getattr(payload, field, None)
         if value is not None:
             setattr(msg, field, value)

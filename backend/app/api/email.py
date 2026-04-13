@@ -317,7 +317,14 @@ async def update_email_message(
     account = await _get_account_or_404(account_id, ctx, session)
     msg = await _get_message_or_404(message_id, account, session)
 
-    for field in ("is_read", "is_starred", "triage_status", "triage_category", "linked_task_id"):
+    # Detect re-categorization for Langfuse quality scoring
+    old_category = msg.triage_category
+    new_category = payload.triage_category
+
+    for field in (
+        "is_read", "is_starred", "triage_status", "triage_category",
+        "triage_trace_id", "linked_task_id",
+    ):
         value = getattr(payload, field, None)
         if value is not None:
             setattr(msg, field, value)
@@ -326,6 +333,38 @@ async def update_email_message(
     session.add(msg)
     await session.commit()
     await session.refresh(msg)
+
+    # Fire Langfuse score when user re-categorizes a triaged email
+    if new_category and new_category != old_category and old_category is not None:
+        from app.services.langfuse_client import score_trace
+
+        trace_id = msg.triage_trace_id
+        if trace_id:
+            score_trace(
+                trace_id=trace_id,
+                name="triage_accuracy",
+                value=0.0,
+                comment=f"Re-categorized: {old_category} → {new_category}",
+            )
+        else:
+            # No trace_id yet — log as a standalone event for quality monitoring
+            from app.services.langfuse_client import get_langfuse
+
+            client = get_langfuse()
+            if client:
+                try:
+                    client.create_event(
+                        name="email_recategorization",
+                        metadata={
+                            "org_id": str(ctx.organization.id),
+                            "message_id": str(msg.id),
+                            "old_category": old_category,
+                            "new_category": new_category,
+                        },
+                    )
+                except Exception:
+                    logger.debug("langfuse.recategorization_event_failed", exc_info=True)
+
     return msg
 
 

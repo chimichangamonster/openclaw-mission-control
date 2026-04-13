@@ -65,6 +65,7 @@ class EmailMessageRead(SQLModel):
     has_attachments: bool
     triage_status: str
     triage_category: str | None = None
+    triage_trace_id: str | None = None
     linked_task_id: UUID | None = None
     synced_at: datetime
     created_at: datetime
@@ -83,6 +84,7 @@ class EmailMessageUpdate(SQLModel):
     is_starred: bool | None = None
     triage_status: str | None = None
     triage_category: str | None = None
+    triage_trace_id: str | None = None
     linked_task_id: UUID | None = None
 
 

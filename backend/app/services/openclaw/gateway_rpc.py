@@ -440,8 +440,13 @@ async def openclaw_call(
     params: dict[str, Any] | None = None,
     *,
     config: GatewayConfig,
+    org_id: str | None = None,
 ) -> object:
-    """Call a gateway RPC method and return the result payload."""
+    """Call a gateway RPC method and return the result payload.
+
+    Pass *org_id* (as a string UUID) so Langfuse traces are attributed to the
+    correct organization.  Callers without org context may omit it.
+    """
     gateway_url = _build_gateway_url(config)
     started_at = perf_counter()
     logger.debug(
@@ -469,7 +474,7 @@ async def openclaw_call(
         )
         from app.services.langfuse_client import trace_rpc_call
 
-        trace_rpc_call(method=method, duration_ms=duration_ms, success=True)
+        trace_rpc_call(method=method, duration_ms=duration_ms, success=True, org_id=org_id)
         return payload
     except OpenClawGatewayError:
         duration_ms = int((perf_counter() - started_at) * 1000)
@@ -482,7 +487,7 @@ async def openclaw_call(
 
         trace_rpc_call(
             method=method, duration_ms=duration_ms, success=False,
-            error_type="gateway_error",
+            error_type="gateway_error", org_id=org_id,
         )
         raise
     except (
@@ -503,7 +508,7 @@ async def openclaw_call(
 
         trace_rpc_call(
             method=method, duration_ms=duration_ms, success=False,
-            error_type=exc.__class__.__name__,
+            error_type=exc.__class__.__name__, org_id=org_id,
         )
         raise OpenClawGatewayError(str(exc)) from exc
 
@@ -553,6 +558,7 @@ async def send_message(
     session_key: str,
     config: GatewayConfig,
     deliver: bool = False,
+    org_id: str | None = None,
 ) -> object:
     """Send a chat message to a session."""
     params: dict[str, Any] = {
@@ -561,39 +567,40 @@ async def send_message(
         "deliver": deliver,
         "idempotencyKey": str(uuid4()),
     }
-    return await openclaw_call("chat.send", params, config=config)
+    return await openclaw_call("chat.send", params, config=config, org_id=org_id)
 
 
 async def get_chat_history(
     session_key: str,
     config: GatewayConfig,
     limit: int | None = None,
+    org_id: str | None = None,
 ) -> object:
     """Fetch chat history for a session."""
     params: dict[str, Any] = {"sessionKey": session_key}
     if limit is not None:
         params["limit"] = limit
-    return await openclaw_call("chat.history", params, config=config)
+    return await openclaw_call("chat.history", params, config=config, org_id=org_id)
 
 
-async def abort_chat(session_key: str, *, config: GatewayConfig) -> object:
+async def abort_chat(session_key: str, *, config: GatewayConfig, org_id: str | None = None) -> object:
     """Abort (stop) the agent's in-progress response."""
-    return await openclaw_call("chat.abort", {"sessionKey": session_key}, config=config)
+    return await openclaw_call("chat.abort", {"sessionKey": session_key}, config=config, org_id=org_id)
 
 
-async def compact_session(session_key: str, *, config: GatewayConfig) -> object:
+async def compact_session(session_key: str, *, config: GatewayConfig, org_id: str | None = None) -> object:
     """Compact a session's context (summarise and trim history)."""
-    return await openclaw_call("sessions.compact", {"key": session_key}, config=config)
+    return await openclaw_call("sessions.compact", {"key": session_key}, config=config, org_id=org_id)
 
 
-async def reset_session(session_key: str, *, config: GatewayConfig) -> object:
+async def reset_session(session_key: str, *, config: GatewayConfig, org_id: str | None = None) -> object:
     """Reset a session (clear conversation history)."""
-    return await openclaw_call("sessions.reset", {"key": session_key}, config=config)
+    return await openclaw_call("sessions.reset", {"key": session_key}, config=config, org_id=org_id)
 
 
-async def delete_session(session_key: str, *, config: GatewayConfig) -> object:
+async def delete_session(session_key: str, *, config: GatewayConfig, org_id: str | None = None) -> object:
     """Delete a session by key."""
-    return await openclaw_call("sessions.delete", {"key": session_key}, config=config)
+    return await openclaw_call("sessions.delete", {"key": session_key}, config=config, org_id=org_id)
 
 
 async def ensure_session(
@@ -601,9 +608,10 @@ async def ensure_session(
     *,
     config: GatewayConfig,
     label: str | None = None,
+    org_id: str | None = None,
 ) -> object:
     """Ensure a session exists and optionally update its label."""
     params: dict[str, Any] = {"key": session_key}
     if label:
         params["label"] = label
-    return await openclaw_call("sessions.patch", params, config=config)
+    return await openclaw_call("sessions.patch", params, config=config, org_id=org_id)

@@ -273,8 +273,10 @@ class GatewaySessionService(OpenClawDBService):
                 item["displayName"] = labels[key]
         return sessions_list
 
-    async def list_sessions(self, config: GatewayClientConfig) -> list[dict[str, object]]:
-        sessions = await openclaw_call("sessions.list", config=config)
+    async def list_sessions(
+        self, config: GatewayClientConfig, org_id: str | None = None,
+    ) -> list[dict[str, object]]:
+        sessions = await openclaw_call("sessions.list", config=config, org_id=org_id)
         if isinstance(sessions, dict):
             raw_items = self.as_object_list(sessions.get("sessions"))
         else:
@@ -287,12 +289,13 @@ class GatewaySessionService(OpenClawDBService):
         *,
         config: GatewayClientConfig,
         main_session: str | None,
+        org_id: str | None = None,
     ) -> list[dict[str, object]]:
         if not main_session or any(item.get("key") == main_session for item in sessions_list):
             return sessions_list
         try:
-            await ensure_session(main_session, config=config, label="Gateway Agent")
-            return await self.list_sessions(config)
+            await ensure_session(main_session, config=config, label="Gateway Agent", org_id=org_id)
+            return await self.list_sessions(config, org_id=org_id)
         except OpenClawGatewayError:
             return sessions_list
 
@@ -347,8 +350,9 @@ class GatewaySessionService(OpenClawDBService):
                 gateway_url=config.url,
                 error=compatibility.message,
             )
+        _oid = str(organization_id)
         try:
-            sessions = await openclaw_call("sessions.list", config=config)
+            sessions = await openclaw_call("sessions.list", config=config, org_id=_oid)
             if isinstance(sessions, dict):
                 sessions_list = self.as_object_list(sessions.get("sessions"))
             else:
@@ -361,6 +365,7 @@ class GatewaySessionService(OpenClawDBService):
                         main_session,
                         config=config,
                         label="Gateway Agent",
+                        org_id=_oid,
                     )
                     if isinstance(ensured, dict):
                         main_session_entry = ensured.get("entry") or ensured
@@ -391,8 +396,9 @@ class GatewaySessionService(OpenClawDBService):
         params = GatewayResolveQuery(board_id=board_id)
         board, config, main_session = await self.resolve_gateway(params, user=user)
         self._require_same_org(board, organization_id)
+        _oid = str(organization_id)
         try:
-            sessions = await openclaw_call("sessions.list", config=config)
+            sessions = await openclaw_call("sessions.list", config=config, org_id=_oid)
         except OpenClawGatewayError as exc:
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
@@ -415,6 +421,7 @@ class GatewaySessionService(OpenClawDBService):
                     main_session,
                     config=config,
                     label="Gateway Agent",
+                    org_id=_oid,
                 )
                 if isinstance(ensured, dict):
                     main_session_entry = ensured.get("entry") or ensured
@@ -433,8 +440,9 @@ class GatewaySessionService(OpenClawDBService):
         params = GatewayResolveQuery(board_id=board_id)
         board, config, main_session = await self.resolve_gateway(params, user=user)
         self._require_same_org(board, organization_id)
+        _oid = str(organization_id)
         try:
-            sessions_list = await self.list_sessions(config)
+            sessions_list = await self.list_sessions(config, org_id=_oid)
         except OpenClawGatewayError as exc:
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
@@ -444,6 +452,7 @@ class GatewaySessionService(OpenClawDBService):
             sessions_list,
             config=config,
             main_session=main_session,
+            org_id=_oid,
         )
         session_entry = next(
             (item for item in sessions_list if item.get("key") == session_id), None
@@ -454,6 +463,7 @@ class GatewaySessionService(OpenClawDBService):
                     main_session,
                     config=config,
                     label="Gateway Agent",
+                    org_id=_oid,
                 )
                 if isinstance(ensured, dict):
                     session_entry = ensured.get("entry") or ensured
@@ -491,8 +501,9 @@ class GatewaySessionService(OpenClawDBService):
         else:
             session_key = f"chat-{short_id}"
 
+        _oid = str(organization_id)
         try:
-            result = await ensure_session(session_key, config=config, label=label)
+            result = await ensure_session(session_key, config=config, label=label, org_id=_oid)
             session_entry = result.get("entry", result) if isinstance(result, dict) else result
         except OpenClawGatewayError as exc:
             raise HTTPException(
@@ -517,7 +528,7 @@ class GatewaySessionService(OpenClawDBService):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
         await require_board_access(self.session, user=user, board=board, write=True)
         try:
-            result = await ensure_session(session_id, config=config, label=label)
+            result = await ensure_session(session_id, config=config, label=label, org_id=str(organization_id))
             session_entry = result.get("entry", result) if isinstance(result, dict) else result
         except OpenClawGatewayError as exc:
             raise HTTPException(
@@ -541,7 +552,7 @@ class GatewaySessionService(OpenClawDBService):
         board, config, _ = await self.require_gateway(board_id, user=user)
         self._require_same_org(board, organization_id)
         try:
-            history = await get_chat_history(session_id, config=config)
+            history = await get_chat_history(session_id, config=config, org_id=str(organization_id))
         except OpenClawGatewayError as exc:
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
@@ -606,11 +617,12 @@ class GatewaySessionService(OpenClawDBService):
         if user is None:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
         await require_board_access(self.session, user=user, board=board, write=True)
+        _oid = str(organization_id)
         try:
             if main_session and session_id == main_session:
-                await ensure_session(main_session, config=config, label="Gateway Agent")
+                await ensure_session(main_session, config=config, label="Gateway Agent", org_id=_oid)
             message = self._build_message_with_attachments(payload)
-            await send_message(message, session_key=session_id, config=config)
+            await send_message(message, session_key=session_id, config=config, org_id=_oid)
         except OpenClawGatewayError as exc:
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
@@ -631,7 +643,7 @@ class GatewaySessionService(OpenClawDBService):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
         await require_board_access(self.session, user=user, board=board, write=True)
         try:
-            await abort_chat(session_id, config=config)
+            await abort_chat(session_id, config=config, org_id=str(organization_id))
         except OpenClawGatewayError as exc:
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
@@ -652,7 +664,7 @@ class GatewaySessionService(OpenClawDBService):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
         await require_board_access(self.session, user=user, board=board, write=True)
         try:
-            await compact_session(session_id, config=config)
+            await compact_session(session_id, config=config, org_id=str(organization_id))
         except OpenClawGatewayError as exc:
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
@@ -676,7 +688,7 @@ class GatewaySessionService(OpenClawDBService):
             # Delete the session (removes persisted JSONL file) instead of
             # just resetting in-memory state, so stale conversation history
             # doesn't get reloaded on gateway restart.
-            await delete_session(session_id, config=config)
+            await delete_session(session_id, config=config, org_id=str(organization_id))
         except OpenClawGatewayError as exc:
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,

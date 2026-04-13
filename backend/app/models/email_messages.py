@@ -46,6 +46,7 @@ class EmailMessage(TenantScoped, table=True):
     has_attachments: bool = Field(default=False)
     triage_status: str = Field(default="pending", index=True)  # pending, triaged, actioned, ignored
     triage_category: str | None = None
+    triage_trace_id: str | None = None
     linked_task_id: UUID | None = Field(default=None, foreign_key="tasks.id", index=True)
     synced_at: datetime = Field(default_factory=utcnow)
     created_at: datetime = Field(default_factory=utcnow)

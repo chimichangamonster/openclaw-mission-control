@@ -47,6 +47,7 @@ export interface EmailMessage {
   has_attachments: boolean;
   triage_status: string;
   triage_category: string | null;
+  triage_trace_id: string | null;
   linked_task_id: string | null;
   synced_at: string;
   created_at: string;

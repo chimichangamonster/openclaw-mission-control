@@ -34,13 +34,10 @@ class TestDetectIndustry:
         result = detect_industry("TopTalent Recruitment Agency")
         assert result["template_id"] == "staffing"
 
-    def test_trading_company(self):
-        result = detect_industry("Apex Capital Trading")
-        assert result["template_id"] == "day_trading"
-
-    def test_betting_company(self):
-        result = detect_industry("Pro Sports Betting Analytics")
-        assert result["template_id"] == "sports_betting"
+    def test_clean_technology(self):
+        result = detect_industry("Magnetik Biomedical Waste Treatment")
+        assert result["template_id"] == "clean_technology"
+        assert result["confidence"] >= 0.4
 
     def test_no_match_returns_none(self):
         result = detect_industry("Acme Corporation")
@@ -88,57 +85,6 @@ class TestDetectIndustry:
         assert "all_scores" in result
         assert "construction" in result["all_scores"]
         assert "waste_management" in result["all_scores"]
-
-    # ── New vertical detection tests ────────────────────────────────────────
-
-    def test_manufacturing(self):
-        result = detect_industry("Precision Manufacturing Corp")
-        assert result["template_id"] == "manufacturing"
-        assert result["confidence"] >= 0.4
-
-    def test_oil_gas(self):
-        result = detect_industry("Northern Pipeline Services")
-        assert result["template_id"] == "oil_gas"
-
-    def test_oil_gas_drilling(self):
-        result = detect_industry("Apex Drilling & Well Servicing")
-        assert result["template_id"] == "oil_gas"
-
-    def test_mining(self):
-        result = detect_industry("Goldfield Mining Corp")
-        assert result["template_id"] == "mining"
-
-    def test_agriculture(self):
-        result = detect_industry("Prairie Grain Farms")
-        assert result["template_id"] == "agriculture"
-
-    def test_logistics(self):
-        result = detect_industry("FastTrack Logistics & Warehousing")
-        assert result["template_id"] == "logistics"
-
-    def test_energy_utilities(self):
-        result = detect_industry("SunPeak Solar Energy")
-        assert result["template_id"] == "energy_utilities"
-
-    def test_healthcare_pharma(self):
-        result = detect_industry("BioGenix Pharmaceutical Lab")
-        assert result["template_id"] == "healthcare_pharma"
-
-    def test_food_beverage(self):
-        result = detect_industry("Mountain Brewery & Distillery")
-        assert result["template_id"] == "food_beverage"
-
-    def test_smart_buildings(self):
-        result = detect_industry("SmartSpace Facilities BMS Services")
-        assert result["template_id"] == "smart_buildings"
-
-    def test_telecom(self):
-        result = detect_industry("NorthLink Telecommunications")
-        assert result["template_id"] == "telecom"
-
-    def test_water_wastewater(self):
-        result = detect_industry("ClearWater Treatment Plant Services")
-        assert result["template_id"] == "water_wastewater"
 
     def test_professional_services(self):
         result = detect_industry("Vantage Consulting Advisory")

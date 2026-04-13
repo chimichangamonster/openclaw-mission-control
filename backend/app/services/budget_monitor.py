@@ -123,7 +123,7 @@ async def _proactive_compaction(
                 ratio * 100,
             )
             try:
-                result = await compact_session(key, config=gw_config)
+                result = await compact_session(key, config=gw_config, org_id=str(org_id) if org_id else None)
                 compacted = result.get("compacted", False) if isinstance(result, dict) else False
                 if compacted:
                     logger.info("budget_monitor.compact_ok session=%s", channel)

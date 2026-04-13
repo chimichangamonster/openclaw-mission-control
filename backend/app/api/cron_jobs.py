@@ -118,10 +118,15 @@ async def _get_gateway_config(org_ctx: OrganizationContext) -> GatewayConfig:
     return gateway_client_config(gateway)
 
 
-async def _rpc_call(method: str, params: dict[str, Any] | None, config: GatewayConfig) -> Any:
+async def _rpc_call(
+    method: str,
+    params: dict[str, Any] | None,
+    config: GatewayConfig,
+    org_id: str | None = None,
+) -> Any:
     """Call a gateway cron RPC method with standard error handling."""
     try:
-        return await openclaw_call(method, params, config=config)
+        return await openclaw_call(method, params, config=config, org_id=org_id)
     except OpenClawGatewayError as exc:
         logger.warning("cron.rpc_failed", extra={"method": method, "error": str(exc)})
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
@@ -229,7 +234,7 @@ async def list_cron_jobs(
     """
     try:
         config = await _get_gateway_config(org_ctx)
-        rpc_result = await _rpc_call("cron.list", None, config)
+        rpc_result = await _rpc_call("cron.list", None, config, org_id=str(org_ctx.organization.id))
         # Gateway returns a list of job dicts or {"jobs": [...]}
         if isinstance(rpc_result, dict) and "jobs" in rpc_result:
             jobs = rpc_result["jobs"]
@@ -254,7 +259,7 @@ async def create_cron_job(
     """Create a new cron job via the gateway."""
     config = await _get_gateway_config(org_ctx)
     params = _build_add_params(payload)
-    result = await _rpc_call("cron.add", params, config)
+    result = await _rpc_call("cron.add", params, config, org_id=str(org_ctx.organization.id))
     return result if isinstance(result, dict) else {"ok": True, "id": params["id"]}
 
 
@@ -267,7 +272,7 @@ async def update_cron_job(
     """Update an existing cron job via the gateway."""
     config = await _get_gateway_config(org_ctx)
     params = _build_update_params(job_id, payload)
-    result = await _rpc_call("cron.update", params, config)
+    result = await _rpc_call("cron.update", params, config, org_id=str(org_ctx.organization.id))
     return result if isinstance(result, dict) else {"ok": True}
 
 
@@ -278,7 +283,7 @@ async def delete_cron_job(
 ) -> None:
     """Remove a cron job via the gateway."""
     config = await _get_gateway_config(org_ctx)
-    await _rpc_call("cron.remove", {"id": job_id}, config)
+    await _rpc_call("cron.remove", {"id": job_id}, config, org_id=str(org_ctx.organization.id))
 
 
 @router.post("/{job_id}/run", dependencies=[_OPERATOR_DEP])
@@ -288,7 +293,7 @@ async def run_cron_job(
 ) -> dict[str, Any]:
     """Manually trigger a cron job to run immediately."""
     config = await _get_gateway_config(org_ctx)
-    result = await _rpc_call("cron.run", {"id": job_id}, config)
+    result = await _rpc_call("cron.run", {"id": job_id}, config, org_id=str(org_ctx.organization.id))
     return result if isinstance(result, dict) else {"ok": True}
 
 
@@ -299,7 +304,7 @@ async def get_cron_job_runs(
 ) -> list[dict[str, Any]]:
     """Get run history for a cron job."""
     config = await _get_gateway_config(org_ctx)
-    result = await _rpc_call("cron.runs", {"id": job_id}, config)
+    result = await _rpc_call("cron.runs", {"id": job_id}, config, org_id=str(org_ctx.organization.id))
     if isinstance(result, list):
         return result
     if isinstance(result, dict) and "runs" in result:

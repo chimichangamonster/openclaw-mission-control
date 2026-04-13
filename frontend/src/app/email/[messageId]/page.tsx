@@ -7,6 +7,7 @@ import { useParams, useSearchParams, useRouter } from "next/navigation";
 import {
   Archive,
   ArrowLeft,
+  ChevronDown,
   Download,
   Eye,
   FileSpreadsheet,
@@ -45,6 +46,11 @@ const TRIAGE_CATEGORY_COLORS: Record<string, string> = {
   spam: "bg-red-50 text-red-500",
   fyi: "bg-slate-50 text-slate-500",
 };
+
+const TRIAGE_CATEGORIES = [
+  "inquiry", "invoice", "regulatory", "stakeholder",
+  "follow_up", "vendor", "scheduling", "spam", "fyi",
+] as const;
 
 import { useAuth } from "@/auth/clerk";
 import { DashboardPageLayout } from "@/components/templates/DashboardPageLayout";
@@ -194,6 +200,15 @@ export default function EmailMessagePage() {
     setMessage(updated);
   };
 
+  const handleRecategorize = async (newCategory: string) => {
+    if (!message || newCategory === message.triage_category) return;
+    const updated = await updateEmailMessage(accountId, messageId, {
+      triage_category: newCategory,
+      triage_status: "triaged",
+    });
+    setMessage(updated);
+  };
+
   return (
     <DashboardPageLayout
       signedOut={{
@@ -262,11 +277,47 @@ export default function EmailMessagePage() {
                 <span className={cn("rounded px-2 py-1 text-xs font-medium", TRIAGE_STATUS_COLORS[message.triage_status] ?? "bg-slate-100 text-slate-600")}>
                   {message.triage_status.replace("_", " ")}
                 </span>
-                {message.triage_category ? (
-                  <span className={cn("rounded px-2 py-1 text-xs font-medium", TRIAGE_CATEGORY_COLORS[message.triage_category] ?? "bg-blue-100 text-blue-700")}>
-                    {message.triage_category.replace("_", " ")}
-                  </span>
-                ) : null}
+                {/* Re-categorization dropdown */}
+                <span className="relative">
+                  <button
+                    onClick={(e) => {
+                      const menu = e.currentTarget.nextElementSibling;
+                      if (menu instanceof HTMLElement) menu.classList.toggle("hidden");
+                    }}
+                    className={cn(
+                      "flex items-center gap-1 rounded px-2 py-1 text-xs font-medium transition hover:ring-1 hover:ring-slate-300",
+                      message.triage_category
+                        ? TRIAGE_CATEGORY_COLORS[message.triage_category] ?? "bg-blue-100 text-blue-700"
+                        : "bg-slate-50 text-slate-400",
+                    )}
+                    title="Change category"
+                  >
+                    {message.triage_category
+                      ? message.triage_category.replace("_", " ")
+                      : "categorize"}
+                    <ChevronDown className="h-3 w-3" />
+                  </button>
+                  <div className="absolute right-0 top-full z-50 mt-1 hidden min-w-[130px] rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
+                    {TRIAGE_CATEGORIES.map((cat) => (
+                      <button
+                        key={cat}
+                        onClick={(e) => {
+                          handleRecategorize(cat);
+                          const menu = e.currentTarget.parentElement;
+                          if (menu instanceof HTMLElement) menu.classList.add("hidden");
+                        }}
+                        className={cn(
+                          "block w-full px-3 py-1.5 text-left text-xs transition hover:bg-slate-50",
+                          message.triage_category === cat
+                            ? "font-medium text-blue-700"
+                            : "text-slate-600",
+                        )}
+                      >
+                        {cat.replace("_", " ")}
+                      </button>
+                    ))}
+                  </div>
+                </span>
               </div>
             </div>
 
