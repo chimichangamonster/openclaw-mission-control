@@ -124,6 +124,58 @@ test.describe("Chat — send message", () => {
   });
 });
 
+test.describe("Chat — layout", () => {
+  test("textarea is within viewport and not clipped", async ({
+    authedPage: page,
+  }) => {
+    await stubChatApis(page);
+    await page.goto("/chat");
+
+    const textarea = page.locator("textarea");
+    await expect(textarea).toBeVisible();
+
+    const box = await textarea.boundingBox();
+    expect(box).toBeTruthy();
+    const vh = page.viewportSize()!.height;
+    // Textarea bottom must be within viewport
+    expect(box!.y + box!.height).toBeLessThanOrEqual(vh);
+    // Textarea top must be positive (not pushed above viewport)
+    expect(box!.y).toBeGreaterThan(0);
+  });
+
+  test("message area is scrollable when content overflows", async ({
+    authedPage: page,
+  }) => {
+    // Return many messages so the list overflows
+    const history = Array.from({ length: 30 }, (_, i) => ({
+      role: i % 2 === 0 ? "user" : "assistant",
+      content: `Message number ${i + 1}: ${"lorem ipsum ".repeat(10)}`,
+      timestamp: new Date(Date.now() - (30 - i) * 60_000).toISOString(),
+    }));
+
+    await stubChatApis(page);
+    // Override history with many messages
+    await page.route(`${API}/gateways/sessions/*/history*`, (r: Route) =>
+      r.fulfill({ json: { history } }),
+    );
+    await page.goto("/chat");
+
+    await expect(page.getByText("Message number 30")).toBeVisible({
+      timeout: 5000,
+    });
+
+    // The message scroll container should have scrollable overflow
+    const isScrollable = await page.evaluate(() => {
+      const scrollContainers = document.querySelectorAll(".overflow-y-auto");
+      for (const el of scrollContainers) {
+        if (el.scrollHeight > el.clientHeight + 10) return true;
+      }
+      return false;
+    });
+    expect(isScrollable).toBe(true);
+  });
+});
+
 test.describe("Chat — mobile", () => {
   test("no horizontal overflow on mobile", async ({ authedPage: page }) => {
     await stubChatApis(page);

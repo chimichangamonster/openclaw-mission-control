@@ -741,7 +741,7 @@ export default function ChatPage() {
       title="Chat"
       description="Talk to The Claw — your AI assistant that coordinates all agents"
       mainClassName="!overflow-hidden"
-      contentClassName="!p-0 h-full overflow-hidden"
+      contentClassName="!p-0 !flex-1 min-h-0 !overflow-hidden"
     >
       <div className="flex h-full">
         {/* ─── Session sidebar ───────────────────────────────────────── */}
@@ -783,7 +783,7 @@ export default function ChatPage() {
         )}
 
         {/* ─── Main chat area ────────────────────────────────────────── */}
-        <div className="flex h-full flex-1 flex-col min-w-0">
+        <div className="flex h-full flex-1 flex-col min-h-0 min-w-0">
         {/* ─── Header bar ──────────────────────────────────────────────── */}
         <div className="flex items-center justify-between border-b border-[color:var(--border)] bg-[color:var(--surface)] px-4 py-3">
           <div className="flex items-center gap-3">
@@ -880,7 +880,7 @@ export default function ChatPage() {
         </div>
 
         {/* ─── Messages ────────────────────────────────────────────────── */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-4 space-y-4 sm:px-4">
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-3 py-4 space-y-4 sm:px-4">
           {resolving || messagesLoading ? (
             <div className="flex items-center justify-center py-20">
               <Loader2 className="h-6 w-6 animate-spin text-[color:var(--text-muted)]" />

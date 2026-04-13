@@ -109,7 +109,7 @@ export function ChatSessionSidebar({
   };
 
   return (
-    <div className="flex h-full w-[260px] shrink-0 flex-col border-r border-[color:var(--border)] bg-[color:var(--surface)]">
+    <div className="flex h-full w-[260px] shrink-0 flex-col min-h-0 border-r border-[color:var(--border)] bg-[color:var(--surface)]">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-[color:var(--border)] px-3 py-3">
         <h3 className="text-sm font-medium text-[color:var(--text)]">Conversations</h3>
@@ -164,7 +164,7 @@ export function ChatSessionSidebar({
       )}
 
       {/* Session list */}
-      <div className="flex-1 overflow-y-auto py-1">
+      <div className="flex-1 min-h-0 overflow-y-auto py-1">
         {isLoading && sessions.length === 0 ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-5 w-5 animate-spin text-[color:var(--text-muted)]" />
