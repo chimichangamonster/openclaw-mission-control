@@ -23,12 +23,13 @@ export function useFeatureFlags(enabled = true) {
     enabled,
     staleTime: 60_000,
     refetchOnMount: "always",
-    retry: false,
+    retry: 2,
+    retryDelay: 1000,
   });
 
   return {
     flags: query.data ?? ({} as FeatureFlags),
-    isLoading: query.isLoading,
+    isLoading: query.isLoading || (query.isError && !query.data),
     isFeatureEnabled: (flag: string) => query.data?.[flag] ?? false,
   };
 }
