@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import time as _time
 from typing import Any
 
@@ -52,74 +53,119 @@ _prev_sessions: dict[str, dict[str, Any]] = {}
 _MAX_BACKOFF_SECONDS = 30
 
 
+def _coerce_preview_text(value: Any) -> str:
+    """Safely coerce a gateway event payload value into a preview string.
+
+    Gateway chat events sometimes ship ``payload.message`` as a full ChatMessage
+    dict ``{role, content, timestamp}`` where ``content`` is a string or a
+    content-blocks array. The activity panel is a telemetry feed, not a
+    transcript — so extract the first line of readable text and cap length.
+    Unknown shapes fall through to empty string; callers substitute a
+    clean event-type label instead.
+    """
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict):
+        content = value.get("content")
+        if isinstance(content, str):
+            return content
+        if isinstance(content, list):
+            parts = [
+                p.get("text", "")
+                for p in content
+                if isinstance(p, dict) and p.get("type") == "text" and isinstance(p.get("text"), str)
+            ]
+            return " ".join(s for s in parts if s)
+    return ""
+
+
 def _normalise_event(event_name: str, payload: dict[str, Any]) -> LiveActivityEvent | None:
-    """Map a raw gateway event into a LiveActivityEvent."""
+    """Map a raw gateway event into a LiveActivityEvent.
+
+    Real gateway schema (from upstream ``server-chat.ts``):
+
+    - ``chat`` with ``state="delta"`` — streaming token chunk, many per turn.
+      Skip (returns None) — would flood the activity panel with duplicates.
+    - ``chat`` with ``state="final"`` — turn completion. ``message`` is present
+      unless it was a silent reply. THIS is the real "agent responded" signal.
+    - ``chat`` with ``state="error"`` — turn error. ``errorMessage`` present.
+    - ``agent`` with ``stream="assistant"`` — LLM token stream, too chatty. Skip.
+    - ``agent`` with ``stream="lifecycle"`` + ``data.phase="start"`` — "Thinking...".
+    - ``agent`` with ``stream="lifecycle"`` + ``data.phase="end"`` — skip (chat
+      final covers completion; lifecycle end is a duplicate).
+    - ``agent`` with ``stream="lifecycle"`` + ``data.phase="error"`` — skip (chat
+      error covers it).
+    - ``agent`` with ``stream="tool"`` — tool call/result.
+    - ``agent`` with ``stream="error"`` — seq gap warning, ignore.
+    """
 
     if event_name == "chat":
-        direction = payload.get("direction", "")
-        agent = payload.get("agentId") or payload.get("agent") or ""
         session = payload.get("sessionKey") or ""
-        text = payload.get("text") or payload.get("message") or ""
-        preview = (text[:120] + "...") if len(text) > 120 else text
+        state = payload.get("state", "")
 
-        if direction == "inbound":
-            return LiveActivityEvent(
-                event_type="agent.message_received",
-                agent_name=str(agent),
-                channel=str(session),
-                message=preview or "Message received",
-            )
-        if direction == "outbound":
+        if state == "delta":
+            return None  # Streaming chunks — skip.
+
+        if state == "final":
+            msg = payload.get("message")
+            text = _coerce_preview_text(msg)
+            preview = (text[:120] + "...") if len(text) > 120 else text
             return LiveActivityEvent(
                 event_type="agent.responded",
-                agent_name=str(agent),
                 channel=str(session),
                 message=preview or "Agent responded",
+                metadata={"runId": payload.get("runId"), "hasMessage": msg is not None},
             )
-        # Generic chat event
-        return LiveActivityEvent(
-            event_type="agent.chat",
-            agent_name=str(agent),
-            channel=str(session),
-            message=preview or "Chat activity",
-            metadata=payload,
-        )
+
+        if state == "error":
+            err = payload.get("errorMessage") or "Agent error"
+            return LiveActivityEvent(
+                event_type="agent.error",
+                channel=str(session),
+                message=str(err)[:200],
+                metadata={"runId": payload.get("runId")},
+            )
+
+        # Unknown chat state — log and skip.
+        return None
 
     if event_name == "agent":
-        agent = payload.get("agentId") or payload.get("id") or ""
-        state = payload.get("state") or payload.get("status") or ""
-        tool = payload.get("tool") or ""
-        model = payload.get("model") or ""
+        session = payload.get("sessionKey") or ""
+        stream = payload.get("stream", "")
+        data = payload.get("data") if isinstance(payload.get("data"), dict) else {}
 
-        if tool:
+        if stream == "assistant":
+            return None  # Token-by-token LLM output — too chatty.
+
+        if stream == "lifecycle":
+            phase = data.get("phase") if isinstance(data, dict) else None
+            if phase == "start":
+                return LiveActivityEvent(
+                    event_type="agent.thinking",
+                    channel=str(session),
+                    message="Thinking...",
+                    metadata={"runId": payload.get("runId")},
+                )
+            # phase="end" / "error" are duplicates of chat final/error — skip.
+            return None
+
+        if stream == "tool":
+            tool_name = ""
+            if isinstance(data, dict):
+                raw = data.get("tool") or data.get("name") or data.get("toolName")
+                if isinstance(raw, str):
+                    tool_name = raw
             return LiveActivityEvent(
                 event_type="agent.tool_call",
-                agent_name=str(agent),
-                message=f"Calling tool: {tool}",
-                model=str(model),
-                metadata=payload,
+                channel=str(session),
+                message=f"Using tool: {tool_name}" if tool_name else "Using tool",
+                metadata={"runId": payload.get("runId")},
             )
-        if state in ("thinking", "busy", "processing"):
-            return LiveActivityEvent(
-                event_type="agent.thinking",
-                agent_name=str(agent),
-                message="Thinking...",
-                model=str(model),
-            )
-        if state in ("idle", "done", "completed"):
-            return LiveActivityEvent(
-                event_type="agent.completed",
-                agent_name=str(agent),
-                message="Completed",
-                model=str(model),
-            )
-        return LiveActivityEvent(
-            event_type="agent.state_change",
-            agent_name=str(agent),
-            message=f"State: {state}" if state else "Agent event",
-            model=str(model),
-            metadata=payload,
-        )
+
+        if stream == "error":
+            return None  # seq gap noise — not a user-facing error.
+
+        return None
 
     if event_name == "cron":
         job_name = payload.get("name") or payload.get("jobName") or ""
@@ -304,17 +350,51 @@ async def _diff_health_sessions(
                         metadata={"tokenDelta": delta, "totalTokens": total},
                     )
                 )
-                # Fire-and-forget auto-title for unlabeled ad-hoc chat sessions.
-                if ":chat-" in key and user_msg and assistant_msg and organization_id:
-                    asyncio.create_task(
-                        _maybe_autotitle_session(
-                            organization_id, key, user_msg, assistant_msg
-                        ),
-                        name=f"autotitle-{key[-8:]}",
-                    )
+                # Titler hook moved to the real chat.final event dispatch site
+                # (see _listen → _autotitle_from_final). Health-diff completion
+                # is a heuristic that fires ~15s late; the chat.final event is
+                # the true signal.
 
     _prev_sessions = current
     return events
+
+
+_DEFAULT_LABEL_RE = re.compile(r"^New chat \d{2}:\d{2}:\d{2}$")
+
+
+def _is_default_label(label: str) -> bool:
+    """True for collision-proof auto-defaults produced by the sidebar.
+
+    Sidebar's ``defaultSessionLabel()`` emits ``New chat HH:MM:SS``. Those
+    labels are NOT user intent — they only exist because gateway rejects
+    duplicate ``Conversation N`` labels with 502. The titler should
+    overwrite them once a real conversation starts.
+    """
+    return bool(_DEFAULT_LABEL_RE.match(label))
+
+
+async def _autotitle_from_final(
+    org_id_str: str,
+    session_key: str,
+    assistant_msg: str,
+    config: GatewayConfig,
+) -> None:
+    """Title hook for real ``chat`` ``state=final`` events.
+
+    The final event carries the assistant reply but not the user turn, so we
+    fetch the last 2 history entries to pair them, then delegate to the same
+    title generator used by the health-diff heuristic.
+    """
+    user_msg = ""
+    try:
+        messages = await _fetch_latest_chat(session_key, config)
+        u, _a = _extract_message_preview(messages)
+        user_msg = u
+    except Exception:  # noqa: BLE001
+        pass
+    if not user_msg:
+        return
+    await _maybe_autotitle_session(org_id_str, session_key, user_msg, assistant_msg)
 
 
 async def _maybe_autotitle_session(
@@ -340,8 +420,9 @@ async def _maybe_autotitle_session(
         async with async_session_maker() as session:
             service = GatewaySessionService(session)
             existing = await service._get_session_labels(org_id)
-        if session_key in existing:
-            return  # Manual or create-time label already set; respect it.
+        current_label = existing.get(session_key)
+        if current_label and not _is_default_label(current_label):
+            return  # User-renamed — respect it.
 
         title = await generate_title(org_id, user_msg, assistant_msg)
         if not title:
@@ -480,6 +561,30 @@ async def _listen(
             normalized = _normalise_event(event_name, payload)
             if normalized:
                 broadcast.publish(_tag(normalized))
+
+            # Fire-and-forget auto-title on real chat completion signal.
+            # Runs for unlabeled :chat- sessions only; manual labels win
+            # because _maybe_autotitle_session re-checks the label store
+            # before writing.
+            if (
+                event_name == "chat"
+                and payload.get("state") == "final"
+                and organization_id
+                and isinstance(payload.get("sessionKey"), str)
+                and ":chat-" in payload["sessionKey"]
+            ):
+                asst = _coerce_preview_text(payload.get("message"))
+                if asst:
+                    session_key = payload["sessionKey"]
+                    # Fetch the latest user message from history to pair with
+                    # the assistant response — the gateway final event only
+                    # carries the assistant side.
+                    asyncio.create_task(
+                        _autotitle_from_final(
+                            organization_id, session_key, asst, config
+                        ),
+                        name=f"autotitle-{session_key[-8:]}",
+                    )
 
 
 async def run_event_listener(

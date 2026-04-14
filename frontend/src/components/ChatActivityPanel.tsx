@@ -47,6 +47,12 @@ function eventIcon(eventType: string) {
   return <Activity className="h-3.5 w-3.5 shrink-0 text-[color:var(--text-quiet)]" />;
 }
 
+function safeMessage(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (value == null) return "";
+  try { return JSON.stringify(value); } catch { return ""; }
+}
+
 function formatEventType(eventType: string): string {
   if (eventType.includes("thinking")) return "Thinking...";
   if (eventType.includes("working")) return "Working...";
@@ -82,7 +88,7 @@ export function ChatActivityPanel({
 
   const lastEvent = events.length > 0 ? events[events.length - 1] : null;
   const lastMessage = lastEvent
-    ? lastEvent.message || formatEventType(lastEvent.event_type)
+    ? safeMessage(lastEvent.message) || formatEventType(lastEvent.event_type)
     : agentTyping
       ? "Agent is working..."
       : "";
@@ -150,7 +156,7 @@ export function ChatActivityPanel({
                 >
                   {eventIcon(event.event_type)}
                   <span className="flex-1 truncate text-xs text-[color:var(--text)]">
-                    {event.message || formatEventType(event.event_type)}
+                    {safeMessage(event.message) || formatEventType(event.event_type)}
                   </span>
                   <span className="shrink-0 text-[10px] tabular-nums text-[color:var(--text-quiet)]">
                     {timeAgo(event.timestamp)}

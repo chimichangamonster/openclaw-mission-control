@@ -19,6 +19,8 @@ import {
   Image as ImageIcon,
   PanelLeft,
 } from "lucide-react";
+import { ChatErrorBoundary } from "./ChatErrorBoundary";
+import { shouldAcceptActivityEvent } from "./activity-filter";
 import { ChatSessionSidebar } from "@/components/ChatSessionSidebar";
 import {
   type ChatProject,
@@ -234,6 +236,8 @@ export default function ChatPage() {
   const MAX_ACTIVITY_EVENTS = 15;
 
   // Refs
+  const messagesRef = useRef<ChatMessage[]>([]);
+  useEffect(() => { messagesRef.current = messages; }, [messages]);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const sseRef = useRef<EventSource | null>(null);
@@ -396,10 +400,7 @@ export default function ChatPage() {
           const data: LiveSSEEvent = JSON.parse(e.data);
           const eventType = data.event_type || "";
 
-          // Accept events from any agent on this org — web chat uses
-          // dynamic gateway agent IDs that don't match static names
-          const ignoredTypes = ["cron."];
-          if (ignoredTypes.some((t) => eventType.startsWith(t))) return;
+          if (!shouldAcceptActivityEvent(data, sessionKeyRef.current)) return;
 
           // Accumulate for activity panel
           setActivityEvents((prev) => {
@@ -707,8 +708,8 @@ export default function ChatPage() {
     } catch { /* ignore */ }
   }, []);
 
-  const createSession = useCallback(async (label: string) => {
-    if (!boardId) return;
+  const createSession = useCallback(async (label: string): Promise<string | null> => {
+    if (!boardId) return null;
     try {
       const raw: any = await customFetch(
         `/api/v1/gateways/sessions?board_id=${boardId}`,
@@ -719,13 +720,27 @@ export default function ChatPage() {
         },
       );
       const data = raw?.data ?? raw;
-      if (data?.session_key) {
-        setSessionKey(data.session_key);
+      const newKey: string | null = data?.session_key ?? null;
+      if (newKey) {
+        setSessionKey(newKey);
         setSessionTokens({ total: 0, input: 0, output: 0, model: "" });
       }
       await refreshSessions();
-    } catch { /* ignore */ }
+      return newKey;
+    } catch {
+      return null;
+    }
   }, [boardId, refreshSessions]);
+
+  const createSessionInProject = useCallback(async (label: string, projectId: string) => {
+    const newKey = await createSession(label);
+    if (newKey) {
+      try {
+        await assignSessionToProject(newKey, projectId);
+        await refreshChatProjects();
+      } catch { /* ignore */ }
+    }
+  }, [createSession, refreshChatProjects]);
 
   const renameSession = useCallback(async (key: string, label: string) => {
     if (!boardId) return;
@@ -809,6 +824,7 @@ export default function ChatPage() {
               unreadSessions={unreadSessions}
               onSelectSession={handleSelectSession}
               onCreateSession={createSession}
+              onCreateSessionInProject={createSessionInProject}
               onRenameSession={renameSession}
               onDeleteSession={deleteSession}
               onAssignToProject={handleAssignToProject}
@@ -834,6 +850,7 @@ export default function ChatPage() {
                 unreadSessions={unreadSessions}
                 onSelectSession={(key) => { handleSelectSession(key); setSidebarOpen(false); }}
                 onCreateSession={createSession}
+                onCreateSessionInProject={createSessionInProject}
                 onRenameSession={renameSession}
                 onDeleteSession={deleteSession}
                 onAssignToProject={handleAssignToProject}
@@ -945,6 +962,26 @@ export default function ChatPage() {
         </div>
 
         {/* ─── Messages ────────────────────────────────────────────────── */}
+        <ChatErrorBoundary
+          debugSnapshot={() => ({
+            messageCount: messagesRef.current.length,
+            messages: messagesRef.current.map((m) => ({
+              id: m.id,
+              role: m.role,
+              timestamp: m.timestamp,
+              contentType: typeof m.content,
+              contentIsArray: Array.isArray(m.content),
+              contentPreview:
+                typeof m.content === "string"
+                  ? m.content.slice(0, 200)
+                  : JSON.stringify(m.content).slice(0, 400),
+            })),
+            sessionKey,
+            agentTyping,
+            activityEventCount: activityEvents.length,
+            lastActivityEvent: activityEvents[activityEvents.length - 1],
+          })}
+        >
         <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-3 py-4 space-y-4 sm:px-4">
           {resolving || messagesLoading ? (
             <div className="flex items-center justify-center py-20">
@@ -1001,10 +1038,10 @@ export default function ChatPage() {
                     <Bot className="h-4 w-4 text-white" />
                   </div>
                 ) : null}
-                <div>
+                <div className="max-w-[90%] md:max-w-[75%] min-w-0">
                   <div
                     className={cn(
-                      "max-w-[90%] md:max-w-[75%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed",
+                      "rounded-2xl px-4 py-2.5 text-sm leading-relaxed",
                       msg.role === "user"
                         ? "bg-[color:var(--accent-strong)] text-white rounded-br-md"
                         : "bg-[color:var(--surface-muted)] text-[color:var(--text)] rounded-bl-md",
@@ -1060,6 +1097,7 @@ export default function ChatPage() {
             agentTyping={agentTyping}
           />
         )}
+        </ChatErrorBoundary>
 
         {/* ─── Input area ──────────────────────────────────────────────── */}
         {!resolving && !resolveError ? (

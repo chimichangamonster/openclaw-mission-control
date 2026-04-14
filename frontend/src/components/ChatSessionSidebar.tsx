@@ -43,7 +43,8 @@ interface ChatSessionSidebarProps {
   mainSessionKey: string | null;
   unreadSessions?: Set<string>;
   onSelectSession: (key: string) => void;
-  onCreateSession: (label: string) => Promise<void>;
+  onCreateSession: (label: string) => Promise<unknown>;
+  onCreateSessionInProject?: (label: string, projectId: string) => Promise<void>;
   onRenameSession: (key: string, label: string) => Promise<void>;
   onDeleteSession: (key: string) => Promise<void>;
   onAssignToProject: (sessionKey: string, projectId: string | null) => Promise<void>;
@@ -67,6 +68,18 @@ const PROJECT_COLORS: { name: string; hex: string }[] = [
   { name: "purple", hex: "#a855f7" },
   { name: "pink", hex: "#ec4899" },
 ];
+
+// Generate a collision-proof default label. Gateway rejects label reuse
+// (INVALID_REQUEST "label already in use"), so we avoid sequential numbering.
+// Format: "New chat 14:32:07" — unique per second. Auto-titler will rename
+// to something meaningful ~2s after first response lands.
+function defaultSessionLabel(): string {
+  const d = new Date();
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  const ss = String(d.getSeconds()).padStart(2, "0");
+  return `New chat ${hh}:${mm}:${ss}`;
+}
 
 function formatTokens(tokens: number | undefined): string {
   if (!tokens) return "";
@@ -94,6 +107,7 @@ export function ChatSessionSidebar({
   unreadSessions,
   onSelectSession,
   onCreateSession,
+  onCreateSessionInProject,
   onRenameSession,
   onDeleteSession,
   onAssignToProject,
@@ -118,6 +132,8 @@ export function ChatSessionSidebar({
   const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(new Set());
   const [actionLoading, setActionLoading] = useState(false);
   const [filter, setFilter] = useState("");
+  const [newSessionProjectId, setNewSessionProjectId] = useState<string | null>(null);
+  const [newSessionInProjectLabel, setNewSessionInProjectLabel] = useState("");
 
   const filterQuery = filter.trim().toLowerCase();
   const matchesFilter = (session: SessionItem) =>
@@ -147,12 +163,21 @@ export function ChatSessionSidebar({
   };
 
   const handleCreate = async () => {
-    const label = newLabel.trim() || `Conversation ${sessions.length + 1}`;
+    const label = newLabel.trim() || defaultSessionLabel();
     setActionLoading(true);
     try {
       await onCreateSession(label);
       setNewLabel("");
       setCreating(false);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleQuickCreate = async () => {
+    setActionLoading(true);
+    try {
+      await onCreateSession(defaultSessionLabel());
     } finally {
       setActionLoading(false);
     }
@@ -223,6 +248,29 @@ export function ChatSessionSidebar({
     }
   };
 
+  const handleCreateInProject = async (projectId: string) => {
+    if (!onCreateSessionInProject) return;
+    const label = newSessionInProjectLabel.trim() || defaultSessionLabel();
+    setActionLoading(true);
+    try {
+      await onCreateSessionInProject(label, projectId);
+      setNewSessionInProjectLabel("");
+      setNewSessionProjectId(null);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleQuickCreateInProject = async (projectId: string) => {
+    if (!onCreateSessionInProject) return;
+    setActionLoading(true);
+    try {
+      await onCreateSessionInProject(defaultSessionLabel(), projectId);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleMoveToProject = async (sessionKey: string, projectId: string | null) => {
     setActionLoading(true);
     try {
@@ -262,36 +310,40 @@ export function ChatSessionSidebar({
             </button>
           </div>
         ) : (
-          <button
-            onClick={() => onSelectSession(session.key)}
+          <div
             className={cn(
-              "group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-xs transition min-w-0",
+              "group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs transition min-w-0",
               isActive
                 ? "bg-[color:var(--accent)]/10 text-[color:var(--text)]"
                 : "text-[color:var(--text-quiet)] hover:bg-[color:var(--surface-muted)] hover:text-[color:var(--text)]",
             )}
           >
-            <MessageSquare className={cn("h-3.5 w-3.5 shrink-0", isActive ? "text-[color:var(--accent)]" : "")} />
-            <span className={cn("flex-1 truncate min-w-0", isUnread && "font-semibold text-[color:var(--text)]")}>{label}</span>
-            {isUnread && <span className="h-2 w-2 shrink-0 rounded-full bg-blue-500" />}
-            {session.totalTokens ? (
-              <span className="shrink-0 text-[10px] tabular-nums text-[color:var(--text-quiet)] opacity-60">
-                {formatTokens(session.totalTokens)}
-              </span>
-            ) : null}
+            <button
+              onClick={() => onSelectSession(session.key)}
+              className="flex flex-1 items-center gap-2.5 text-left min-w-0"
+            >
+              <MessageSquare className={cn("h-3.5 w-3.5 shrink-0", isActive ? "text-[color:var(--accent)]" : "")} />
+              <span className={cn("flex-1 truncate min-w-0", isUnread && "font-semibold text-[color:var(--text)]")}>{label}</span>
+              {isUnread && <span className="h-2 w-2 shrink-0 rounded-full bg-blue-500" />}
+              {session.totalTokens ? (
+                <span className="shrink-0 text-[10px] tabular-nums text-[color:var(--text-quiet)] opacity-60">
+                  {formatTokens(session.totalTokens)}
+                </span>
+              ) : null}
+            </button>
             {!isMain && (
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
+                onClick={() => {
                   setMenuKey(menuKey === session.key ? null : session.key);
                   setMoveMenuKey(null);
                 }}
-                className="shrink-0 rounded p-0.5 opacity-0 group-hover:opacity-100 text-[color:var(--text-quiet)] hover:text-[color:var(--text)] transition"
+                className="shrink-0 rounded p-0.5 opacity-60 sm:opacity-0 sm:group-hover:opacity-100 text-[color:var(--text-quiet)] hover:text-[color:var(--text)] hover:opacity-100 transition"
+                aria-label="Session actions"
               >
                 <MoreHorizontal className="h-3.5 w-3.5" />
               </button>
             )}
-          </button>
+          </div>
         )}
 
         {/* Session context menu */}
@@ -373,14 +425,12 @@ export function ChatSessionSidebar({
             <FolderPlus className="h-4 w-4" />
           </button>
           <button
-            onClick={() => {
-              setCreating(true);
-              setCreatingProject(false);
-            }}
-            className="rounded-md p-1.5 text-[color:var(--text-quiet)] hover:bg-[color:var(--surface-muted)] hover:text-[color:var(--text)] transition"
+            onClick={() => void handleQuickCreate()}
+            disabled={actionLoading}
+            className="rounded-md p-1.5 text-[color:var(--text-quiet)] hover:bg-[color:var(--surface-muted)] hover:text-[color:var(--text)] transition disabled:opacity-40"
             title="New conversation"
           >
-            <Plus className="h-4 w-4" />
+            {actionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
           </button>
           <button
             onClick={onClose}
@@ -538,33 +588,83 @@ export function ChatSessionSidebar({
                         </button>
                       </>
                     ) : (
-                      <button
-                        onClick={() => toggleProjectCollapse(project.id)}
-                        className="group flex w-full items-center gap-1.5 rounded px-1 py-1 text-left text-[11px] font-medium uppercase tracking-wider text-[color:var(--text-quiet)] hover:text-[color:var(--text)] transition min-w-0"
-                      >
-                        {isCollapsed ? (
-                          <ChevronRight className="h-3 w-3 shrink-0" />
-                        ) : (
-                          <ChevronDown className="h-3 w-3 shrink-0" />
-                        )}
-                        <span
-                          className="h-2 w-2 shrink-0 rounded-full"
-                          style={{ backgroundColor: project.color || "#64748b" }}
-                        />
-                        <span className="flex-1 truncate min-w-0">{project.name}</span>
-                        <span className="shrink-0 text-[10px] tabular-nums text-[color:var(--text-quiet)] opacity-60">
-                          {projectSessions.length}
-                        </span>
+                      <div className="group flex w-full items-center gap-1.5 rounded px-1 py-1 text-[11px] font-medium uppercase tracking-wider text-[color:var(--text-quiet)] min-w-0">
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setProjectMenuId(projectMenuId === project.id ? null : project.id);
-                          }}
-                          className="shrink-0 rounded p-0.5 opacity-0 group-hover:opacity-100 text-[color:var(--text-quiet)] hover:text-[color:var(--text)] transition"
+                          onClick={() => toggleProjectCollapse(project.id)}
+                          className="flex flex-1 items-center gap-1.5 text-left hover:text-[color:var(--text)] transition min-w-0"
+                        >
+                          {isCollapsed ? (
+                            <ChevronRight className="h-3 w-3 shrink-0" />
+                          ) : (
+                            <ChevronDown className="h-3 w-3 shrink-0" />
+                          )}
+                          <span
+                            className="h-2 w-2 shrink-0 rounded-full"
+                            style={{ backgroundColor: project.color || "#64748b" }}
+                          />
+                          <span className="flex-1 truncate min-w-0">{project.name}</span>
+                          <span className="shrink-0 text-[10px] tabular-nums text-[color:var(--text-quiet)] opacity-60">
+                            {projectSessions.length}
+                          </span>
+                        </button>
+                        {onCreateSessionInProject && (
+                          <button
+                            onClick={() => {
+                              if (collapsedProjects.has(project.id)) {
+                                toggleProjectCollapse(project.id);
+                              }
+                              void handleQuickCreateInProject(project.id);
+                            }}
+                            disabled={actionLoading}
+                            className="shrink-0 rounded p-0.5 opacity-60 sm:opacity-0 sm:group-hover:opacity-100 text-[color:var(--text-quiet)] hover:text-[color:var(--text)] hover:opacity-100 transition disabled:opacity-40"
+                            title="New conversation in this project"
+                            aria-label="New conversation in this project"
+                          >
+                            <Plus className="h-3 w-3" />
+                          </button>
+                        )}
+                        <button
+                          onClick={() =>
+                            setProjectMenuId(projectMenuId === project.id ? null : project.id)
+                          }
+                          className="shrink-0 rounded p-0.5 opacity-60 sm:opacity-0 sm:group-hover:opacity-100 text-[color:var(--text-quiet)] hover:text-[color:var(--text)] hover:opacity-100 transition"
+                          aria-label="Project actions"
                         >
                           <MoreHorizontal className="h-3 w-3" />
                         </button>
-                      </button>
+                      </div>
+                    )}
+
+                    {/* Inline new-session input for this project */}
+                    {newSessionProjectId === project.id && (
+                      <div className="px-3 py-2 border-b border-[color:var(--border)]">
+                        <input
+                          autoFocus
+                          value={newSessionInProjectLabel}
+                          onChange={(e) => setNewSessionInProjectLabel(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") void handleCreateInProject(project.id);
+                            if (e.key === "Escape") setNewSessionProjectId(null);
+                          }}
+                          placeholder="Conversation name..."
+                          className="w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-2.5 py-1.5 text-xs text-[color:var(--text)] placeholder:text-[color:var(--text-quiet)] focus:border-[color:var(--accent)] focus:outline-none"
+                        />
+                        <div className="mt-1.5 flex justify-end gap-1">
+                          <button
+                            onClick={() => setNewSessionProjectId(null)}
+                            className="rounded p-1 text-[color:var(--text-quiet)] hover:text-[color:var(--text)] transition"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            onClick={() => void handleCreateInProject(project.id)}
+                            disabled={actionLoading}
+                            className="rounded p-1 text-[color:var(--accent)] hover:text-[color:var(--accent-strong)] transition disabled:opacity-40"
+                          >
+                            {actionLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                          </button>
+                        </div>
+                      </div>
                     )}
                   </div>
 

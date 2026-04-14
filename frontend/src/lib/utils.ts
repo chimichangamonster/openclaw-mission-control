@@ -23,10 +23,13 @@ export function extractTextContent(content: unknown): string {
       .map((p) => p.text)
       .join("\n");
   }
-  // Handle nested message objects (gateway sometimes wraps content)
+  // Handle nested message objects (gateway sometimes wraps content — e.g.
+  // assistant turn stored as {role, content, timestamp, stopReason, usage,
+  // api, provider, model} where .content is a string or content-blocks array).
   if (content && typeof content === "object") {
     const obj = content as Record<string, unknown>;
     if (typeof obj.content === "string") return obj.content;
+    if (Array.isArray(obj.content)) return extractTextContent(obj.content);
     if (typeof obj.text === "string") return obj.text;
     // Last resort — JSON stringify to prevent [object Object]
     try {
