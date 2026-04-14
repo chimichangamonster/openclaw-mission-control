@@ -218,7 +218,10 @@ def _extract_message_preview(messages: list[dict[str, Any]]) -> tuple[str, str]:
 
 
 async def _diff_health_sessions(
-    payload: dict[str, Any], config: GatewayConfig
+    payload: dict[str, Any],
+    config: GatewayConfig,
+    *,
+    organization_id: str = "",
 ) -> list[LiveActivityEvent]:
     """Compare health event sessions with previous state and emit deltas."""
     global _prev_sessions  # noqa: PLW0603
@@ -301,9 +304,61 @@ async def _diff_health_sessions(
                         metadata={"tokenDelta": delta, "totalTokens": total},
                     )
                 )
+                # Fire-and-forget auto-title for unlabeled ad-hoc chat sessions.
+                if ":chat-" in key and user_msg and assistant_msg and organization_id:
+                    asyncio.create_task(
+                        _maybe_autotitle_session(
+                            organization_id, key, user_msg, assistant_msg
+                        ),
+                        name=f"autotitle-{key[-8:]}",
+                    )
 
     _prev_sessions = current
     return events
+
+
+async def _maybe_autotitle_session(
+    org_id_str: str, session_key: str, user_msg: str, assistant_msg: str
+) -> None:
+    """Generate + persist a title for an ad-hoc chat session that has no label.
+
+    Fire-and-forget helper called from the health-diff completed branch. All
+    errors are swallowed — worst case is the session keeps its default label.
+    """
+    from uuid import UUID
+
+    from app.db.session import async_session_maker
+    from app.services.openclaw.session_service import GatewaySessionService
+    from app.services.openclaw.session_titler import generate_title
+
+    try:
+        org_id = UUID(org_id_str)
+    except (ValueError, TypeError):
+        return
+
+    try:
+        async with async_session_maker() as session:
+            service = GatewaySessionService(session)
+            existing = await service._get_session_labels(org_id)
+        if session_key in existing:
+            return  # Manual or create-time label already set; respect it.
+
+        title = await generate_title(org_id, user_msg, assistant_msg)
+        if not title:
+            return
+
+        async with async_session_maker() as session:
+            service = GatewaySessionService(session)
+            await service._save_session_label(org_id, session_key, title)
+
+        logger.info(
+            "session_titler.persisted org=%s key=%s title=%s",
+            org_id_str[:8],
+            session_key[-12:],
+            title,
+        )
+    except Exception:  # noqa: BLE001
+        logger.debug("session_titler.autotitle_failed key=%s", session_key, exc_info=True)
 
 
 async def _listen(
@@ -416,7 +471,9 @@ async def _listen(
 
             # Health events use diff-based detection.
             if event_name == "health":
-                for activity in await _diff_health_sessions(payload, config):
+                for activity in await _diff_health_sessions(
+                    payload, config, organization_id=organization_id
+                ):
                     broadcast.publish(_tag(activity))
                 continue
 

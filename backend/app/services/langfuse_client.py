@@ -85,6 +85,39 @@ def trace_embedding(
         logger.debug("langfuse.trace_embedding_failed", exc_info=True)
 
 
+# ── Session titling traces ────────────────────────────────────────────
+
+
+def trace_session_titling(
+    *,
+    org_id: str,
+    model: str,
+    title: str,
+    token_count: int | None = None,
+) -> None:
+    """Log an auto-generated session title to Langfuse."""
+    client = get_langfuse()
+    if not client:
+        return
+
+    try:
+        span = client.start_observation(
+            name="session_titling",
+            metadata={"org_id": org_id, "title": title},
+        )
+        gen = span.start_observation(
+            name="generate_title",
+            as_type="generation",
+            model=model,
+            output=title,
+            usage_details={"total": token_count} if token_count else None,
+        )
+        gen.end()
+        span.end()
+    except Exception:
+        logger.debug("langfuse.trace_session_titling_failed", exc_info=True)
+
+
 # ── Gateway RPC traces ────────────────────────────────────────────────
 
 

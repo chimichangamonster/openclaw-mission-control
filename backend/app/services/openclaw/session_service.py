@@ -510,6 +510,9 @@ class GatewaySessionService(OpenClawDBService):
                 status_code=status.HTTP_502_BAD_GATEWAY,
                 detail=str(exc),
             ) from exc
+        # Persist label in MC database so it survives gateway restarts.
+        # Gateway's ensure_session accepts the label but doesn't persist it.
+        await self._save_session_label(organization_id, session_key, label)
         return CreateSessionResponse(session_key=session_key, session=session_entry)
 
     async def rename_session(

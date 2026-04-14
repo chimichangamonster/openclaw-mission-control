@@ -11,6 +11,7 @@ import {
   X,
   PanelLeftClose,
   Loader2,
+  Search,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -71,6 +72,14 @@ export function ChatSessionSidebar({
   const [editLabel, setEditLabel] = useState("");
   const [menuKey, setMenuKey] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [filter, setFilter] = useState("");
+
+  const filterQuery = filter.trim().toLowerCase();
+  const visibleSessions = filterQuery
+    ? sessions.filter((session) =>
+        sessionLabel(session, mainSessionKey).toLowerCase().includes(filterQuery),
+      )
+    : sessions;
 
   const handleCreate = async () => {
     const label = newLabel.trim() || `Conversation ${sessions.length + 1}`;
@@ -131,6 +140,30 @@ export function ChatSessionSidebar({
         </div>
       </div>
 
+      {/* Search input */}
+      {sessions.length > 0 && (
+        <div className="border-b border-[color:var(--border)] px-3 py-2">
+          <div className="relative">
+            <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[color:var(--text-quiet)]" />
+            <input
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              placeholder="Search conversations"
+              className="w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] pl-7 pr-7 py-1.5 text-xs text-[color:var(--text)] placeholder:text-[color:var(--text-quiet)] focus:border-[color:var(--accent)] focus:outline-none"
+            />
+            {filter && (
+              <button
+                onClick={() => setFilter("")}
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-[color:var(--text-quiet)] hover:text-[color:var(--text)] transition"
+                title="Clear search"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* New conversation input */}
       {creating && (
         <div className="border-b border-[color:var(--border)] px-3 py-2">
@@ -173,8 +206,12 @@ export function ChatSessionSidebar({
           <p className="px-3 py-4 text-xs text-[color:var(--text-quiet)] text-center">
             No conversations yet
           </p>
+        ) : visibleSessions.length === 0 ? (
+          <p className="px-3 py-4 text-xs text-[color:var(--text-quiet)] text-center">
+            No matches
+          </p>
         ) : (
-          sessions.map((session) => {
+          visibleSessions.map((session) => {
             const isActive = session.key === activeSessionKey;
             const isMain = session.key === mainSessionKey;
             const isUnread = !isActive && (unreadSessions?.has(session.key) ?? false);
