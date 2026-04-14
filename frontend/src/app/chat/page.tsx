@@ -20,6 +20,15 @@ import {
   PanelLeft,
 } from "lucide-react";
 import { ChatSessionSidebar } from "@/components/ChatSessionSidebar";
+import {
+  type ChatProject,
+  listChatProjects,
+  listSessionAssignments,
+  createChatProject,
+  updateChatProject,
+  deleteChatProject,
+  assignSessionToProject,
+} from "@/lib/chat-projects-api";
 import { ChatActivityPanel } from "@/components/ChatActivityPanel";
 import type { LiveSSEEvent } from "@/components/ChatActivityPanel";
 import { useNotifications } from "@/components/providers/NotificationProvider";
@@ -199,6 +208,10 @@ export default function ChatPage() {
   const [mainSessionKey, setMainSessionKey] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
+  // Chat projects + session-to-project assignments
+  const [chatProjects, setChatProjects] = useState<ChatProject[]>([]);
+  const [projectAssignments, setProjectAssignments] = useState<Record<string, string>>({});
+
   // Chat state
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [messagesLoading, setMessagesLoading] = useState(false);
@@ -236,6 +249,17 @@ export default function ChatPage() {
     boardIdRef.current = boardId;
   }, [boardId]);
 
+  const refreshChatProjects = useCallback(async () => {
+    try {
+      const [projects, assignments] = await Promise.all([
+        listChatProjects(false),
+        listSessionAssignments(),
+      ]);
+      setChatProjects(projects);
+      setProjectAssignments(assignments);
+    } catch { /* ignore */ }
+  }, []);
+
   // ─── Resolve The Claw's session on mount ──────────────────────────────────
 
   useEffect(() => {
@@ -260,6 +284,7 @@ export default function ChatPage() {
           (s: any) => typeof s === "object" && s !== null && s.key,
         );
         setAllSessions(list);
+        void refreshChatProjects();
         const claw = findClawSession(list);
         if (claw) {
           setMainSessionKey(claw.key);
@@ -284,7 +309,7 @@ export default function ChatPage() {
     return () => {
       cancelled = true;
     };
-  }, [isSignedIn, boardId, boardResolving]);
+  }, [isSignedIn, boardId, boardResolving, refreshChatProjects]);
 
   // ─── Poll session tokens ───────────────────────────────────────────────────
 
@@ -638,6 +663,34 @@ export default function ChatPage() {
 
   // ─── Session CRUD (multi-session) ─────────────────────────────────────────
 
+  const handleCreateProject = useCallback(async (name: string, color: string | null) => {
+    try {
+      await createChatProject({ name, color });
+      await refreshChatProjects();
+    } catch { /* ignore */ }
+  }, [refreshChatProjects]);
+
+  const handleRenameProject = useCallback(async (projectId: string, name: string) => {
+    try {
+      await updateChatProject(projectId, { name });
+      await refreshChatProjects();
+    } catch { /* ignore */ }
+  }, [refreshChatProjects]);
+
+  const handleArchiveProject = useCallback(async (projectId: string) => {
+    try {
+      await deleteChatProject(projectId);
+      await refreshChatProjects();
+    } catch { /* ignore */ }
+  }, [refreshChatProjects]);
+
+  const handleAssignToProject = useCallback(async (sessionKey: string, projectId: string | null) => {
+    try {
+      await assignSessionToProject(sessionKey, projectId);
+      await refreshChatProjects();
+    } catch { /* ignore */ }
+  }, [refreshChatProjects]);
+
   const refreshSessions = useCallback(async () => {
     const bid = boardIdRef.current;
     if (!bid) return;
@@ -749,6 +802,8 @@ export default function ChatPage() {
           <div className="hidden md:block">
             <ChatSessionSidebar
               sessions={allSessions}
+              projects={chatProjects}
+              assignments={projectAssignments}
               activeSessionKey={sessionKey}
               mainSessionKey={mainSessionKey}
               unreadSessions={unreadSessions}
@@ -756,6 +811,10 @@ export default function ChatPage() {
               onCreateSession={createSession}
               onRenameSession={renameSession}
               onDeleteSession={deleteSession}
+              onAssignToProject={handleAssignToProject}
+              onCreateProject={handleCreateProject}
+              onRenameProject={handleRenameProject}
+              onArchiveProject={handleArchiveProject}
               onClose={() => setSidebarOpen(false)}
               isLoading={resolving}
             />
@@ -768,6 +827,8 @@ export default function ChatPage() {
             <div className="relative z-50 h-full">
               <ChatSessionSidebar
                 sessions={allSessions}
+                projects={chatProjects}
+                assignments={projectAssignments}
                 activeSessionKey={sessionKey}
                 mainSessionKey={mainSessionKey}
                 unreadSessions={unreadSessions}
@@ -775,6 +836,10 @@ export default function ChatPage() {
                 onCreateSession={createSession}
                 onRenameSession={renameSession}
                 onDeleteSession={deleteSession}
+                onAssignToProject={handleAssignToProject}
+                onCreateProject={handleCreateProject}
+                onRenameProject={handleRenameProject}
+                onArchiveProject={handleArchiveProject}
                 onClose={() => setSidebarOpen(false)}
                 isLoading={resolving}
               />

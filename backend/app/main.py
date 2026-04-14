@@ -28,6 +28,7 @@ from app.api.board_onboarding import router as board_onboarding_router
 from app.api.board_webhooks import router as board_webhooks_router
 from app.api.boards import router as boards_router
 from app.api.bookkeeping import router as bookkeeping_router
+from app.api.chat_projects import router as chat_projects_router
 from app.api.contacts import router as contacts_router
 from app.api.cost_tracker import router as cost_tracker_router
 from app.api.cron_jobs import router as cron_jobs_router
@@ -953,6 +954,7 @@ api_v1.include_router(paper_bets_router)
 api_v1.include_router(cost_tracker_router)
 api_v1.include_router(org_settings_router)
 api_v1.include_router(cron_jobs_router)
+api_v1.include_router(chat_projects_router)
 api_v1.include_router(model_registry_router)
 api_v1.include_router(board_memory_router)
 api_v1.include_router(board_webhooks_router)

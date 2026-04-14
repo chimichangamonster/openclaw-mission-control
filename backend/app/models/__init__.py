@@ -23,6 +23,7 @@ from app.models.bookkeeping import (
     BkWorker,
 )
 from app.models.budget import BudgetConfig, DailyAgentSpend
+from app.models.chat_projects import ChatProject
 from app.models.crypto_positions import CryptoPosition
 from app.models.crypto_trade_proposals import CryptoTradeProposal
 from app.models.email_accounts import EmailAccount
@@ -76,6 +77,7 @@ __all__ = [
     "BoardGroup",
     "Board",
     "BudgetConfig",
+    "ChatProject",
     "DailyAgentSpend",
     "CryptoPosition",
     "CryptoTradeProposal",
