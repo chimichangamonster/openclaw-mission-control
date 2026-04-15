@@ -49,7 +49,7 @@ async def generate_title(
     async with async_session_maker() as session:
         endpoint = await resolve_llm_endpoint(session, org_id)
     if not endpoint:
-        logger.debug("session_titler.no_endpoint org_id=%s", org_id)
+        logger.info("session_titler.no_endpoint org_id=%s", org_id)
         return None
 
     prompt = (
@@ -79,14 +79,15 @@ async def generate_title(
             resp.raise_for_status()
             data = resp.json()
     except httpx.HTTPError:
-        logger.debug("session_titler.http_error org_id=%s", org_id, exc_info=True)
+        logger.info("session_titler.http_error org_id=%s", org_id, exc_info=True)
         return None
     except Exception:
-        logger.debug("session_titler.unexpected_error org_id=%s", org_id, exc_info=True)
+        logger.info("session_titler.unexpected_error org_id=%s", org_id, exc_info=True)
         return None
 
     title = _extract_title(data)
     if not title:
+        logger.info("session_titler.empty_title_from_llm org_id=%s", org_id)
         return None
 
     try:

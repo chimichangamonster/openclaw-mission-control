@@ -229,9 +229,17 @@ def _normalise_event(event_name: str, payload: dict[str, Any]) -> LiveActivityEv
 
 
 async def _fetch_latest_chat(session_key: str, config: GatewayConfig) -> list[dict[str, Any]]:
-    """Fetch the last 2 messages from a session's chat history (zero token cost)."""
+    """Fetch recent messages from a session's chat history (zero token cost).
+
+    Uses limit=20 rather than 2 because tool-calling agents interleave the
+    user turn with assistant thinking/toolCall messages and toolResult
+    replies. With limit=2 we would get [toolResult, assistant(text)] and
+    miss the user message entirely — which silently broke the titler
+    dispatch path until 2026-04-15. _extract_message_preview walks
+    backward and will stop at the first user turn it finds.
+    """
     try:
-        result = await get_chat_history(session_key, config, limit=2)
+        result = await get_chat_history(session_key, config, limit=20)
         if isinstance(result, dict):
             return result.get("messages", []) or result.get("history", []) or []
         if isinstance(result, list):
@@ -385,6 +393,11 @@ async def _autotitle_from_final(
     fetch the last 2 history entries to pair them, then delegate to the same
     title generator used by the health-diff heuristic.
     """
+    logger.info(
+        "session_titler.final_enter org=%s key=%s",
+        org_id_str[:8],
+        session_key[-12:],
+    )
     user_msg = ""
     try:
         messages = await _fetch_latest_chat(session_key, config)
@@ -393,6 +406,11 @@ async def _autotitle_from_final(
     except Exception:  # noqa: BLE001
         pass
     if not user_msg:
+        logger.info(
+            "session_titler.no_user_msg org=%s key=%s",
+            org_id_str[:8],
+            session_key[-12:],
+        )
         return
     await _maybe_autotitle_session(org_id_str, session_key, user_msg, assistant_msg)
 
@@ -422,10 +440,21 @@ async def _maybe_autotitle_session(
             existing = await service._get_session_labels(org_id)
         current_label = existing.get(session_key)
         if current_label and not _is_default_label(current_label):
+            logger.info(
+                "session_titler.manual_label_wins org=%s key=%s label=%s",
+                org_id_str[:8],
+                session_key[-12:],
+                current_label,
+            )
             return  # User-renamed — respect it.
 
         title = await generate_title(org_id, user_msg, assistant_msg)
         if not title:
+            logger.info(
+                "session_titler.no_title_returned org=%s key=%s",
+                org_id_str[:8],
+                session_key[-12:],
+            )
             return
 
         async with async_session_maker() as session:
@@ -439,7 +468,9 @@ async def _maybe_autotitle_session(
             title,
         )
     except Exception:  # noqa: BLE001
-        logger.debug("session_titler.autotitle_failed key=%s", session_key, exc_info=True)
+        logger.info(
+            "session_titler.autotitle_failed key=%s", session_key, exc_info=True
+        )
 
 
 async def _listen(
