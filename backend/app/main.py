@@ -899,6 +899,63 @@ async def system_health() -> Any:
     if cron_failed > 0:
         issues.append(f"{cron_failed} cron job(s) in failed state")
 
+    # ── LLM Reliability (last 24h, mc-backend direct calls) ────────────────
+    # Aggregates model_call_log rows written by the llm_call wrapper. Covers
+    # session titling, embeddings, document intake — NOT gateway-driven skill
+    # traffic (that needs separate Layer-2 OpenRouter Activity polling).
+    try:
+        from datetime import timedelta
+
+        from sqlalchemy import func, select
+
+        from app.core.time import utcnow
+        from app.db.session import async_session_maker
+        from app.models.model_call_log import ModelCallLog
+
+        async with async_session_maker() as session:
+            one_day_ago = utcnow() - timedelta(hours=24)
+            result = await session.execute(
+                select(
+                    ModelCallLog.model,
+                    ModelCallLog.status,
+                    func.count(ModelCallLog.id).label("n"),
+                )
+                .where(ModelCallLog.created_at >= one_day_ago)
+                .group_by(ModelCallLog.model, ModelCallLog.status)
+            )
+            rows = result.all()
+
+        per_model: dict[str, dict[str, int]] = {}
+        for model_name, status_val, count in rows:
+            bucket = per_model.setdefault(model_name, {"success": 0, "error": 0, "timeout": 0})
+            bucket[status_val] = int(count)
+
+        reliability: dict[str, dict[str, Any]] = {}
+        flaky_models: list[str] = []
+        for model_name, counts in per_model.items():
+            total = counts["success"] + counts["error"] + counts["timeout"]
+            if total == 0:
+                continue
+            success_rate = counts["success"] / total
+            reliability[model_name] = {
+                "success_rate": round(success_rate, 4),
+                "total_calls": total,
+                "errors": counts["error"],
+                "timeouts": counts["timeout"],
+            }
+            # Flag models with <95% success AND meaningful sample size (10+ calls)
+            if success_rate < 0.95 and total >= 10:
+                flaky_models.append(model_name)
+
+        components["llm_reliability_24h"] = {
+            "status": "ok" if not flaky_models else "degraded",
+            "models": reliability,
+        }
+        if flaky_models:
+            issues.append(f"llm reliability degraded: {', '.join(flaky_models)}")
+    except Exception as exc:
+        components["llm_reliability_24h"] = {"status": "unknown", "error": str(exc)[:100]}
+
     # ── Overall Status ─────────────────────────────────────────────────────
     critical = any(k in ("postgresql down", "redis down") for k in issues)
     if critical:

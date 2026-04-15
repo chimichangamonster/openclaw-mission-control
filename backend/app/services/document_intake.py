@@ -19,6 +19,7 @@ from pypdf import PdfReader
 
 from app.core.logging import get_logger
 from app.core.sanitize import sanitize_extracted_document
+from app.services.llm_call import llm_call
 
 logger = get_logger(__name__)
 
@@ -88,16 +89,19 @@ async def extract_text_from_image(
 
     b64 = base64.b64encode(file_bytes).decode()
     media_type = content_type or "image/jpeg"
+    vision_model = "google/gemini-2.0-flash-001"
 
     async with httpx.AsyncClient(timeout=60) as client:
-        resp = await client.post(
-            f"{endpoint.api_url}/chat/completions",
+        resp = await llm_call(
+            client,
+            method="POST",
+            url=f"{endpoint.api_url}/chat/completions",
             headers={
                 "Authorization": f"Bearer {endpoint.api_key}",
                 "Content-Type": "application/json",
             },
-            json={
-                "model": "google/gemini-2.0-flash-001",
+            json_body={
+                "model": vision_model,
                 "messages": [
                     {
                         "role": "user",
@@ -115,6 +119,9 @@ async def extract_text_from_image(
                 ],
                 "max_tokens": 4096,
             },
+            skill_name="document_intake_ocr",
+            model=vision_model,
+            organization_id=org_id,
         )
         resp.raise_for_status()
         data = resp.json()
@@ -136,20 +143,26 @@ async def classify_document(
         return {"type": "other", "confidence": 0, "summary": "No LLM endpoint configured"}
 
     prompt = CLASSIFICATION_PROMPT.format(text=text[:3000])
+    classifier_model = "google/gemini-2.0-flash-001"
 
     async with httpx.AsyncClient(timeout=30) as client:
-        resp = await client.post(
-            f"{endpoint.api_url}/chat/completions",
+        resp = await llm_call(
+            client,
+            method="POST",
+            url=f"{endpoint.api_url}/chat/completions",
             headers={
                 "Authorization": f"Bearer {endpoint.api_key}",
                 "Content-Type": "application/json",
             },
-            json={
-                "model": "google/gemini-2.0-flash-001",
+            json_body={
+                "model": classifier_model,
                 "messages": [{"role": "user", "content": prompt}],
                 "max_tokens": 256,
                 "temperature": 0,
             },
+            skill_name="document_intake_classify",
+            model=classifier_model,
+            organization_id=org_id,
         )
         resp.raise_for_status()
         data = resp.json()

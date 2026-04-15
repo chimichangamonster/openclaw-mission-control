@@ -9,6 +9,7 @@ Default retention periods (used when orgs don't override):
 - audit_logs: 365 days
 - board_webhook_payloads: 30 days
 - daily_agent_spends: 365 days
+- model_call_log: 90 days
 """
 
 from __future__ import annotations
@@ -31,6 +32,7 @@ DEFAULT_RETENTION = {
     "audit_retention_days": 365,
     "webhook_retention_days": 30,
     "spend_retention_days": 365,
+    "model_call_log_retention_days": 90,
 }
 
 # Max rows to delete per batch to avoid long locks
@@ -142,6 +144,13 @@ async def run_retention_cleanup() -> dict[str, int]:
         table_name="board_webhook_payloads",
         timestamp_col="received_at",
         cutoff_days=DEFAULT_RETENTION["webhook_retention_days"],
+    )
+
+    # ModelCallLog — platform-level LLM reliability audit, clean globally
+    results["model_call_log"] = await _cleanup_table(
+        table_name="model_call_log",
+        timestamp_col="created_at",
+        cutoff_days=DEFAULT_RETENTION["model_call_log_retention_days"],
     )
 
     # ── Org-scoped tables ───────────────────────────────────────────

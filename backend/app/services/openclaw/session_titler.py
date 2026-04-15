@@ -57,15 +57,19 @@ async def generate_title(
         f"User: {user_msg[:_MSG_CLIP]}\n\n" f"Assistant: {assistant_msg[:_MSG_CLIP]}\n\n" "Title:"
     )
 
+    from app.services.llm_call import llm_call
+
     try:
         async with httpx.AsyncClient(timeout=TITLER_TIMEOUT_SECONDS) as client:
-            resp = await client.post(
-                f"{endpoint.api_url}/chat/completions",
+            resp = await llm_call(
+                client,
+                method="POST",
+                url=f"{endpoint.api_url}/chat/completions",
                 headers={
                     "Authorization": f"Bearer {endpoint.api_key}",
                     "Content-Type": "application/json",
                 },
-                json={
+                json_body={
                     "model": TITLER_MODEL,
                     "messages": [
                         {"role": "system", "content": _SYSTEM_PROMPT},
@@ -74,6 +78,9 @@ async def generate_title(
                     "max_tokens": TITLER_MAX_TOKENS,
                     "temperature": TITLER_TEMPERATURE,
                 },
+                skill_name="session_titler",
+                model=TITLER_MODEL,
+                organization_id=org_id,
             )
             resp.raise_for_status()
             data = resp.json()

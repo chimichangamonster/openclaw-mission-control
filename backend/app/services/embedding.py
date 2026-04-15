@@ -52,16 +52,23 @@ async def _resolve_api_key(org_id: UUID) -> str:
 
 async def get_embedding(content: str, org_id: UUID) -> list[float]:
     """Generate an embedding vector for the given text via OpenRouter."""
+    from app.services.llm_call import llm_call
+
     api_key = await _resolve_api_key(org_id)
 
     async with httpx.AsyncClient(timeout=30.0) as client:
-        resp = await client.post(
-            OPENROUTER_EMBEDDINGS_URL,
+        resp = await llm_call(
+            client,
+            method="POST",
+            url=OPENROUTER_EMBEDDINGS_URL,
             headers={
                 "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json",
             },
-            json={"model": EMBEDDING_MODEL, "input": content},
+            json_body={"model": EMBEDDING_MODEL, "input": content},
+            skill_name="embedding",
+            model=EMBEDDING_MODEL,
+            organization_id=org_id,
         )
         resp.raise_for_status()
         data = resp.json()

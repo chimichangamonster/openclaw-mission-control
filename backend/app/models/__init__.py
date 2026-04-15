@@ -32,6 +32,7 @@ from app.models.email_messages import EmailMessage
 from app.models.exchange_accounts import ExchangeAccount
 from app.models.gateways import Gateway
 from app.models.generated_documents import GeneratedDocument
+from app.models.model_call_log import ModelCallLog
 from app.models.org_config import OrgConfigData, OrgOnboardingStep
 from app.models.org_contacts import OrgContact
 from app.models.organization_board_access import OrganizationBoardAccess
@@ -126,6 +127,7 @@ __all__ = [
     "BkTimesheet",
     "BkTransaction",
     "BkWorker",
+    "ModelCallLog",
     "OrgConfigData",
     "OrgContact",
     "OrgOnboardingStep",

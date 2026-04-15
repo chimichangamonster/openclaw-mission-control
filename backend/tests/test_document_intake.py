@@ -118,13 +118,14 @@ class TestClassifyDocument:
             "app.services.llm_routing.resolve_llm_endpoint", new_callable=AsyncMock
         ) as mock_resolve:
             mock_resolve.return_value = mock_endpoint
-            with patch("httpx.AsyncClient") as mock_client_cls:
-                mock_client = AsyncMock()
-                mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-                mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+            with patch(
+                "app.services.document_intake.llm_call", new_callable=AsyncMock
+            ) as mock_llm_call:
                 mock_resp = MagicMock()
+                mock_resp.status_code = 200
                 mock_resp.json.return_value = mock_response
-                mock_client.post.return_value = mock_resp
+                mock_resp.raise_for_status = MagicMock()
+                mock_llm_call.return_value = mock_resp
 
                 result = await classify_document("Sample invoice text", "org-123", AsyncMock())
                 assert result["type"] == "invoice"
@@ -150,13 +151,14 @@ class TestClassifyDocument:
             "app.services.llm_routing.resolve_llm_endpoint", new_callable=AsyncMock
         ) as mock_resolve:
             mock_resolve.return_value = mock_endpoint
-            with patch("httpx.AsyncClient") as mock_client_cls:
-                mock_client = AsyncMock()
-                mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-                mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+            with patch(
+                "app.services.document_intake.llm_call", new_callable=AsyncMock
+            ) as mock_llm_call:
                 mock_resp = MagicMock()
+                mock_resp.status_code = 200
                 mock_resp.json.return_value = mock_response
-                mock_client.post.return_value = mock_resp
+                mock_resp.raise_for_status = MagicMock()
+                mock_llm_call.return_value = mock_resp
 
                 result = await classify_document("Sample receipt text", "org-123", AsyncMock())
                 assert result["type"] == "receipt"
@@ -182,13 +184,14 @@ class TestClassifyDocument:
             "app.services.llm_routing.resolve_llm_endpoint", new_callable=AsyncMock
         ) as mock_resolve:
             mock_resolve.return_value = mock_endpoint
-            with patch("httpx.AsyncClient") as mock_client_cls:
-                mock_client = AsyncMock()
-                mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-                mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+            with patch(
+                "app.services.document_intake.llm_call", new_callable=AsyncMock
+            ) as mock_llm_call:
                 mock_resp = MagicMock()
+                mock_resp.status_code = 200
                 mock_resp.json.return_value = mock_response
-                mock_client.post.return_value = mock_resp
+                mock_resp.raise_for_status = MagicMock()
+                mock_llm_call.return_value = mock_resp
 
                 result = await classify_document("Some text", "org-123", AsyncMock())
                 assert result["type"] == "other"
