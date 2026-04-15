@@ -108,7 +108,10 @@ interface CronJob {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const BOARD_ID = "fc95c061-3c32-4c82-a87d-9e21225e59fd";
+// The /live page is single-gateway by design. Board ID is resolved at runtime
+// from the user's active org (first board with a gateway_id). Historical:
+// this used to be hardcoded to Vantage's The Claw, which broke for any
+// non-Vantage user. Cross-org unified live view is a future upgrade (Option 2).
 
 const AGENTS: Record<string, { name: string; color: string; dotColor: string; tierDefault: string; channelDefault: string }> = {
   "the-claw":       { name: "The Claw",       color: "bg-blue-500",    dotColor: "bg-blue-400",    tierDefault: "Tier 3", channelDefault: "#general" },
@@ -179,6 +182,71 @@ function tierFromModel(model: string): { label: string; color: string } {
 
 export default function LivePage() {
   const { isSignedIn, getToken } = useAuth();
+
+  // Active-org board resolution (replaces the old hardcoded Vantage BOARD_ID).
+  // Fetches the user's org list, picks the active org, then picks its first
+  // board with a gateway_id. Null until resolved, which gates the polling.
+  const [boardId, setBoardId] = useState<string | null>(null);
+  const [boardResolutionError, setBoardResolutionError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isSignedIn) return;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        type OrgListItem = { id: string; is_active?: boolean };
+        type BoardItem = { id: string; gateway_id: string | null };
+        const orgsResp = await customFetch<{ data: OrgListItem[] | null } | OrgListItem[]>(
+          "/api/v1/organizations/me/list",
+          { method: "GET" },
+        );
+        if (cancelled) return;
+        const orgsData = (orgsResp as { data?: OrgListItem[] | null })?.data;
+        const orgs: OrgListItem[] = Array.isArray(orgsData)
+          ? orgsData
+          : Array.isArray(orgsResp)
+            ? (orgsResp as OrgListItem[])
+            : [];
+        const activeOrg = orgs.find((o) => o.is_active) ?? orgs[0];
+        if (!activeOrg) {
+          setBoardResolutionError("No organizations available for this account.");
+          return;
+        }
+
+        const boardsResp = await customFetch<{ data: BoardItem[] | null } | BoardItem[]>(
+          `/api/v1/organizations/${activeOrg.id}/boards`,
+          { method: "GET" },
+        );
+        if (cancelled) return;
+        const boardsData = (boardsResp as { data?: BoardItem[] | null })?.data;
+        const boards: BoardItem[] = Array.isArray(boardsData)
+          ? boardsData
+          : Array.isArray(boardsResp)
+            ? (boardsResp as BoardItem[])
+            : [];
+        const firstWithGateway = boards.find((b) => b.gateway_id);
+        if (!firstWithGateway) {
+          setBoardResolutionError(
+            "No gateway-connected board in your active organization.",
+          );
+          return;
+        }
+        setBoardId(firstWithGateway.id);
+        setBoardResolutionError(null);
+      } catch (err) {
+        if (!cancelled) {
+          setBoardResolutionError(
+            err instanceof Error ? err.message : "Failed to resolve board.",
+          );
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isSignedIn]);
 
   // Core state
   const [sessions, setSessions] = useState<AgentSession[]>([]);
@@ -258,8 +326,9 @@ export default function LivePage() {
   // ─── Poll gateway sessions ───────────────────────────────────────────────
 
   const poll = useCallback(async () => {
+    if (!boardId) return;
     try {
-      const raw: any = await customFetch(`/api/v1/gateways/status?board_id=${BOARD_ID}`, { method: "GET" });
+      const raw: any = await customFetch(`/api/v1/gateways/status?board_id=${boardId}`, { method: "GET" });
       const data = raw?.data ?? raw;
 
       setConnected(data?.connected ?? false);
@@ -313,7 +382,7 @@ export default function LivePage() {
           let chatFull = "";
           try {
             const historyRaw: any = await customFetch(
-              `/api/v1/gateways/sessions/${encodeURIComponent(session.key)}/history?board_id=${BOARD_ID}&limit=2`,
+              `/api/v1/gateways/sessions/${encodeURIComponent(session.key)}/history?board_id=${boardId}&limit=2`,
               { method: "GET" }
             );
             const history = historyRaw?.data ?? historyRaw;
@@ -361,14 +430,14 @@ export default function LivePage() {
     } catch {
       setConnected(false);
     }
-  }, []);
+  }, [boardId]);
 
   useEffect(() => {
-    if (!isSignedIn) return;
+    if (!isSignedIn || !boardId) return;
     poll();
     const interval = setInterval(poll, 3000);
     return () => clearInterval(interval);
-  }, [isSignedIn, poll]);
+  }, [isSignedIn, boardId, poll]);
 
   // ─── Load model usage (for agent detail panel) ───────────────────────────
 
@@ -463,14 +532,32 @@ export default function LivePage() {
         {/* Connection Status Bar */}
         <div className={cn(
           "flex items-center justify-between rounded-lg px-4 py-2 text-sm",
-          connected ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"
+          boardResolutionError
+            ? "bg-amber-50 text-amber-800"
+            : !boardId
+              ? "bg-slate-50 text-slate-600"
+              : connected ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"
         )}>
           <div className="flex items-center gap-2">
-            {connected ? <Wifi className="h-4 w-4" /> : <WifiOff className="h-4 w-4" />}
-            {connected ? "Gateway connected" : "Gateway disconnected"}
-            <span className="text-xs opacity-60">
-              {lastPoll > 0 ? `Polling every 3s  \u2022  Last: ${timeAgo(lastPoll)}` : ""}
-            </span>
+            {boardResolutionError ? (
+              <>
+                <AlertTriangle className="h-4 w-4" />
+                {boardResolutionError}
+              </>
+            ) : !boardId ? (
+              <>
+                <RefreshCw className="h-4 w-4 animate-spin" />
+                Resolving gateway board…
+              </>
+            ) : (
+              <>
+                {connected ? <Wifi className="h-4 w-4" /> : <WifiOff className="h-4 w-4" />}
+                {connected ? "Gateway connected" : "Gateway disconnected"}
+                <span className="text-xs opacity-60">
+                  {lastPoll > 0 ? `Polling every 3s  \u2022  Last: ${timeAgo(lastPoll)}` : ""}
+                </span>
+              </>
+            )}
           </div>
           <div className="flex items-center gap-3 text-xs">
             <span>{sessions.length} sessions</span>
