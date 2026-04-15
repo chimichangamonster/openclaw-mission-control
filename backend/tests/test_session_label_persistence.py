@@ -64,7 +64,7 @@ async def test_create_session_persists_label_to_org_config() -> None:
         response = await service.create_session(
             label="Property Smart Discovery",
             board_id=str(uuid4()),
-            organization_id=org_id,
+            fallback_organization_id=org_id,
             user=fake_user,
         )
 
@@ -103,7 +103,7 @@ async def test_create_session_label_survives_gateway_restart_simulation() -> Non
         response = await service.create_session(
             label="Magnetik Q2 Proposal",
             board_id=str(uuid4()),
-            organization_id=org_id,
+            fallback_organization_id=org_id,
             user=fake_user,
         )
 
@@ -145,7 +145,7 @@ async def test_create_session_isolates_labels_per_org() -> None:
             return await service.create_session(
                 label=label,
                 board_id=str(uuid4()),
-                organization_id=org_id,
+                fallback_organization_id=org_id,
                 user=fake_user,
             )
 

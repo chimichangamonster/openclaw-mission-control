@@ -39,7 +39,6 @@ from app.services.openclaw.gateway_rpc import (
     openclaw_call,
     send_message,
 )
-from app.services.openclaw.policies import OpenClawAuthorizationPolicy
 from app.services.openclaw.shared import GatewayAgentIdentity
 from app.services.organizations import require_board_access
 
@@ -318,26 +317,26 @@ class GatewaySessionService(OpenClawDBService):
         return "\n".join(lines)
 
     @staticmethod
-    def _require_same_org(board: Board | None, organization_id: UUID) -> None:
-        if board is None:
-            return
-        OpenClawAuthorizationPolicy.require_board_write_access(
-            allowed=board.organization_id == organization_id,
-        )
+    def _effective_org_id(board: Board | None, fallback: UUID) -> UUID:
+        # board.organization_id is authoritative. resolve_gateway already runs
+        # require_board_access(write=False), so membership is verified before
+        # we get here. Fallback only applies to the gateway_url probe path
+        # where no board is in play.
+        return board.organization_id if board is not None else fallback
 
     async def get_status(
         self,
         *,
         params: GatewayResolveQuery,
-        organization_id: UUID,
+        fallback_organization_id: UUID,
         user: User | None,
     ) -> GatewaysStatusResponse:
         board, config, main_session = await self.resolve_gateway(
             params,
             user=user,
-            organization_id=organization_id,
+            organization_id=fallback_organization_id,
         )
-        self._require_same_org(board, organization_id)
+        organization_id = self._effective_org_id(board, fallback_organization_id)
         try:
             compatibility = await check_gateway_version_compatibility(config)
         except OpenClawGatewayError as exc:
@@ -392,12 +391,12 @@ class GatewaySessionService(OpenClawDBService):
         self,
         *,
         board_id: str | None,
-        organization_id: UUID,
+        fallback_organization_id: UUID,
         user: User | None,
     ) -> GatewaySessionsResponse:
         params = GatewayResolveQuery(board_id=board_id)
         board, config, main_session = await self.resolve_gateway(params, user=user)
-        self._require_same_org(board, organization_id)
+        organization_id = self._effective_org_id(board, fallback_organization_id)
         _oid = str(organization_id)
         try:
             sessions = await openclaw_call("sessions.list", config=config, org_id=_oid)
@@ -436,12 +435,12 @@ class GatewaySessionService(OpenClawDBService):
         *,
         session_id: str,
         board_id: str | None,
-        organization_id: UUID,
+        fallback_organization_id: UUID,
         user: User | None,
     ) -> GatewaySessionResponse:
         params = GatewayResolveQuery(board_id=board_id)
         board, config, main_session = await self.resolve_gateway(params, user=user)
-        self._require_same_org(board, organization_id)
+        organization_id = self._effective_org_id(board, fallback_organization_id)
         _oid = str(organization_id)
         try:
             sessions_list = await self.list_sessions(config, org_id=_oid)
@@ -483,14 +482,14 @@ class GatewaySessionService(OpenClawDBService):
         *,
         label: str,
         board_id: str | None,
-        organization_id: UUID,
+        fallback_organization_id: UUID,
         user: User | None,
     ) -> CreateSessionResponse:
         """Create a new named chat session on the gateway."""
         import uuid as _uuid
 
         board, config, main_session = await self.require_gateway(board_id, user=user)
-        self._require_same_org(board, organization_id)
+        organization_id = self._effective_org_id(board, fallback_organization_id)
         if user is None:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
         await require_board_access(self.session, user=user, board=board, write=True)
@@ -523,12 +522,12 @@ class GatewaySessionService(OpenClawDBService):
         session_id: str,
         label: str,
         board_id: str | None,
-        organization_id: UUID,
+        fallback_organization_id: UUID,
         user: User | None,
     ) -> GatewaySessionResponse:
         """Rename an existing chat session."""
         board, config, _ = await self.require_gateway(board_id, user=user)
-        self._require_same_org(board, organization_id)
+        organization_id = self._effective_org_id(board, fallback_organization_id)
         if user is None:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
         await require_board_access(self.session, user=user, board=board, write=True)
@@ -553,11 +552,11 @@ class GatewaySessionService(OpenClawDBService):
         *,
         session_id: str,
         board_id: str | None,
-        organization_id: UUID,
+        fallback_organization_id: UUID,
         user: User | None,
     ) -> GatewaySessionHistoryResponse:
         board, config, _ = await self.require_gateway(board_id, user=user)
-        self._require_same_org(board, organization_id)
+        organization_id = self._effective_org_id(board, fallback_organization_id)
         try:
             history = await get_chat_history(session_id, config=config, org_id=str(organization_id))
         except OpenClawGatewayError as exc:
@@ -616,11 +615,11 @@ class GatewaySessionService(OpenClawDBService):
         session_id: str,
         payload: GatewaySessionMessageRequest,
         board_id: str | None,
-        organization_id: UUID,
+        fallback_organization_id: UUID,
         user: User | None,
     ) -> None:
         board, config, main_session = await self.require_gateway(board_id, user=user)
-        self._require_same_org(board, organization_id)
+        organization_id = self._effective_org_id(board, fallback_organization_id)
         if user is None:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
         await require_board_access(self.session, user=user, board=board, write=True)
@@ -643,11 +642,11 @@ class GatewaySessionService(OpenClawDBService):
         *,
         session_id: str,
         board_id: str | None,
-        organization_id: UUID,
+        fallback_organization_id: UUID,
         user: User | None,
     ) -> None:
         board, config, _ = await self.require_gateway(board_id, user=user)
-        self._require_same_org(board, organization_id)
+        organization_id = self._effective_org_id(board, fallback_organization_id)
         if user is None:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
         await require_board_access(self.session, user=user, board=board, write=True)
@@ -664,11 +663,11 @@ class GatewaySessionService(OpenClawDBService):
         *,
         session_id: str,
         board_id: str | None,
-        organization_id: UUID,
+        fallback_organization_id: UUID,
         user: User | None,
     ) -> None:
         board, config, _ = await self.require_gateway(board_id, user=user)
-        self._require_same_org(board, organization_id)
+        organization_id = self._effective_org_id(board, fallback_organization_id)
         if user is None:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
         await require_board_access(self.session, user=user, board=board, write=True)
@@ -685,11 +684,11 @@ class GatewaySessionService(OpenClawDBService):
         *,
         session_id: str,
         board_id: str | None,
-        organization_id: UUID,
+        fallback_organization_id: UUID,
         user: User | None,
     ) -> None:
         board, config, _ = await self.require_gateway(board_id, user=user)
-        self._require_same_org(board, organization_id)
+        organization_id = self._effective_org_id(board, fallback_organization_id)
         if user is None:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
         await require_board_access(self.session, user=user, board=board, write=True)

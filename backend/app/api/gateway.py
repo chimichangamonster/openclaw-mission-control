@@ -207,7 +207,7 @@ async def gateways_status(
     service = GatewaySessionService(session)
     return await service.get_status(
         params=params,
-        organization_id=ctx.organization.id,
+        fallback_organization_id=ctx.organization.id,
         user=auth.user,
     )
 
@@ -223,7 +223,7 @@ async def list_gateway_sessions(
     service = GatewaySessionService(session)
     return await service.get_sessions(
         board_id=board_id,
-        organization_id=ctx.organization.id,
+        fallback_organization_id=ctx.organization.id,
         user=auth.user,
     )
 
@@ -241,7 +241,7 @@ async def create_gateway_session(
     return await service.create_session(
         label=payload.label,
         board_id=board_id,
-        organization_id=ctx.organization.id,
+        fallback_organization_id=ctx.organization.id,
         user=auth.user,
     )
 
@@ -261,7 +261,7 @@ async def rename_gateway_session(
         session_id=session_id,
         label=payload.label,
         board_id=board_id,
-        organization_id=ctx.organization.id,
+        fallback_organization_id=ctx.organization.id,
         user=auth.user,
     )
 
@@ -279,7 +279,7 @@ async def get_gateway_session(
     return await service.get_session(
         session_id=session_id,
         board_id=board_id,
-        organization_id=ctx.organization.id,
+        fallback_organization_id=ctx.organization.id,
         user=auth.user,
     )
 
@@ -297,7 +297,7 @@ async def get_session_history(
     return await service.get_session_history(
         session_id=session_id,
         board_id=board_id,
-        organization_id=ctx.organization.id,
+        fallback_organization_id=ctx.organization.id,
         user=auth.user,
     )
 
@@ -317,7 +317,7 @@ async def send_gateway_session_message(
         session_id=session_id,
         payload=payload,
         board_id=board_id,
-        organization_id=ctx.organization.id,
+        fallback_organization_id=ctx.organization.id,
         user=auth.user,
     )
     return OkResponse()
@@ -336,7 +336,7 @@ async def abort_gateway_session(
     await service.abort_session_chat(
         session_id=session_id,
         board_id=board_id,
-        organization_id=ctx.organization.id,
+        fallback_organization_id=ctx.organization.id,
         user=auth.user,
     )
     return OkResponse()
@@ -355,7 +355,7 @@ async def compact_gateway_session(
     await service.compact_session_history(
         session_id=session_id,
         board_id=board_id,
-        organization_id=ctx.organization.id,
+        fallback_organization_id=ctx.organization.id,
         user=auth.user,
     )
     return OkResponse()
@@ -374,7 +374,7 @@ async def reset_gateway_session(
     await service.reset_session_history(
         session_id=session_id,
         board_id=board_id,
-        organization_id=ctx.organization.id,
+        fallback_organization_id=ctx.organization.id,
         user=auth.user,
     )
     return OkResponse()

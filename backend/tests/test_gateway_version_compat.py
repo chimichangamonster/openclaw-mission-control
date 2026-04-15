@@ -305,7 +305,7 @@ async def test_gateway_status_reports_incompatible_version(
     service = GatewaySessionService(session=object())  # type: ignore[arg-type]
     response = await service.get_status(
         params=GatewayResolveQuery(gateway_url="ws://gateway.example/ws"),
-        organization_id=uuid4(),
+        fallback_organization_id=uuid4(),
         user=None,
     )
 
@@ -326,7 +326,7 @@ async def test_gateway_status_surfaces_scope_error_guidance(
     service = GatewaySessionService(session=object())  # type: ignore[arg-type]
     response = await service.get_status(
         params=GatewayResolveQuery(gateway_url="ws://gateway.example/ws"),
-        organization_id=uuid4(),
+        fallback_organization_id=uuid4(),
         user=None,
     )
 
@@ -348,8 +348,14 @@ async def test_gateway_status_returns_sessions_when_version_compatible(
             message=None,
         )
 
-    async def _fake_openclaw_call(method: str, params: object = None, *, config: object) -> object:
-        _ = (params, config)
+    async def _fake_openclaw_call(
+        method: str,
+        params: object = None,
+        *,
+        config: object,
+        org_id: str | None = None,
+    ) -> object:
+        _ = (params, config, org_id)
         assert method == "sessions.list"
         return {"sessions": [{"key": "agent:main"}]}
 
@@ -359,7 +365,7 @@ async def test_gateway_status_returns_sessions_when_version_compatible(
     service = GatewaySessionService(session=object())  # type: ignore[arg-type]
     response = await service.get_status(
         params=GatewayResolveQuery(gateway_url="ws://gateway.example/ws"),
-        organization_id=uuid4(),
+        fallback_organization_id=uuid4(),
         user=None,
     )
 
