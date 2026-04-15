@@ -595,8 +595,8 @@ export function DashboardSidebar() {
               className={cn(
                 "h-2 w-2 rounded-full",
                 systemStatus === "operational" && "bg-emerald-500",
-                systemStatus === "degraded" && "bg-rose-500",
-                systemStatus === "unknown" && "bg-slate-300 dark:bg-slate-600",
+                systemStatus === "degraded" && "bg-amber-500",
+                systemStatus === "unknown" && "bg-rose-500",
               )}
             />
             {statusLabel}
