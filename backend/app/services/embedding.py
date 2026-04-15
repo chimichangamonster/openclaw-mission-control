@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 from datetime import timedelta
+from typing import Any
 from uuid import UUID
 
 import httpx
@@ -65,7 +66,7 @@ async def get_embedding(content: str, org_id: UUID) -> list[float]:
         resp.raise_for_status()
         data = resp.json()
 
-    embedding = data["data"][0]["embedding"]
+    embedding: list[float] = data["data"][0]["embedding"]
     if len(embedding) != EMBEDDING_DIMENSIONS:
         msg = f"Expected {EMBEDDING_DIMENSIONS} dimensions, got {len(embedding)}"
         raise ValueError(msg)
@@ -89,7 +90,7 @@ async def store_memory(
     source: str,
     *,
     agent_id: str | None = None,
-    metadata: dict | None = None,
+    metadata: dict[str, Any] | None = None,
     ttl_days: int | None = None,
 ) -> VectorMemory:
     """Embed text and persist to vector_memories table."""
@@ -129,14 +130,14 @@ async def search_memory(
     *,
     limit: int = 5,
     source_filter: str | None = None,
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """Semantic search: embed query, find nearest neighbors by cosine similarity."""
     query_embedding = await get_embedding(query, org_id)
 
     # Build the SQL with pgvector cosine distance operator (<=>)
     # Lower distance = more similar; similarity = 1 - distance
     where_clauses = ["organization_id = :org_id"]
-    params: dict = {"org_id": org_id, "limit": limit}
+    params: dict[str, Any] = {"org_id": org_id, "limit": limit}
 
     if source_filter:
         where_clauses.append("source LIKE :source_filter")

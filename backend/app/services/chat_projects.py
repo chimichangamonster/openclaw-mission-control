@@ -15,8 +15,8 @@ import json
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
+from sqlmodel import col, select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.time import utcnow
 from app.models.chat_projects import ChatProject
@@ -40,8 +40,8 @@ async def list_projects(
     """List all projects for an org, with session counts."""
     stmt = select(ChatProject).where(ChatProject.organization_id == organization_id)
     if not include_archived:
-        stmt = stmt.where(~ChatProject.archived)
-    stmt = stmt.order_by(ChatProject.sort_order, ChatProject.created_at)
+        stmt = stmt.where(col(ChatProject.archived).is_(False))
+    stmt = stmt.order_by(col(ChatProject.sort_order), col(ChatProject.created_at))
 
     result = await session.exec(stmt)
     projects = result.all()

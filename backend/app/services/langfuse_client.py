@@ -144,7 +144,7 @@ def trace_rpc_call(
                 **(metadata or {}),
             },
         )
-        child = span.start_observation(
+        child = span.start_observation(  # type: ignore[call-overload]
             name=f"rpc.{method}",
             metadata={
                 "duration_ms": duration_ms,

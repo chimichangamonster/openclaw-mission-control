@@ -259,4 +259,4 @@ async def _cleanup_expired_vector_memories() -> int:
             "data_retention.cleaned",
             extra={"table": "vector_memories", "deleted": total, "type": "ttl_expiry"},
         )
-    return total
+    return int(total)

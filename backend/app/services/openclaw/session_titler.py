@@ -7,6 +7,7 @@ swallowed and the session keeps its default label. Manual renames always win.
 
 from __future__ import annotations
 
+from typing import Any
 from uuid import UUID
 
 import httpx
@@ -103,7 +104,7 @@ async def generate_title(
     return title
 
 
-def _extract_title(data: dict) -> str | None:
+def _extract_title(data: dict[str, Any]) -> str | None:
     """Pull the title string out of a chat/completions response and sanitize it."""
     try:
         raw = data["choices"][0]["message"]["content"]

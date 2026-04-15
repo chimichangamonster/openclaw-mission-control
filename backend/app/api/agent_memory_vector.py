@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlmodel import select
 
 from app.core.agent_auth import AgentAuthContext, get_agent_auth_context
 from app.core.logging import get_logger

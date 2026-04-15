@@ -9,7 +9,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, status
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.deps import (
     AUTH_DEP,
@@ -62,7 +62,7 @@ async def create_chat_project(
     payload: ChatProjectCreate,
     session: AsyncSession = SESSION_DEP,
     ctx: OrganizationContext = OPERATOR_DEP,
-    _auth=AUTH_DEP,
+    _auth: object = AUTH_DEP,
 ) -> ChatProjectRead:
     return await chat_projects_service.create_project(
         session,
@@ -77,7 +77,7 @@ async def update_chat_project(
     payload: ChatProjectUpdate,
     session: AsyncSession = SESSION_DEP,
     ctx: OrganizationContext = OPERATOR_DEP,
-    _auth=AUTH_DEP,
+    _auth: object = AUTH_DEP,
 ) -> ChatProjectRead:
     return await chat_projects_service.update_project(
         session,
@@ -92,7 +92,7 @@ async def delete_chat_project(
     project_id: UUID,
     session: AsyncSession = SESSION_DEP,
     ctx: OrganizationContext = OPERATOR_DEP,
-    _auth=AUTH_DEP,
+    _auth: object = AUTH_DEP,
 ) -> None:
     await chat_projects_service.delete_project(
         session,
@@ -119,7 +119,7 @@ async def assign_session_to_project(
     payload: SessionProjectAssignment,
     session: AsyncSession = SESSION_DEP,
     ctx: OrganizationContext = OPERATOR_DEP,
-    _auth=AUTH_DEP,
+    _auth: object = AUTH_DEP,
 ) -> None:
     """Assign a session to a project, or clear the assignment if project_id is null."""
     await chat_projects_service.assign_session(

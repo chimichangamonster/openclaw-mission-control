@@ -167,17 +167,19 @@ class TestVectorMemorySchemas:
 class TestFeatureFlags:
     """Feature flag defaults and gating."""
 
-    def test_agent_memory_default_off(self):
+    def test_agent_memory_default_on(self):
+        # Flipped to default-on 2026-04-13 (session #9 — agent memory rollout)
         from app.models.organization_settings import DEFAULT_FEATURE_FLAGS
 
         assert "agent_memory" in DEFAULT_FEATURE_FLAGS
-        assert DEFAULT_FEATURE_FLAGS["agent_memory"] is False
+        assert DEFAULT_FEATURE_FLAGS["agent_memory"] is True
 
-    def test_observability_default_off(self):
+    def test_observability_default_on(self):
+        # Flipped to default-on 2026-04-13 (session #9 — agent memory rollout)
         from app.models.organization_settings import DEFAULT_FEATURE_FLAGS
 
         assert "observability" in DEFAULT_FEATURE_FLAGS
-        assert DEFAULT_FEATURE_FLAGS["observability"] is False
+        assert DEFAULT_FEATURE_FLAGS["observability"] is True
 
 
 # ---------------------------------------------------------------------------

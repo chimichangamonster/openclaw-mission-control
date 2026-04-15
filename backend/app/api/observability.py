@@ -115,7 +115,8 @@ async def list_traces(
         )
     if resp.status_code != 200:
         raise HTTPException(status_code=resp.status_code, detail="Langfuse API error")
-    return resp.json()
+    result: dict[str, Any] = resp.json()
+    return result
 
 
 @router.get("/traces/{trace_id}")
@@ -134,7 +135,8 @@ async def get_trace(
         raise HTTPException(status_code=404, detail="Trace not found")
     if resp.status_code != 200:
         raise HTTPException(status_code=resp.status_code, detail="Langfuse API error")
-    return resp.json()
+    result: dict[str, Any] = resp.json()
+    return result
 
 
 @router.get("/scores")
@@ -153,4 +155,5 @@ async def list_scores(
         )
     if resp.status_code != 200:
         raise HTTPException(status_code=resp.status_code, detail="Langfuse API error")
-    return resp.json()
+    result: dict[str, Any] = resp.json()
+    return result
