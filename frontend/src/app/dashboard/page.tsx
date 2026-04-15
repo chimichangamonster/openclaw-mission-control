@@ -48,6 +48,11 @@ import {
   useListBoardsApiV1BoardsGet,
 } from "@/api/generated/boards/boards";
 import {
+  type listMyOrganizationsApiV1OrganizationsMeListGetResponse,
+  useListMyOrganizationsApiV1OrganizationsMeListGet,
+} from "@/api/generated/organizations/organizations";
+import { customFetch } from "@/api/mutator";
+import {
   type listActivityApiV1ActivityGetResponse,
   useListActivityApiV1ActivityGet,
 } from "@/api/generated/activity/activity";
@@ -561,9 +566,64 @@ export default function DashboardPage() {
     () => agents.filter((agent) => (agent.status ?? "").toLowerCase() === "online").length,
     [agents],
   );
+
+  // Cross-org gateway discovery: fetch every org the user belongs to, then
+  // fetch each org's boards via the dedicated /organizations/{id}/boards
+  // endpoint. Prior design filtered gateways by the user's active org only,
+  // which broke the Gateway Health widget for multi-org members.
+  const myOrgsQuery = useListMyOrganizationsApiV1OrganizationsMeListGet<
+    listMyOrganizationsApiV1OrganizationsMeListGetResponse,
+    ApiError
+  >({
+    query: {
+      enabled: Boolean(isSignedIn),
+      refetchInterval: 60_000,
+      refetchOnMount: "always",
+    },
+  });
+
+  const myOrgIds = useMemo(() => {
+    if (myOrgsQuery.data?.status !== 200) return [];
+    return (myOrgsQuery.data.data ?? []).map((org) => org.id);
+  }, [myOrgsQuery.data]);
+
+  type CrossOrgBoard = {
+    id: string;
+    name: string;
+    gateway_id: string | null;
+    organization_id: string;
+  };
+
+  const crossOrgBoardsQuery = useQuery<CrossOrgBoard[], ApiError>({
+    queryKey: ["dashboard", "cross-org-boards", myOrgIds],
+    enabled: Boolean(isSignedIn) && myOrgIds.length > 0,
+    refetchInterval: 60_000,
+    refetchOnMount: "always",
+    queryFn: async ({ signal }) => {
+      const results = await Promise.all(
+        myOrgIds.map(async (orgId) => {
+          try {
+            // customFetch wraps responses as { data, status, headers }.
+            const response = await customFetch<{ data: CrossOrgBoard[]; status: number }>(
+              `/api/v1/organizations/${orgId}/boards`,
+              { method: "GET", signal },
+            );
+            const boards = response?.data;
+            return Array.isArray(boards) ? boards : [];
+          } catch {
+            // A single org failing shouldn't poison the whole view.
+            return [] as CrossOrgBoard[];
+          }
+        }),
+      );
+      return results.flat();
+    },
+  });
+
   const gatewayTargets = useMemo<GatewayTarget[]>(() => {
+    const allBoards = crossOrgBoardsQuery.data ?? [];
     const byGateway = new Map<string, GatewayTarget>();
-    for (const board of boards) {
+    for (const board of allBoards) {
       const gatewayId = board.gateway_id;
       if (!gatewayId) continue;
       if (byGateway.has(gatewayId)) continue;
@@ -574,7 +634,7 @@ export default function DashboardPage() {
       });
     }
     return [...byGateway.values()].sort((a, b) => a.boardName.localeCompare(b.boardName));
-  }, [boards]);
+  }, [crossOrgBoardsQuery.data]);
   const hasConfiguredGateways = gatewayTargets.length > 0;
 
   const gatewayStatusesQuery = useQuery<GatewaySnapshot[], ApiError>({

@@ -53,6 +53,7 @@ from app.schemas.organizations import (
     OrganizationRead,
     OrganizationUserRead,
 )
+from app.schemas.boards import BoardRead
 from app.schemas.pagination import DefaultLimitOffsetPage
 from app.services.organizations import (
     OrganizationContext,
@@ -60,6 +61,7 @@ from app.services.organizations import (
     apply_invite_board_access,
     apply_invite_to_member,
     apply_member_access_update,
+    board_access_filter,
     get_active_membership,
     get_member,
     is_org_admin,
@@ -193,6 +195,37 @@ async def list_my_organizations(
         )
         for org, member in rows
     ]
+
+
+@router.get("/{organization_id}/boards", response_model=list[BoardRead])
+async def list_organization_boards(
+    organization_id: UUID,
+    session: AsyncSession = SESSION_DEP,
+    auth: AuthContext = AUTH_DEP,
+) -> list[Board]:
+    """List boards in a specific organization the caller is a member of.
+
+    Unlike `/boards` (which filters to the caller's *active* org), this
+    endpoint lets a multi-org member query boards in any org they belong
+    to. Used by the dashboard's cross-org gateway health aggregation.
+    403s if the caller is not a member of the requested org.
+    """
+    if auth.user is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
+    member = await get_member(
+        session,
+        user_id=auth.user.id,
+        organization_id=organization_id,
+    )
+    if member is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No org access")
+    statement = (
+        select(Board)
+        .where(board_access_filter(member, write=False))
+        .order_by(func.lower(col(Board.name)).asc(), col(Board.created_at).desc())
+    )
+    result = await session.exec(statement)
+    return list(result)
 
 
 @router.patch("/me/active", response_model=OrganizationRead)
