@@ -16,6 +16,4 @@ class QualityScoreCreate(SQLModel):
         description="Score name — e.g. 'accuracy', 'helpfulness', 'relevance'"
     )
     value: float = Field(ge=0.0, le=1.0, description="Score value between 0 and 1")
-    comment: str | None = Field(
-        default=None, max_length=1000, description="Optional explanation"
-    )
+    comment: str | None = Field(default=None, max_length=1000, description="Optional explanation")

@@ -53,7 +53,9 @@ async def get_live_feed(
 
     config = GatewayConfig(url=gateway.url, token=gateway.token)
     try:
-        sessions_data = await openclaw_call("sessions.list", config=config, org_id=str(ctx.organization.id))
+        sessions_data = await openclaw_call(
+            "sessions.list", config=config, org_id=str(ctx.organization.id)
+        )
     except Exception:
         logger.exception("gateway_live.rpc_failed")
         return LiveFeedResponse(sessions=[], timestamp=datetime.now(UTC).isoformat())

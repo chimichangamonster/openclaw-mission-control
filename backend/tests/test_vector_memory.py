@@ -208,7 +208,11 @@ class TestEmbeddingService:
         mock_post = AsyncMock(return_value=mock_response)
 
         with (
-            patch("app.services.embedding._resolve_api_key", new_callable=AsyncMock, return_value="sk-test"),
+            patch(
+                "app.services.embedding._resolve_api_key",
+                new_callable=AsyncMock,
+                return_value="sk-test",
+            ),
             patch("httpx.AsyncClient.post", mock_post),
             patch("app.services.langfuse_client.trace_embedding"),
         ):
@@ -232,7 +236,11 @@ class TestEmbeddingService:
         mock_post = AsyncMock(return_value=mock_response)
 
         with (
-            patch("app.services.embedding._resolve_api_key", new_callable=AsyncMock, return_value="sk-test"),
+            patch(
+                "app.services.embedding._resolve_api_key",
+                new_callable=AsyncMock,
+                return_value="sk-test",
+            ),
             patch("httpx.AsyncClient.post", mock_post),
             patch("app.services.langfuse_client.trace_embedding"),
             pytest.raises(ValueError, match="Expected 1536 dimensions"),

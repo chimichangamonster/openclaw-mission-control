@@ -125,8 +125,8 @@ async def memory_stats(
     """Get summary statistics for the org's vector memories."""
     org_id = org_ctx.organization.id
 
-    total_q = select(func.count()).select_from(VectorMemory).where(
-        VectorMemory.organization_id == org_id
+    total_q = (
+        select(func.count()).select_from(VectorMemory).where(VectorMemory.organization_id == org_id)
     )
     total = (await session.execute(total_q)).scalar() or 0
 

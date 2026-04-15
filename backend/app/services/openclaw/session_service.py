@@ -274,7 +274,9 @@ class GatewaySessionService(OpenClawDBService):
         return sessions_list
 
     async def list_sessions(
-        self, config: GatewayClientConfig, org_id: str | None = None,
+        self,
+        config: GatewayClientConfig,
+        org_id: str | None = None,
     ) -> list[dict[str, object]]:
         sessions = await openclaw_call("sessions.list", config=config, org_id=org_id)
         if isinstance(sessions, dict):
@@ -531,7 +533,9 @@ class GatewaySessionService(OpenClawDBService):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
         await require_board_access(self.session, user=user, board=board, write=True)
         try:
-            result = await ensure_session(session_id, config=config, label=label, org_id=str(organization_id))
+            result = await ensure_session(
+                session_id, config=config, label=label, org_id=str(organization_id)
+            )
             session_entry = result.get("entry", result) if isinstance(result, dict) else result
         except OpenClawGatewayError as exc:
             raise HTTPException(
@@ -623,7 +627,9 @@ class GatewaySessionService(OpenClawDBService):
         _oid = str(organization_id)
         try:
             if main_session and session_id == main_session:
-                await ensure_session(main_session, config=config, label="Gateway Agent", org_id=_oid)
+                await ensure_session(
+                    main_session, config=config, label="Gateway Agent", org_id=_oid
+                )
             message = self._build_message_with_attachments(payload)
             await send_message(message, session_key=session_id, config=config, org_id=_oid)
         except OpenClawGatewayError as exc:

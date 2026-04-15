@@ -16,7 +16,6 @@ from app.api.agent import router as agent_router
 from app.api.agent_contacts import router as agent_contacts_router
 from app.api.agent_email import router as agent_email_router
 from app.api.agent_memory_vector import router as agent_memory_vector_router
-from app.api.memory_vector import router as memory_vector_router
 from app.api.agent_polymarket import router as agent_polymarket_router
 from app.api.agents import router as agents_router
 from app.api.approvals import router as approvals_router
@@ -47,6 +46,7 @@ from app.api.industry_templates import router as industry_templates_router
 from app.api.invoice_pdf import router as invoice_pdf_router
 from app.api.legal import router as legal_router
 from app.api.memory import router as memory_router
+from app.api.memory_vector import router as memory_vector_router
 from app.api.metrics import router as metrics_router
 from app.api.microsoft_graph import router as microsoft_graph_router
 from app.api.model_registry import router as model_registry_router

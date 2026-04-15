@@ -180,17 +180,13 @@ async def _get_or_404(
     return project
 
 
-async def _count_sessions(
-    session: AsyncSession, organization_id: UUID, project_id: UUID
-) -> int:
+async def _count_sessions(session: AsyncSession, organization_id: UUID, project_id: UUID) -> int:
     assignments = await _get_assignments(session, organization_id)
     pid_str = str(project_id)
     return sum(1 for v in assignments.values() if v == pid_str)
 
 
-async def _get_assignments(
-    session: AsyncSession, organization_id: UUID
-) -> dict[str, str]:
+async def _get_assignments(session: AsyncSession, organization_id: UUID) -> dict[str, str]:
     result = await session.exec(
         select(OrgConfigData).where(
             OrgConfigData.organization_id == organization_id,

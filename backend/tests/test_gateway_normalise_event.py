@@ -8,7 +8,6 @@ Locks in the 2026-04-14 schema fix that replaced the fantasy
 
 from app.services.openclaw.gateway_event_listener import _is_default_label, _normalise_event
 
-
 # ── _is_default_label ──────────────────────────────────────────────────────
 
 

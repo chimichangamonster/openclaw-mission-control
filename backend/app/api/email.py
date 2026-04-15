@@ -322,8 +322,12 @@ async def update_email_message(
     new_category = payload.triage_category
 
     for field in (
-        "is_read", "is_starred", "triage_status", "triage_category",
-        "triage_trace_id", "linked_task_id",
+        "is_read",
+        "is_starred",
+        "triage_status",
+        "triage_category",
+        "triage_trace_id",
+        "linked_task_id",
     ):
         value = getattr(payload, field, None)
         if value is not None:

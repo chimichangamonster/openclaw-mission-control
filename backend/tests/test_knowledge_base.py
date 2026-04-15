@@ -11,7 +11,6 @@ from pathlib import Path
 
 from app.api.memory import KnowledgeArticle
 
-
 # ---------------------------------------------------------------------------
 # Unit tests — list_knowledge_articles logic
 # ---------------------------------------------------------------------------

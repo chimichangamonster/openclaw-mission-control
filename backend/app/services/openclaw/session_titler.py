@@ -53,9 +53,7 @@ async def generate_title(
         return None
 
     prompt = (
-        f"User: {user_msg[:_MSG_CLIP]}\n\n"
-        f"Assistant: {assistant_msg[:_MSG_CLIP]}\n\n"
-        "Title:"
+        f"User: {user_msg[:_MSG_CLIP]}\n\n" f"Assistant: {assistant_msg[:_MSG_CLIP]}\n\n" "Title:"
     )
 
     try:

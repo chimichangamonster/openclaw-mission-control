@@ -32,9 +32,7 @@ async def _resolve_api_key(org_id: UUID) -> str:
     """Resolve OpenRouter API key: BYOK > platform key."""
     async with async_session_maker() as session:
         result = await session.execute(
-            select(OrganizationSettings).where(
-                OrganizationSettings.organization_id == org_id
-            )
+            select(OrganizationSettings).where(OrganizationSettings.organization_id == org_id)
         )
         org_settings = result.scalars().first()
 

@@ -51,7 +51,12 @@ def test_extract_skips_tool_result_role_when_looking_for_user():
             "role": "assistant",
             "content": [
                 {"type": "thinking", "thinking": "Need to call a tool", "thinkingSignature": "x"},
-                {"type": "toolCall", "id": "t1", "name": "read", "arguments": {"file_path": "BOOTSTRAP.md"}},
+                {
+                    "type": "toolCall",
+                    "id": "t1",
+                    "name": "read",
+                    "arguments": {"file_path": "BOOTSTRAP.md"},
+                },
             ],
             "timestamp": 2,
         },
@@ -70,12 +75,12 @@ def test_extract_skips_tool_result_role_when_looking_for_user():
         },
     ]
     user, assistant = _extract_message_preview(messages)
-    assert user == "what's the weather", (
-        "User message must be found even when tool-call messages are interleaved"
-    )
-    assert assistant == "The weather is sunny.", (
-        "Assistant must resolve to the final text block, not thinking/toolCall content"
-    )
+    assert (
+        user == "what's the weather"
+    ), "User message must be found even when tool-call messages are interleaved"
+    assert (
+        assistant == "The weather is sunny."
+    ), "Assistant must resolve to the final text block, not thinking/toolCall content"
 
 
 def test_extract_returns_empty_user_when_only_tool_messages_present():

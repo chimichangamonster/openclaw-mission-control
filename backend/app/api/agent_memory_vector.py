@@ -35,9 +35,7 @@ SESSION_DEP = Depends(get_session)
 AGENT_CTX_DEP = Depends(get_agent_auth_context)
 
 
-async def _resolve_org_id(
-    agent_ctx: AgentAuthContext, session: AsyncSession
-) -> UUID:
+async def _resolve_org_id(agent_ctx: AgentAuthContext, session: AsyncSession) -> UUID:
     """Resolve organization_id from the agent's linked board."""
     agent = agent_ctx.agent
     if agent.board_id is None:
@@ -57,9 +55,7 @@ async def _resolve_org_id(
 async def _require_agent_memory(org_id: UUID, session: AsyncSession) -> None:
     """Check that the agent_memory feature flag is enabled for this org."""
     result = await session.execute(
-        select(OrganizationSettings).where(
-            OrganizationSettings.organization_id == org_id
-        )
+        select(OrganizationSettings).where(OrganizationSettings.organization_id == org_id)
     )
     settings = result.scalars().first()
     flags = settings.feature_flags if settings else dict(DEFAULT_FEATURE_FLAGS)
@@ -91,7 +87,11 @@ async def store_memory(
         ttl_days=body.ttl_days,
     )
 
-    return {"id": str(memory.id), "source": memory.source, "created_at": memory.created_at.isoformat()}
+    return {
+        "id": str(memory.id),
+        "source": memory.source,
+        "created_at": memory.created_at.isoformat(),
+    }
 
 
 @router.post("/search", response_model=list[VectorMemoryRead])

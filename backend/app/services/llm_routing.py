@@ -120,9 +120,7 @@ async def resolve_llm_endpoint(
     return None
 
 
-def _trace_resolve(
-    org_id: UUID, endpoint: LLMEndpoint | None, started_at: float
-) -> None:
+def _trace_resolve(org_id: UUID, endpoint: LLMEndpoint | None, started_at: float) -> None:
     """Trace LLM endpoint resolution to Langfuse (best-effort)."""
     from time import perf_counter
 

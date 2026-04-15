@@ -73,7 +73,9 @@ def _coerce_preview_text(value: Any) -> str:
             parts = [
                 p.get("text", "")
                 for p in content
-                if isinstance(p, dict) and p.get("type") == "text" and isinstance(p.get("text"), str)
+                if isinstance(p, dict)
+                and p.get("type") == "text"
+                and isinstance(p.get("text"), str)
             ]
             return " ".join(s for s in parts if s)
     return ""
@@ -468,9 +470,7 @@ async def _maybe_autotitle_session(
             title,
         )
     except Exception:  # noqa: BLE001
-        logger.info(
-            "session_titler.autotitle_failed key=%s", session_key, exc_info=True
-        )
+        logger.info("session_titler.autotitle_failed key=%s", session_key, exc_info=True)
 
 
 async def _listen(
@@ -611,9 +611,7 @@ async def _listen(
                     # the assistant response — the gateway final event only
                     # carries the assistant side.
                     asyncio.create_task(
-                        _autotitle_from_final(
-                            organization_id, session_key, asst, config
-                        ),
+                        _autotitle_from_final(organization_id, session_key, asst, config),
                         name=f"autotitle-{session_key[-8:]}",
                     )
 

@@ -364,7 +364,9 @@ async def generate_simple(
     od = await _try_onedrive_upload(pdf_bytes, Path(relative_path).name, "application/pdf")
 
     actual_filename = Path(relative_path).name
-    logger.info("document_gen.simple filename=%s org=%s size=%d", body.filename, org_slug, len(pdf_bytes))
+    logger.info(
+        "document_gen.simple filename=%s org=%s size=%d", body.filename, org_slug, len(pdf_bytes)
+    )
 
     await _persist_document(
         filename=actual_filename,

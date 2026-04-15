@@ -206,8 +206,12 @@ async def agent_update_email_message(
     await _require_shared_account(session, msg)
 
     for field in (
-        "is_read", "is_starred", "triage_status", "triage_category",
-        "triage_trace_id", "linked_task_id",
+        "is_read",
+        "is_starred",
+        "triage_status",
+        "triage_category",
+        "triage_trace_id",
+        "linked_task_id",
     ):
         value = getattr(payload, field, None)
         if value is not None:

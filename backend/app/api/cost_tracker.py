@@ -257,7 +257,9 @@ async def get_usage_by_model(
 
     config = GatewayConfig(url=gateway.url, token=gateway.token)
     try:
-        sessions_data = await openclaw_call("sessions.list", config=config, org_id=str(org_ctx.organization.id))
+        sessions_data = await openclaw_call(
+            "sessions.list", config=config, org_id=str(org_ctx.organization.id)
+        )
     except Exception:
         logger.exception("cost_tracker.sessions_rpc_failed")
         return {"models": [], "total_cost": 0}

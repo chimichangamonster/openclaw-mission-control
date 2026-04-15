@@ -316,7 +316,9 @@ async def upload_workspace_to_onedrive(
     if org_slug:
         org_workspace = (workspace_root / org_slug).resolve()
         if not str(file_path).startswith(str(org_workspace)):
-            raise HTTPException(status_code=403, detail="File does not belong to your organization.")
+            raise HTTPException(
+                status_code=403, detail="File does not belong to your organization."
+            )
 
     if not file_path.is_file():
         raise HTTPException(status_code=404, detail="File not found in workspace.")

@@ -57,7 +57,8 @@ async def test_unlabeled_session_receives_title() -> None:
         ),
     ):
         await _maybe_autotitle_session(
-            str(org_id), session_key,
+            str(org_id),
+            session_key,
             user_msg="How much did we spend last month?",
             assistant_msg="Your spend was $1,200 across all agents.",
         )
@@ -94,7 +95,8 @@ async def test_default_label_gets_overwritten() -> None:
         ),
     ):
         await _maybe_autotitle_session(
-            str(org_id), session_key,
+            str(org_id),
+            session_key,
             user_msg="What's the market doing today?",
             assistant_msg="S&P 500 is up 0.3%.",
         )
@@ -132,8 +134,10 @@ async def test_user_renamed_label_preserved() -> None:
         ),
     ):
         await _maybe_autotitle_session(
-            str(org_id), session_key,
-            user_msg="hi", assistant_msg="hello",
+            str(org_id),
+            session_key,
+            user_msg="hi",
+            assistant_msg="hello",
         )
 
     async with maker() as session:
@@ -166,8 +170,10 @@ async def test_title_generation_failure_leaves_label_untouched() -> None:
         ),
     ):
         await _maybe_autotitle_session(
-            str(org_id), session_key,
-            user_msg="hi", assistant_msg="hello",
+            str(org_id),
+            session_key,
+            user_msg="hi",
+            assistant_msg="hello",
         )
 
     async with maker() as session:
@@ -185,7 +191,9 @@ async def test_invalid_org_id_is_noop() -> None:
         new=AsyncMock(return_value="Should Not Save"),
     ) as mock_gen:
         await _maybe_autotitle_session(
-            "not-a-uuid", "org:the-claw:chat-x",
-            user_msg="hi", assistant_msg="hello",
+            "not-a-uuid",
+            "org:the-claw:chat-x",
+            user_msg="hi",
+            assistant_msg="hello",
         )
     mock_gen.assert_not_called()  # Short-circuits on bad UUID before hitting LLM
