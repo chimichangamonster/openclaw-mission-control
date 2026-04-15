@@ -334,3 +334,48 @@ async def test_response_validation_exception_wrapper_success_path() -> None:
     resp = await _response_validation_exception_handler(req, exc)
     assert resp.status_code == 500
     assert b"request_id" in resp.body
+
+
+@pytest.mark.asyncio
+async def test_5xx_track_error_failure_is_swallowed(monkeypatch):
+    """If asyncio.ensure_future(track_error(...)) raises on a 5xx path, the
+    request middleware must not surface the error. Covers the fallback
+    except/pass at error_handling.py:130-131."""
+    import asyncio
+
+    from starlette.types import Message
+
+    from app.core.error_handling import RequestIdMiddleware
+
+    async def inner_app(_scope, _receive, _send):
+        await _send({"type": "http.response.start", "status": 500, "headers": []})
+        await _send({"type": "http.response.body", "body": b"", "more_body": False})
+
+    middleware = RequestIdMiddleware(inner_app)
+
+    def _raising_ensure_future(*args, **kwargs):
+        raise RuntimeError("asyncio sabotage")
+
+    monkeypatch.setattr(asyncio, "ensure_future", _raising_ensure_future)
+
+    scope = {
+        "type": "http",
+        "method": "GET",
+        "path": "/internal",
+        "headers": [],
+        "client": ("127.0.0.1", 0),
+        "state": {},
+    }
+    sent_messages: list[Message] = []
+
+    async def receive() -> Message:
+        return {"type": "http.request", "body": b"", "more_body": False}
+
+    async def send(message: Message) -> None:
+        sent_messages.append(message)
+
+    # A 500 status triggers the ensure_future branch; our monkeypatched version
+    # raises, and the except/pass must swallow it so the response still flows.
+    await middleware(scope, receive, send)
+
+    assert any(m.get("type") == "http.response.start" for m in sent_messages)
