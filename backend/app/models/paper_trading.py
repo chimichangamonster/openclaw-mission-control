@@ -58,6 +58,8 @@ class PaperPosition(TenantScoped, table=True):
     stop_loss: Optional[float] = None
     take_profit: Optional[float] = None
     source_report: Optional[str] = None  # e.g. "10 Bagger Report - March 15, 2026"
+    # Langfuse trace ID for trade outcome scoring (null for manual or pre-Phase-3c trades)
+    trade_trace_id: Optional[str] = None
     # Price tracking
     price_updated_at: Optional[datetime] = None
     created_at: datetime = Field(default_factory=utcnow)

@@ -20,10 +20,25 @@ from app.api.deps import (  # type: ignore[attr-defined]
 from app.core.logging import get_logger
 from app.core.time import utcnow
 from app.models.paper_trading import PaperPortfolio, PaperPosition, PaperTrade
+from app.services.langfuse_client import score_trace, trace_trade_proposal
 from app.services.notifications import notify
 from app.services.organizations import OrganizationContext
 
 logger = get_logger(__name__)
+
+
+def _classify_exit_trigger(notes: str, proposed_by: str) -> str:
+    """Best-effort label for why a position closed — drives the score comment."""
+    text = (notes or "").lower()
+    if "stop" in text or "stop-loss" in text or "stop_loss" in text:
+        return "stop_loss_triggered"
+    if "take-profit" in text or "take_profit" in text or "target" in text:
+        return "take_profit_hit"
+    if not proposed_by or proposed_by == "manual":
+        return "manual_exit"
+    return "agent_exit"
+
+
 router = APIRouter(
     prefix="/paper-trading",
     tags=["paper-trading"],
@@ -259,6 +274,10 @@ async def execute_trade(
     total = quantity * price
     # Flat $9.99 per trade (realistic Canadian brokerage fee)
     fees = 9.99
+    # Populated when a traced position fully closes — scored after commit.
+    closed_with_trace: tuple[str, str] | None = None
+    close_pnl_pct: float | None = None
+    close_realized_pnl: float | None = None
 
     if trade_type == "buy":
         if portfolio.cash_balance < total + fees:
@@ -299,6 +318,24 @@ async def execute_trade(
             position.total_fees += fees
             position.trade_count += 1
         else:
+            # Fire-and-forget Langfuse trace for agent-proposed trades. Manual
+            # buys skip this — the outcome score is only meaningful when an
+            # agent is the decision-maker. The trace_id is persisted on the
+            # position and resolved on full close for outcome scoring.
+            new_trace_id: str | None = None
+            if proposed_by and proposed_by != "manual":
+                new_trace_id = trace_trade_proposal(
+                    org_id=str(org_ctx.organization.id),
+                    symbol=symbol,
+                    side="long",
+                    quantity=quantity,
+                    entry_price=price,
+                    proposed_by=proposed_by,
+                    asset_type=asset_type,
+                    stop_loss=stop_loss,
+                    take_profit=take_profit,
+                    source_report=source_report,
+                )
             position = PaperPosition(
                 portfolio_id=portfolio_id,
                 symbol=symbol,
@@ -315,6 +352,7 @@ async def execute_trade(
                 source_report=source_report,
                 total_fees=fees,
                 trade_count=1,
+                trade_trace_id=new_trace_id,
             )
             session.add(position)
 
@@ -347,6 +385,21 @@ async def execute_trade(
             position.status = "closed"
             position.exit_date = utcnow()
             position.exit_price = price
+            # Capture trace + exit trigger for outcome scoring below. Only fire
+            # after commit so Langfuse failures can't roll back the sell.
+            if position.trade_trace_id:
+                trigger = _classify_exit_trigger(notes, proposed_by)
+                closed_with_trace = (position.trade_trace_id, trigger)
+                # Return on final tranche — simpler and well-defined even
+                # after partial sells, at the cost of ignoring averaging-up
+                # price drift. The comment carries the absolute $ P&L for
+                # precision; the score value is for signal/comparison.
+                close_pnl_pct = (
+                    ((price - position.entry_price) / position.entry_price)
+                    if position.entry_price
+                    else 0.0
+                )
+                close_realized_pnl = position.pnl_realized
 
         portfolio.cash_balance += total - fees
 
@@ -373,6 +426,26 @@ async def execute_trade(
     portfolio.updated_at = utcnow()
 
     await session.commit()
+
+    # Fire-and-forget outcome score after commit. Score value is the return as
+    # a decimal (0.20 = +20%, -0.15 = -15%); comment carries the exit trigger
+    # and absolute realized P&L for context. Langfuse failures are swallowed
+    # inside score_trace — the sell has already been persisted.
+    if (
+        closed_with_trace is not None
+        and close_pnl_pct is not None
+        and close_realized_pnl is not None
+    ):
+        trace_id, trigger = closed_with_trace
+        score_trace(
+            trace_id=trace_id,
+            name="trade_outcome",
+            value=round(close_pnl_pct, 4),
+            comment=(
+                f"{trigger} — realized P&L ${close_realized_pnl:.2f} "
+                f"({close_pnl_pct * 100:+.2f}%)"
+            ),
+        )
 
     # Notify #notifications channel
     emoji = "📈" if trade_type == "buy" else "📉"

@@ -118,6 +118,60 @@ def trace_session_titling(
         logger.debug("langfuse.trace_session_titling_failed", exc_info=True)
 
 
+# ── Trade proposal traces ─────────────────────────────────────────────
+
+
+def trace_trade_proposal(
+    *,
+    org_id: str,
+    symbol: str,
+    side: str,
+    quantity: float,
+    entry_price: float,
+    proposed_by: str,
+    asset_type: str,
+    stop_loss: float | None,
+    take_profit: float | None,
+    source_report: str | None,
+) -> str | None:
+    """Create a Langfuse trace for a new trade proposal; return the trace_id.
+
+    Called from ``execute_trade()`` on the buy path when an agent (non-manual)
+    opens a new position. The returned trace_id is persisted on the position and
+    later used by ``score_trace()`` when the position fully closes.
+
+    Returns None when Langfuse is not configured or when any tracing call fails —
+    callers must treat a None return as "no trace, no later scoring" and continue
+    normally.
+    """
+    client = get_langfuse()
+    if not client:
+        return None
+
+    try:
+        span = client.start_observation(
+            name="trade_proposal",
+            metadata={
+                "org_id": org_id,
+                "symbol": symbol,
+                "side": side,
+                "quantity": quantity,
+                "entry_price": entry_price,
+                "proposed_by": proposed_by,
+                "asset_type": asset_type,
+                "stop_loss": stop_loss,
+                "take_profit": take_profit,
+                "source_report": source_report,
+            },
+        )
+        trace_id = getattr(span, "trace_id", None)
+        span.end()
+        return trace_id if isinstance(trace_id, str) else None
+    except Exception:
+        logger.debug("langfuse.trace_trade_proposal_failed", exc_info=True)
+        return None
+
+
 # ── Gateway RPC traces ────────────────────────────────────────────────
 
 
