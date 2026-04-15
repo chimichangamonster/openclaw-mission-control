@@ -14,7 +14,7 @@ from app.api.deps import (  # type: ignore[attr-defined]
     PORTFOLIO_DEP,
     get_session,
     require_feature,
-    require_org_member,
+    require_org_from_actor,
 )
 from app.core.logging import get_logger
 from app.core.time import utcnow
@@ -78,7 +78,7 @@ async def list_watchlist(
 async def add_watchlist_item(
     portfolio_id: UUID,
     session: AsyncSession = Depends(get_session),
-    org_ctx: OrganizationContext = Depends(require_org_member),
+    org_ctx: OrganizationContext = Depends(require_org_from_actor),
     symbol: str = "",
     yahoo_ticker: str = "",
     company_name: str | None = None,
@@ -264,7 +264,7 @@ async def bulk_add_watchlist(
     portfolio_id: UUID,
     items: list[dict[str, Any]],
     session: AsyncSession = Depends(get_session),
-    org_ctx: OrganizationContext = Depends(require_org_member),
+    org_ctx: OrganizationContext = Depends(require_org_from_actor),
 ) -> dict[str, Any]:
     """Bulk add watchlist items from a report scan."""
     # Verify portfolio

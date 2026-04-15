@@ -182,7 +182,7 @@ def require_feature(flag: str) -> Callable[..., Any]:
     """
 
     async def _check(
-        org_ctx: OrganizationContext = ORG_MEMBER_DEP,
+        org_ctx: OrganizationContext = ORG_ACTOR_DEP,
         session: AsyncSession = SESSION_DEP,
     ) -> None:
         result = await session.execute(
@@ -206,7 +206,7 @@ def require_feature(flag: str) -> Callable[..., Any]:
 
 
 async def check_org_rate_limit(
-    org_ctx: OrganizationContext = ORG_MEMBER_DEP,
+    org_ctx: OrganizationContext = ORG_ACTOR_DEP,
 ) -> None:
     """Enforce per-org API rate limiting (600 req/min)."""
     from app.core.rate_limit import org_api_limiter
@@ -342,7 +342,7 @@ BOARD_READ_DEP = Depends(get_board_for_actor_read)
 async def get_portfolio_for_org(
     portfolio_id: UUID,
     session: AsyncSession = SESSION_DEP,
-    org_ctx: OrganizationContext = ORG_MEMBER_DEP,
+    org_ctx: OrganizationContext = ORG_ACTOR_DEP,
 ) -> PaperPortfolio:
     """Load a portfolio and verify it belongs to the caller's organization."""
     result = await session.execute(

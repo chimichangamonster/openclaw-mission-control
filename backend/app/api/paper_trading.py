@@ -15,7 +15,7 @@ from app.api.deps import (  # type: ignore[attr-defined]
     PORTFOLIO_DEP,
     get_session,
     require_feature,
-    require_org_member,
+    require_org_from_actor,
 )
 from app.core.logging import get_logger
 from app.core.time import utcnow
@@ -49,7 +49,7 @@ router = APIRouter(
 @router.get("/portfolios")
 async def list_portfolios(
     session: AsyncSession = Depends(get_session),
-    org_ctx: OrganizationContext = Depends(require_org_member),
+    org_ctx: OrganizationContext = Depends(require_org_from_actor),
 ) -> list[dict[str, Any]]:
     stmt = select(PaperPortfolio).where(PaperPortfolio.organization_id == org_ctx.organization.id)  # type: ignore[arg-type]
     result = await session.execute(stmt)
@@ -79,7 +79,7 @@ async def list_portfolios(
 @router.post("/portfolios", status_code=status.HTTP_201_CREATED)
 async def create_portfolio(
     session: AsyncSession = Depends(get_session),
-    org_ctx: OrganizationContext = Depends(require_org_member),
+    org_ctx: OrganizationContext = Depends(require_org_from_actor),
     name: str = "Default Portfolio",
     starting_balance: float = 10000.0,
 ) -> dict[str, Any]:
@@ -105,7 +105,7 @@ async def create_portfolio(
 async def get_portfolio(
     portfolio_id: UUID,
     session: AsyncSession = Depends(get_session),
-    org_ctx: OrganizationContext = Depends(require_org_member),
+    org_ctx: OrganizationContext = Depends(require_org_from_actor),
 ) -> dict[str, Any]:
     stmt = select(PaperPortfolio).where(
         PaperPortfolio.id == portfolio_id,  # type: ignore[arg-type]
@@ -158,7 +158,7 @@ async def toggle_auto_trade(
     portfolio_id: UUID,
     enabled: bool = True,
     session: AsyncSession = Depends(get_session),
-    org_ctx: OrganizationContext = Depends(require_org_member),
+    org_ctx: OrganizationContext = Depends(require_org_from_actor),
 ) -> dict[str, Any]:
     """Toggle auto-trade on/off for a portfolio."""
     stmt = select(PaperPortfolio).where(
@@ -247,7 +247,7 @@ async def list_positions(
 async def execute_trade(
     portfolio_id: UUID,
     session: AsyncSession = Depends(get_session),
-    org_ctx: OrganizationContext = Depends(require_org_member),
+    org_ctx: OrganizationContext = Depends(require_org_from_actor),
     symbol: str = "",
     asset_type: str = "stock",
     trade_type: str = "buy",
@@ -508,7 +508,7 @@ async def list_trades(
 async def portfolio_summary(
     portfolio_id: UUID,
     session: AsyncSession = Depends(get_session),
-    org_ctx: OrganizationContext = Depends(require_org_member),
+    org_ctx: OrganizationContext = Depends(require_org_from_actor),
 ) -> dict[str, Any]:
     # Get portfolio
     stmt = select(PaperPortfolio).where(
@@ -682,7 +682,7 @@ async def update_position(
 async def equity_curve(
     portfolio_id: UUID,
     session: AsyncSession = Depends(get_session),
-    org_ctx: OrganizationContext = Depends(require_org_member),
+    org_ctx: OrganizationContext = Depends(require_org_from_actor),
 ) -> list[dict[str, Any]]:
     """Daily equity curve: starting balance + cumulative realized P&L from trades."""
     # Verify portfolio

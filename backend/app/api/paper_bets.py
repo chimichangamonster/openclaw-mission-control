@@ -14,7 +14,7 @@ from app.api.deps import (  # type: ignore[attr-defined]
     PORTFOLIO_DEP,
     get_session,
     require_feature,
-    require_org_member,
+    require_org_from_actor,
 )
 from app.core.logging import get_logger
 from app.core.time import utcnow
@@ -48,7 +48,7 @@ def _calculate_payout(stake: float, odds: int) -> float:
 async def place_bet(
     portfolio_id: UUID,
     session: AsyncSession = Depends(get_session),
-    org_ctx: OrganizationContext = Depends(require_org_member),
+    org_ctx: OrganizationContext = Depends(require_org_from_actor),
     sport: str = "nhl",
     game: str = "",
     game_date: str = "",
