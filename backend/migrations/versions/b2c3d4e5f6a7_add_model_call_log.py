@@ -1,6 +1,6 @@
 """Add model_call_log table for LLM reliability tracking.
 
-Revision ID: a1b2c3d4e5f6
+Revision ID: b2c3d4e5f6a7
 Revises: z0a1b2c3d4e5
 Create Date: 2026-04-15 20:00:00.000000
 
@@ -11,7 +11,7 @@ from __future__ import annotations
 import sqlalchemy as sa
 from alembic import op
 
-revision = "a1b2c3d4e5f6"
+revision = "b2c3d4e5f6a7"
 down_revision = "z0a1b2c3d4e5"
 branch_labels = None
 depends_on = None
