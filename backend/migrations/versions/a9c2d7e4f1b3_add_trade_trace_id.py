@@ -1,7 +1,7 @@
 """Add trade_trace_id to paper_positions for Langfuse trade outcome scoring.
 
 Revision ID: a9c2d7e4f1b3
-Revises: z0a1b2c3d4e5
+Revises: b2c3d4e5f6a7
 Create Date: 2026-04-15 18:30:00.000000
 
 """
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "a9c2d7e4f1b3"
-down_revision = "z0a1b2c3d4e5"
+down_revision = "b2c3d4e5f6a7"
 branch_labels = None
 depends_on = None
 
