@@ -13,7 +13,7 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
-from app.api.memory import Report, _report_category
+from app.api.memory import _report_category
 
 # ---------------------------------------------------------------------------
 # Helpers
