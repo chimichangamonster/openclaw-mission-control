@@ -7,6 +7,25 @@ VantageClaw fork of abhi1693/openclaw-mission-control. Separate git repo (not a 
 - `upstream` — abhi1693/openclaw-mission-control — read-only, used by `make sync-upstream` if needed
 - Reconfigured 2026-04-09: previously `origin`/`fork` swap, renamed so `git status` reports honest "ahead/behind" against the fork instead of phantom drift against upstream
 
+### Upstream-sync discipline — FROZEN as of 2026-04-20
+
+**Do not run `make sync-upstream` as a reflex.** The fork is deliberately indefinite.
+
+VantageClaw is ~40 commits ahead of upstream and building a fundamentally different product on the same foundation (multi-tenant business platform vs. abhi1693's single-tenant mission-control). Every upstream pull is risk exposure for zero strategic benefit — dependabot bumps and small fixes upstream are not worth the merge-conflict cost or the surface-area risk of breaking load-bearing customizations.
+
+**The rule:** upstream pulls require a deliberate decision with scoped intent. Specifically:
+
+1. **No blanket `git merge upstream/master`.** If you want a specific upstream commit (e.g. a security patch or a specific bugfix), cherry-pick it onto a scoped branch, test it, merge to main individually.
+2. **Security patches are the only routine exception.** CVE disclosure in an upstream dep → cherry-pick the fix, ship. Everything else is case-by-case.
+3. **Before any upstream sync:** write what you're pulling and why in the commit message. Don't do passive "sync upstream" commits.
+4. **Watch for upstream-replace-with-build decisions.** If upstream ships something we were planning to build, consider a clean reimplementation in our own architecture rather than merging — usually faster than resolving conflicts.
+
+**Why this is now explicit:** the convenience of `make sync-upstream` as a one-command reflex is a risk. Session 2026-04-20 audited the fork state (~40 commits ahead, last sync 2026-03-24, prior sync had conflicts on `0b8d95b`). Conclusion: convert implicit discipline into explicit rule so future sessions and fresh-context collaborators don't accidentally re-open the upstream-coupling risk.
+
+**The Makefile target stays** (removing it would hide capability we occasionally need), but it now requires deliberate invocation with intent documented in the commit.
+
+Related: parent-repo `.openclaw-gateway/` fork (gitignored sibling) follows the same rule by analogy. If a gateway security patch ships upstream, cherry-pick it; otherwise freeze.
+
 ## Backend (Python 3.12 + FastAPI)
 - Entry: `backend/app/main.py`
 - Models: SQLModel in `backend/app/models/`
