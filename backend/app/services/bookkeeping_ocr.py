@@ -1,7 +1,7 @@
 """Receipt OCR service — vision model extracts structured data from receipt images.
 
 Uses the org's resolved LLM endpoint (BYOK, custom, or platform OpenRouter).
-Primary model: Claude Sonnet 4. Fallback: Gemini Flash.
+Primary model: Claude Sonnet 4.6. Fallback: Gemini Flash.
 """
 
 from __future__ import annotations
@@ -19,7 +19,11 @@ from app.services.llm_routing import resolve_llm_endpoint
 
 logger = get_logger(__name__)
 
-OCR_PRIMARY_MODEL = "anthropic/claude-sonnet-4-20250514"
+# Anthropic's canonical API ID for Sonnet 4.6 is the undated family string
+# (`claude-sonnet-4-6`), not a dated snapshot. Predecessor `claude-sonnet-4-20250514`
+# was deprecated 2026-04-14 with retirement scheduled 2026-06-15; migration caught
+# by /frontier-analyze 2026-04-20.
+OCR_PRIMARY_MODEL = "anthropic/claude-sonnet-4-6"
 OCR_FALLBACK_MODEL = "google/gemini-2.0-flash-001"
 
 OCR_PROMPT = """You are a receipt OCR extraction system. Analyze this receipt image and extract structured data.
