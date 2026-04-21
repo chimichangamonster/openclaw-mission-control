@@ -1110,6 +1110,67 @@ function EditRow({
 // REPORTS TAB
 // ===========================================================================
 
+type PeriodGrouping = "month" | "quarter";
+
+interface QuarterBucket {
+  key: string; // "2026-Q1"
+  year: number;
+  q: 1 | 2 | 3 | 4;
+  label: string; // "Q1 2026"
+  months: ReconciliationMonth[];
+  business_income: number;
+  business_expenses: number;
+  vehicle_expenses: number;
+  gst_collected: number;
+  gst_paid: number;
+  flagged: number;
+  all_locked: boolean;
+}
+
+function groupByQuarter(months: ReconciliationMonth[]): QuarterBucket[] {
+  const byKey = new Map<string, QuarterBucket>();
+  for (const m of months) {
+    const [yStr, monStr] = m.period.split("-");
+    const year = Number(yStr);
+    const monNum = Number(monStr);
+    const q = (Math.ceil(monNum / 3) as 1 | 2 | 3 | 4);
+    const key = `${year}-Q${q}`;
+    let bucket = byKey.get(key);
+    if (!bucket) {
+      bucket = {
+        key,
+        year,
+        q,
+        label: `Q${q} ${year}`,
+        months: [],
+        business_income: 0,
+        business_expenses: 0,
+        vehicle_expenses: 0,
+        gst_collected: 0,
+        gst_paid: 0,
+        flagged: 0,
+        all_locked: true,
+      };
+      byKey.set(key, bucket);
+    }
+    bucket.months.push(m);
+    bucket.business_income += m.business_income;
+    bucket.business_expenses += m.business_expenses;
+    bucket.vehicle_expenses += m.vehicle_expenses;
+    bucket.gst_collected += m.gst_collected_informational;
+    bucket.gst_paid += m.gst_paid_informational;
+    bucket.flagged += m.flagged_line_count;
+    if (m.status !== "locked") bucket.all_locked = false;
+  }
+  // Sort months within each quarter ascending, quarters themselves newest-first
+  for (const bucket of byKey.values()) {
+    bucket.months.sort((a, b) => (a.period < b.period ? -1 : 1));
+  }
+  return Array.from(byKey.values()).sort((a, b) =>
+    b.year !== a.year ? b.year - a.year : b.q - a.q
+  );
+}
+
 function ReportsTab({
   month,
   allMonths,
@@ -1124,6 +1185,8 @@ function ReportsTab({
   const [rules, setRules] = useState<VendorRule[]>([]);
   const [loadingRules, setLoadingRules] = useState(true);
   const [showInactive, setShowInactive] = useState(false);
+  const [grouping, setGrouping] = useState<PeriodGrouping>("month");
+  const [expandedQuarter, setExpandedQuarter] = useState<string | null>(null);
 
   const refreshRules = useCallback(async () => {
     setLoadingRules(true);
@@ -1212,11 +1275,41 @@ function ReportsTab({
         </div>
       ) : null}
 
-      {/* YTD table */}
+      {/* YTD / grouping table */}
       <div className="rounded-lg border border-slate-200 bg-white">
-        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-2">
-          <div className="text-xs font-semibold text-slate-600">
-            Locked months {ytd.count > 0 ? `— ${new Date().getFullYear()} YTD (${ytd.count})` : ""}
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-4 py-2">
+          <div className="flex items-center gap-3">
+            <div className="text-xs font-semibold text-slate-600">
+              {grouping === "month"
+                ? `Locked months${ytd.count > 0 ? ` — ${new Date().getFullYear()} YTD (${ytd.count})` : ""}`
+                : "By quarter"}
+            </div>
+            <div className="inline-flex rounded border border-slate-200 p-0.5 text-[10px]">
+              <button
+                type="button"
+                onClick={() => setGrouping("month")}
+                className={cn(
+                  "rounded px-2 py-0.5",
+                  grouping === "month"
+                    ? "bg-slate-900 text-white"
+                    : "text-slate-500 hover:text-slate-700"
+                )}
+              >
+                Months
+              </button>
+              <button
+                type="button"
+                onClick={() => setGrouping("quarter")}
+                className={cn(
+                  "rounded px-2 py-0.5",
+                  grouping === "quarter"
+                    ? "bg-slate-900 text-white"
+                    : "text-slate-500 hover:text-slate-700"
+                )}
+              >
+                Quarters
+              </button>
+            </div>
           </div>
           {ytd.count > 0 ? (
             <div className="text-xs text-slate-500">
@@ -1230,7 +1323,7 @@ function ReportsTab({
         </div>
         {sortedMonths.length === 0 ? (
           <div className="px-4 py-6 text-center text-sm text-slate-400">No months yet.</div>
-        ) : (
+        ) : grouping === "month" ? (
           <table className="w-full text-xs">
             <thead className="bg-slate-50 text-left text-slate-500">
               <tr>
@@ -1286,6 +1379,118 @@ function ReportsTab({
                   </td>
                 </tr>
               ))}
+            </tbody>
+          </table>
+        ) : (
+          <table className="w-full text-xs">
+            <thead className="bg-slate-50 text-left text-slate-500">
+              <tr>
+                <th className="px-3 py-2 font-medium">Quarter</th>
+                <th className="px-3 py-2 font-medium">Status</th>
+                <th className="px-3 py-2 text-right font-medium">Business income</th>
+                <th className="px-3 py-2 text-right font-medium">Business exp.</th>
+                <th className="px-3 py-2 text-right font-medium">Vehicle exp.</th>
+                <th className="px-3 py-2 text-right font-medium">Flagged</th>
+                <th className="px-3 py-2"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {groupByQuarter(sortedMonths).flatMap((q) => {
+                const isExpanded = expandedQuarter === q.key;
+                const quarterRow = (
+                  <tr
+                    key={q.key}
+                    onClick={() => setExpandedQuarter(isExpanded ? null : q.key)}
+                    className="cursor-pointer bg-slate-50/50 hover:bg-slate-100/60"
+                  >
+                    <td className="px-3 py-1.5 font-semibold text-slate-700">
+                      <span className="mr-1 inline-block w-3 text-slate-400">
+                        {isExpanded ? "▾" : "▸"}
+                      </span>
+                      {q.label}
+                      <span className="ml-2 text-[10px] font-normal text-slate-400">
+                        ({q.months.length} mo)
+                      </span>
+                    </td>
+                    <td className="px-3 py-1.5">
+                      <span
+                        className={cn(
+                          "rounded border px-2 py-0.5 text-[10px]",
+                          q.all_locked
+                            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                            : "border-slate-200 bg-slate-50 text-slate-600"
+                        )}
+                      >
+                        {q.all_locked ? "locked" : "partial"}
+                      </span>
+                    </td>
+                    <td className="px-3 py-1.5 text-right font-mono font-semibold text-emerald-700">
+                      {currencyFmt(q.business_income)}
+                    </td>
+                    <td className="px-3 py-1.5 text-right font-mono font-semibold text-slate-700">
+                      {currencyFmt(q.business_expenses)}
+                    </td>
+                    <td className="px-3 py-1.5 text-right font-mono font-semibold text-amber-700">
+                      {currencyFmt(q.vehicle_expenses)}
+                    </td>
+                    <td className="px-3 py-1.5 text-right">
+                      {q.flagged > 0 ? (
+                        <span className="text-red-600">{q.flagged}</span>
+                      ) : (
+                        <span className="text-slate-300">0</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-1.5 text-right text-slate-400" />
+                  </tr>
+                );
+                if (!isExpanded) return [quarterRow];
+                const monthRows = q.months.map((m) => (
+                  <tr key={m.id} className="hover:bg-slate-50">
+                    <td className="px-3 py-1.5 pl-10 text-slate-600">{periodLabel(m.period)}</td>
+                    <td className="px-3 py-1.5">
+                      <span
+                        className={cn(
+                          "rounded border px-2 py-0.5 text-[10px]",
+                          m.status === "locked"
+                            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                            : "border-slate-200 bg-slate-50 text-slate-600"
+                        )}
+                      >
+                        {m.status}
+                      </span>
+                    </td>
+                    <td className="px-3 py-1.5 text-right font-mono text-emerald-700">
+                      {currencyFmt(m.business_income)}
+                    </td>
+                    <td className="px-3 py-1.5 text-right font-mono text-slate-700">
+                      {currencyFmt(m.business_expenses)}
+                    </td>
+                    <td className="px-3 py-1.5 text-right font-mono text-amber-700">
+                      {currencyFmt(m.vehicle_expenses)}
+                    </td>
+                    <td className="px-3 py-1.5 text-right">
+                      {m.flagged_line_count > 0 ? (
+                        <span className="text-red-600">{m.flagged_line_count}</span>
+                      ) : (
+                        <span className="text-slate-300">0</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-1.5 text-right">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onPickMonth(m.period);
+                        }}
+                        className="text-blue-600 hover:underline"
+                      >
+                        View
+                      </button>
+                    </td>
+                  </tr>
+                ));
+                return [quarterRow, ...monthRows];
+              })}
             </tbody>
           </table>
         )}
