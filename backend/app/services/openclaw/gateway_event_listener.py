@@ -53,6 +53,54 @@ _prev_sessions: dict[str, dict[str, Any]] = {}
 _MAX_BACKOFF_SECONDS = 30
 
 
+def _extract_delivery_mode(payload: dict[str, Any]) -> str | None:
+    """Derive a toast-routing hint from a gateway cron event payload.
+
+    Gateway payload shape (verified live 2026-04-21 via bundle read):
+      - `delivered`: bool (true = sent to channel, false = not sent)
+      - `deliveryStatus`: "delivered" | "not-delivered" | "unknown"
+      - NO configured `delivery.mode` in event payload
+
+    Gateway's `resolveDeliveryStatus` returns `not-delivered` when
+    `delivered === false`, which happens in TWO cases:
+      (a) mode=announce/webhook and send actually failed (real failure)
+      (b) mode=none (silent-disk) — nothing to send, so never "delivered"
+
+    Case (b) is the common case (item 44a's primary target), case (a) is
+    rare (delivery genuinely failed). We can't disambiguate without an
+    RPC lookup, so map `not-delivered` to "none" (silent-disk toast to
+    /memory?tab=reports). Real delivery failures will route there too —
+    acceptable false-positive since both need user visibility and the
+    report is equally accessible.
+
+    Mapping:
+      "delivered"     → "announce" (Discord/webhook confirmed sent)
+      "not-delivered" → "none"     (silent-disk OR genuine send failure)
+      "unknown"       → None       (legacy fallback toast)
+
+    Legacy shapes (nested delivery.mode, snake/camel case) kept for tests
+    and potential gateway evolution.
+    """
+    status = payload.get("deliveryStatus") or payload.get("delivery_status")
+    if isinstance(status, str):
+        mapping = {
+            "delivered": "announce",
+            "not-delivered": "none",
+        }
+        mapped = mapping.get(status)
+        if mapped is not None:
+            return mapped
+    delivery = payload.get("delivery")
+    if isinstance(delivery, dict):
+        mode = delivery.get("mode")
+        if isinstance(mode, str):
+            return mode
+    mode = payload.get("delivery_mode") or payload.get("deliveryMode")
+    if isinstance(mode, str):
+        return mode
+    return None
+
+
 def _coerce_preview_text(value: Any) -> str:
     """Safely coerce a gateway event payload value into a preview string.
 
@@ -170,35 +218,65 @@ def _normalise_event(event_name: str, payload: dict[str, Any]) -> LiveActivityEv
         return None
 
     if event_name == "cron":
-        job_name = payload.get("name") or payload.get("jobName") or ""
+        # Real gateway payload: {action, deliveryStatus, durationMs, jobId, model,
+        # nextRunAtMs, provider, runAtMs, sessionId, sessionKey, status, summary,
+        # usage}. No name/agentId — derive from jobId+sessionKey.
+        job_name = (
+            payload.get("name")
+            or payload.get("jobName")
+            or payload.get("summary")
+            or payload.get("jobId")
+            or ""
+        )
         status = payload.get("status") or ""
-        agent = payload.get("agentId") or ""
+        action = payload.get("action") or ""
+        agent = payload.get("agentId") or payload.get("sessionKey") or ""
+        logger.info(
+            "cron_event_dispatch action=%s status=%s deliveryStatus=%s",
+            action,
+            status,
+            payload.get("deliveryStatus"),
+        )
+        # Promote delivery.mode to a stable top-level field for frontend consumers.
+        # Gateway may emit delivery as a nested object, as separate fields, or omit
+        # it entirely — fail-open to None so downstream fail-open to legacy behavior.
+        delivery_mode = _extract_delivery_mode(payload)
+        enriched = {**payload, "delivery_mode": delivery_mode}
         if status in ("started", "running"):
             return LiveActivityEvent(
                 event_type="cron.started",
                 agent_name=str(agent),
                 message=f"Cron started: {job_name}",
-                metadata=payload,
+                metadata=enriched,
             )
-        if status in ("completed", "done", "success"):
+        # Completion is signaled by either action="finished" OR status in the
+        # success/completed set. Gateway often sends both; check either.
+        if action == "finished" or status in ("completed", "done", "success", "ok"):
+            logger.info(
+                "cron.completed action=%s status=%s delivery_mode=%s job=%s",
+                action,
+                status,
+                delivery_mode,
+                job_name,
+            )
             return LiveActivityEvent(
                 event_type="cron.completed",
                 agent_name=str(agent),
                 message=f"Cron completed: {job_name}",
-                metadata=payload,
+                metadata=enriched,
             )
-        if status in ("error", "failed"):
+        if status in ("error", "failed") or action == "failed":
             return LiveActivityEvent(
                 event_type="cron.error",
                 agent_name=str(agent),
                 message=f"Cron failed: {job_name} — {payload.get('error', '')}",
-                metadata=payload,
+                metadata=enriched,
             )
         return LiveActivityEvent(
             event_type="cron.event",
             agent_name=str(agent),
             message=f"Cron: {job_name} ({status})",
-            metadata=payload,
+            metadata=enriched,
         )
 
     if event_name == "exec.approval.requested":

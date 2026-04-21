@@ -158,17 +158,48 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
           const eventType = data.event_type || "";
 
           // ── Cron job completed ─────────────────────────────────
+          // Backend normaliser maps gateway `deliveryStatus` → delivery_mode:
+          //   "announce" (delivered)     → silent toast (already notified elsewhere)
+          //   "webhook"  (delivered)     → silent toast (downstream handles)
+          //   "none"     (not-requested) → "New report available" → /memory?tab=reports
+          //   "error"    (not-delivered) → warn toast (delivery attempted but failed)
+          //   null/unknown               → legacy "Check the conversation" → /chat
           if (eventType === "cron.completed") {
-            const jobName = data.metadata?.name as string || data.agent_name || "Scheduled task";
-            notify({
-              title: "Cron job completed",
-              body: `${jobName} finished. Check the conversation for results.`,
-              href: "/chat",
-              variant: "success",
-            });
+            const jobName =
+              (data.metadata?.name as string) ||
+              (data.metadata?.summary as string) ||
+              data.agent_name ||
+              "Scheduled task";
+            const deliveryMode = data.metadata?.delivery_mode as string | null | undefined;
+            if (deliveryMode === "announce" || deliveryMode === "webhook") {
+              // Already notified via Discord / webhook; don't duplicate.
+            } else if (deliveryMode === "none") {
+              notify({
+                title: "New report available",
+                body: `${jobName} completed. Report saved to memory.`,
+                href: "/memory?tab=reports",
+                variant: "success",
+              });
+            } else if (deliveryMode === "error") {
+              notify({
+                title: "Cron delivery failed",
+                body: `${jobName} finished but delivery was not confirmed.`,
+                href: "/cron-jobs",
+                variant: "warning",
+              });
+            } else {
+              notify({
+                title: "Cron job completed",
+                body: `${jobName} finished. Check the conversation for results.`,
+                href: "/chat",
+                variant: "success",
+              });
+            }
           }
 
           // ── Cron job failed ────────────────────────────────────
+          // Always toast errors regardless of delivery.mode — silent-disk crons
+          // failing are exactly the case where the user needs to know.
           if (eventType === "cron.error") {
             const jobName = data.metadata?.name as string || data.agent_name || "Scheduled task";
             notify({

@@ -4,6 +4,7 @@ export const dynamic = "force-dynamic";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   BookOpen,
   Brain,
@@ -100,7 +101,12 @@ async function fetchReport(path: string): Promise<MemoryFile> {
 
 export default function MemoryPage() {
   const { isSignedIn } = useAuth();
-  const [tab, setTab] = useState<"files" | "knowledge" | "reports">("files");
+  const searchParams = useSearchParams();
+  const initialTab = (() => {
+    const t = searchParams?.get("tab");
+    return t === "knowledge" || t === "reports" ? t : "files";
+  })();
+  const [tab, setTab] = useState<"files" | "knowledge" | "reports">(initialTab);
 
   // Memory files state
   const [files, setFiles] = useState<MemoryFile[]>([]);

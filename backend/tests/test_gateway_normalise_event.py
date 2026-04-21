@@ -6,7 +6,11 @@ Locks in the 2026-04-14 schema fix that replaced the fantasy
 ``direction="inbound/outbound"`` / ``state="thinking/done"`` guesses.
 """
 
-from app.services.openclaw.gateway_event_listener import _is_default_label, _normalise_event
+from app.services.openclaw.gateway_event_listener import (
+    _extract_delivery_mode,
+    _is_default_label,
+    _normalise_event,
+)
 
 # ── _is_default_label ──────────────────────────────────────────────────────
 
@@ -208,3 +212,118 @@ def test_agent_error_stream_skipped():
 def test_agent_unknown_stream_skipped():
     payload = {"runId": "r1", "stream": "future_stream", "sessionKey": "s1", "data": {}}
     assert _normalise_event("agent", payload) is None
+
+
+# ── cron delivery mode extraction (item 44a) ───────────────────────────────
+
+
+def test_extract_delivery_mode_from_gateway_deliveryStatus_delivered():
+    """deliveryStatus='delivered' = Discord/webhook confirmed → 'announce'."""
+    payload = {"deliveryStatus": "delivered"}
+    assert _extract_delivery_mode(payload) == "announce"
+
+
+def test_extract_delivery_mode_from_gateway_deliveryStatus_not_delivered():
+    """deliveryStatus='not-delivered' = silent-disk OR send failure → 'none'.
+
+    Gateway emits this for both mode=none (silent-disk expected) and genuine
+    send failures. Both need a visibility toast; mapping to 'none' routes
+    to /memory?tab=reports which works for either case.
+    """
+    payload = {"deliveryStatus": "not-delivered"}
+    assert _extract_delivery_mode(payload) == "none"
+
+
+def test_extract_delivery_mode_from_gateway_deliveryStatus_unknown_falls_through():
+    """deliveryStatus='unknown' falls through to legacy checks, ultimately None."""
+    assert _extract_delivery_mode({"deliveryStatus": "unknown"}) is None
+
+
+def test_extract_delivery_mode_from_nested_delivery_object():
+    """Legacy shape: delivery as nested object — kept as fallback."""
+    payload = {"delivery": {"mode": "none", "bestEffort": True}}
+    assert _extract_delivery_mode(payload) == "none"
+
+
+def test_extract_delivery_mode_from_flattened_snake_case():
+    payload = {"delivery_mode": "announce"}
+    assert _extract_delivery_mode(payload) == "announce"
+
+
+def test_extract_delivery_mode_from_flattened_camel_case():
+    payload = {"deliveryMode": "webhook"}
+    assert _extract_delivery_mode(payload) == "webhook"
+
+
+def test_extract_delivery_mode_missing_returns_none():
+    """Fail-open: frontend falls back to legacy toast behavior on None."""
+    assert _extract_delivery_mode({}) is None
+    assert _extract_delivery_mode({"name": "job", "status": "completed"}) is None
+
+
+def test_extract_delivery_mode_nested_delivery_missing_mode():
+    """Delivery dict without mode key — still None, no KeyError."""
+    assert _extract_delivery_mode({"delivery": {"bestEffort": True}}) is None
+
+
+def test_cron_completed_metadata_includes_delivery_mode():
+    """cron.completed events must surface delivery_mode for NotificationProvider."""
+    payload = {
+        "name": "competitor-scan",
+        "status": "completed",
+        "agentId": "waste-gurus-agent",
+        "delivery": {"mode": "none", "bestEffort": True},
+    }
+    event = _normalise_event("cron", payload)
+    assert event is not None
+    assert event.event_type == "cron.completed"
+    assert event.metadata["delivery_mode"] == "none"
+
+
+def test_cron_completed_real_gateway_payload():
+    """Real gateway payload verified via live VPS trace 2026-04-21 session #23.
+
+    Gateway payload keys: action, delivered, deliveryStatus, durationMs, jobId,
+    model, nextRunAtMs, provider, runAtMs, sessionId, sessionKey, status,
+    summary, usage. Completion signaled by action='finished' AND status='ok'.
+    Silent-disk crons (mode=none) land with deliveryStatus='not-delivered'
+    because gateway's resolveDeliveryStatus returns that whenever delivered=false.
+    """
+    payload = {
+        "action": "finished",
+        "delivered": False,
+        "deliveryStatus": "not-delivered",
+        "durationMs": 94758,
+        "jobId": "da0997df-8e75-43d1-8b19-4189674e57db",
+        "status": "ok",
+        "summary": "**Email Triage Complete**",
+        "sessionKey": "waste-gurus:waste-gurus-agent:cron:abc123",
+    }
+    event = _normalise_event("cron", payload)
+    assert event is not None
+    assert event.event_type == "cron.completed"
+    assert event.metadata["delivery_mode"] == "none"  # silent-disk → none toast
+
+
+def test_cron_completed_without_delivery_falls_open():
+    """Legacy cron events without delivery metadata still emit an event."""
+    payload = {"name": "legacy-job", "status": "completed", "agentId": "a1"}
+    event = _normalise_event("cron", payload)
+    assert event is not None
+    assert event.event_type == "cron.completed"
+    assert event.metadata["delivery_mode"] is None
+
+
+def test_cron_error_includes_delivery_mode():
+    """Errors also surface delivery_mode so warning toasts can branch."""
+    payload = {
+        "name": "failing-job",
+        "status": "error",
+        "agentId": "a1",
+        "error": "timeout",
+        "delivery": {"mode": "announce"},
+    }
+    event = _normalise_event("cron", payload)
+    assert event is not None
+    assert event.event_type == "cron.error"
+    assert event.metadata["delivery_mode"] == "announce"
