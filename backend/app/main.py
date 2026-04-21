@@ -27,6 +27,7 @@ from app.api.board_onboarding import router as board_onboarding_router
 from app.api.board_webhooks import router as board_webhooks_router
 from app.api.boards import router as boards_router
 from app.api.bookkeeping import router as bookkeeping_router
+from app.api.personal_bookkeeping import router as personal_bookkeeping_router
 from app.api.chat_projects import router as chat_projects_router
 from app.api.contacts import router as contacts_router
 from app.api.cost_tracker import router as cost_tracker_router
@@ -1023,6 +1024,7 @@ api_v1.include_router(tags_router)
 api_v1.include_router(users_router)
 api_v1.include_router(watchlist_router)
 api_v1.include_router(bookkeeping_router)
+api_v1.include_router(personal_bookkeeping_router)
 api_v1.include_router(org_config_router)
 api_v1.include_router(skill_config_router)
 api_v1.include_router(industry_templates_router)

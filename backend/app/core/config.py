@@ -140,6 +140,9 @@ class Settings(BaseSettings):
         ""  # DEPRECATED — legacy fallback, remove after compose mounts dropped
     )
 
+    # Personal bookkeeping statement storage (encrypted, CRA 6-year retention)
+    personal_bookkeeping_statements_root: str = ""
+
     # Adobe PDF Services (platform-level fallback for BYOK)
     adobe_pdf_client_id: str = ""
     adobe_pdf_client_secret: str = ""

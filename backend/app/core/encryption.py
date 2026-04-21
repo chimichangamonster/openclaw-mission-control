@@ -112,6 +112,34 @@ def decrypt_token(ciphertext: str) -> str:
     return _decrypt_fernet(ciphertext)
 
 
+def encrypt_bytes(plaintext: bytes) -> bytes:
+    """Encrypt raw bytes using AES-256-GCM. Returns a self-contained blob.
+
+    Wire format: version(1) + nonce(12) + ciphertext+tag(N+16). No base64,
+    no "v1:" prefix — suitable for writing directly to disk.
+    """
+    cipher, ver = _get_aesgcm()
+    nonce = os.urandom(_NONCE_BYTES)
+    ct = cipher.encrypt(nonce, plaintext, None)  # ct includes tag
+    return struct.pack("B", ver) + nonce + ct
+
+
+def decrypt_bytes(blob: bytes) -> bytes:
+    """Decrypt a blob produced by ``encrypt_bytes``."""
+    if len(blob) < _VERSION_BYTES + _NONCE_BYTES + _TAG_BYTES:
+        raise ValueError("Blob too short — corrupted or truncated.")
+    version = struct.unpack("B", blob[:_VERSION_BYTES])[0]
+    nonce = blob[_VERSION_BYTES : _VERSION_BYTES + _NONCE_BYTES]
+    ct_and_tag = blob[_VERSION_BYTES + _NONCE_BYTES :]
+    cipher, _ = _get_aesgcm(version)
+    try:
+        return cipher.decrypt(nonce, ct_and_tag, None)
+    except Exception:
+        raise ValueError(
+            f"Failed to decrypt blob (key version {version}) — encryption key may have changed."
+        )
+
+
 def _decrypt_v1(ciphertext: str) -> str:
     """Decrypt an AES-256-GCM v1 ciphertext."""
     raw = urlsafe_b64decode(ciphertext[len(_V1_PREFIX) :])

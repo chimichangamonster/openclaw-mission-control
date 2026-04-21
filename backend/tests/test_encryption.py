@@ -78,6 +78,18 @@ class TestAES256GCM:
             with pytest.raises(ValueError, match="Failed to decrypt"):
                 enc.decrypt_token(ct)
 
+    def test_encrypt_bytes_round_trip(self):
+        with patch("app.core.encryption.settings", _make_settings()):
+            blob = enc.encrypt_bytes(b"\x00\x01\x02binary\xffstream")
+            assert enc.decrypt_bytes(blob) == b"\x00\x01\x02binary\xffstream"
+
+    def test_encrypt_bytes_tamper_detected(self):
+        with patch("app.core.encryption.settings", _make_settings()):
+            blob = bytearray(enc.encrypt_bytes(b"hello"))
+            blob[-1] ^= 0xFF  # flip last byte of auth tag
+            with pytest.raises(ValueError, match="Failed to decrypt"):
+                enc.decrypt_bytes(bytes(blob))
+
     def test_truncated_ciphertext_fails(self):
         with patch("app.core.encryption.settings", _make_settings()):
             ct = enc.encrypt_token("test")

@@ -32,6 +32,7 @@ DEFAULT_FEATURE_FLAGS = {
     "pentest": False,
     "agent_memory": True,
     "observability": True,
+    "personal_bookkeeping": False,
 }
 
 
