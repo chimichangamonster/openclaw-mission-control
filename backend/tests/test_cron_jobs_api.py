@@ -69,14 +69,13 @@ def build_add_params(payload: CronJobCreate) -> dict[str, Any]:
     schedule["tz"] = payload.timezone
 
     params: dict[str, Any] = {
-        "id": "test-id",
         "name": payload.name,
         "agentId": payload.agent_id,
         "enabled": payload.enabled,
         "schedule": schedule,
         "payload": {"message": payload.message},
         "sessionTarget": payload.session_target,
-        "delivery": {"mode": "announce" if payload.announce else "silent"},
+        "delivery": {"mode": "announce" if payload.announce else "none"},
     }
     if payload.description:
         params["description"] = payload.description
@@ -130,7 +129,7 @@ def build_update_params(job_id: str, payload: CronJobUpdate) -> dict[str, Any]:
         params["payload"] = payload_update
 
     if payload.announce is not None:
-        params["delivery"] = {"mode": "announce" if payload.announce else "silent"}
+        params["delivery"] = {"mode": "announce" if payload.announce else "none"}
 
     return params
 
@@ -291,7 +290,12 @@ class TestBuildAddParams:
         params = build_add_params(job)
         assert params["delivery"]["mode"] == "announce"
 
-    def test_silent_delivery_default(self) -> None:
+    def test_none_delivery_default(self) -> None:
+        """Default (announce=False) maps to delivery.mode='none'.
+
+        Regression: item 42 — 'silent' is NOT a valid gateway enum value.
+        Valid values are announce|webhook|none. See feedback_cron_delivery_modes.md.
+        """
         job = CronJobCreate(
             name="test",
             agent_id="the-claw",
@@ -299,7 +303,42 @@ class TestBuildAddParams:
             schedule_expr="0 9 * * *",
         )
         params = build_add_params(job)
-        assert params["delivery"]["mode"] == "silent"
+        assert params["delivery"]["mode"] == "none"
+        assert params["delivery"]["mode"] != "silent"
+
+    def test_no_id_in_payload(self) -> None:
+        """Gateway assigns the UUID; client must not supply one.
+
+        Regression: item 42 — newer gateway schema rejects client-supplied IDs with
+        'unexpected property id'.
+        """
+        job = CronJobCreate(
+            name="test",
+            agent_id="the-claw",
+            schedule_type="cron",
+            schedule_expr="0 9 * * *",
+        )
+        params = build_add_params(job)
+        assert "id" not in params
+
+    def test_delivery_mode_is_never_silent(self) -> None:
+        """Neither announce=True nor announce=False may emit 'silent'.
+
+        Regression: item 42 session #21 discovery — 'silent' coerced to 'announce'
+        at the gateway and triggered a misleading 'Channel is required' error on
+        non-Discord gateways.
+        """
+        for announce in (True, False):
+            job = CronJobCreate(
+                name="test",
+                agent_id="the-claw",
+                schedule_type="cron",
+                schedule_expr="0 9 * * *",
+                announce=announce,
+            )
+            params = build_add_params(job)
+            assert params["delivery"]["mode"] in ("announce", "none")
+            assert params["delivery"]["mode"] != "silent"
 
     def test_thinking_and_timeout_in_payload(self) -> None:
         job = CronJobCreate(
@@ -389,6 +428,13 @@ class TestBuildUpdateParams:
         params = build_update_params("job-123", update)
         assert params["delivery"]["mode"] == "announce"
 
+    def test_announce_off_maps_to_none(self) -> None:
+        """Regression: item 42 — update path must not emit 'silent' either."""
+        update = CronJobUpdate(announce=False)
+        params = build_update_params("job-123", update)
+        assert params["delivery"]["mode"] == "none"
+        assert params["delivery"]["mode"] != "silent"
+
     def test_timezone_only_update(self) -> None:
         update = CronJobUpdate(timezone="UTC")
         params = build_update_params("job-123", update)
@@ -439,7 +485,7 @@ class TestNormalizeJob:
             "enabled": True,
             "schedule": {"kind": "every", "every": "6h", "tz": "UTC"},
             "payload": {"message": "Check prices"},
-            "delivery": {"mode": "silent"},
+            "delivery": {"mode": "none"},
         }
         result = normalize_job(raw)
         assert result["schedule_type"] == "every"

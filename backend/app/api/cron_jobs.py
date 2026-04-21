@@ -6,7 +6,6 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
-from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import select
@@ -144,7 +143,6 @@ def _build_add_params(payload: CronJobCreate) -> dict[str, Any]:
     schedule["tz"] = payload.timezone
 
     params: dict[str, Any] = {
-        "id": str(uuid4()),
         "name": payload.name,
         "agentId": payload.agent_id,
         "enabled": payload.enabled,
@@ -153,7 +151,7 @@ def _build_add_params(payload: CronJobCreate) -> dict[str, Any]:
             "message": payload.message,
         },
         "sessionTarget": payload.session_target,
-        "delivery": {"mode": "announce" if payload.announce else "silent"},
+        "delivery": {"mode": "announce" if payload.announce else "none"},
     }
     if payload.description:
         params["description"] = payload.description
@@ -213,7 +211,7 @@ def _build_update_params(job_id: str, payload: CronJobUpdate) -> dict[str, Any]:
 
     # Delivery
     if payload.announce is not None:
-        params["delivery"] = {"mode": "announce" if payload.announce else "silent"}
+        params["delivery"] = {"mode": "announce" if payload.announce else "none"}
 
     return params
 
@@ -260,7 +258,8 @@ async def create_cron_job(
     config = await _get_gateway_config(org_ctx)
     params = _build_add_params(payload)
     result = await _rpc_call("cron.add", params, config, org_id=str(org_ctx.organization.id))
-    return result if isinstance(result, dict) else {"ok": True, "id": params["id"]}
+    # Gateway assigns the UUID and returns it as {ok: true, id: <uuid>}
+    return result if isinstance(result, dict) else {"ok": True}
 
 
 @router.patch("/{job_id}", dependencies=[_OPERATOR_DEP])
