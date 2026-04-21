@@ -44,6 +44,12 @@ from app.models.organizations import Organization
 from app.models.paper_bets import PaperBet
 from app.models.paper_trading import PaperPortfolio, PaperPosition, PaperTrade
 from app.models.pentest_scans import PentestScanRecord
+from app.models.personal_bookkeeping import (
+    PersonalReconciliationMonth,
+    PersonalStatementFile,
+    PersonalTransaction,
+    PersonalVendorRule,
+)
 from app.models.polymarket_positions import PolymarketPosition
 from app.models.polymarket_risk_config import PolymarketRiskConfig
 from app.models.polymarket_wallets import PolymarketWallet
@@ -113,6 +119,10 @@ __all__ = [
     "User",
     "PaperBet",
     "PentestScanRecord",
+    "PersonalReconciliationMonth",
+    "PersonalStatementFile",
+    "PersonalTransaction",
+    "PersonalVendorRule",
     "TxAuditRecord",
     "PaperPortfolio",
     "PaperPosition",
