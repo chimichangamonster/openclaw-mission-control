@@ -70,6 +70,23 @@ class StatementImportResult(BaseModel):
     classification_summary: dict[str, int]
 
 
+class BulkImportPeriodResult(BaseModel):
+    period: str
+    inserted_count: int
+    skipped_count: int
+    classification_summary: dict[str, int]
+    month_status: str  # "draft" | "reviewed" | "locked"
+    month_locked_and_skipped: bool = False  # True when rows landed in a month we can't touch
+
+
+class BulkImportResult(BaseModel):
+    statement_file_id: UUID
+    source: str
+    total_inserted: int
+    total_skipped: int
+    per_period: list[BulkImportPeriodResult]
+
+
 class StatementFileUpdate(BaseModel):
     local_path: str | None = None
 

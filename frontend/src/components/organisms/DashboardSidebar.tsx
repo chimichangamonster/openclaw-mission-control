@@ -30,6 +30,7 @@ import {
   Tags,
   Star,
   Brain,
+  BookOpen,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 
@@ -243,6 +244,20 @@ export function DashboardSidebar() {
                 <FileText className="h-4 w-4" />
                 Documents
               </Link>
+              {isFeatureEnabled("personal_bookkeeping") ? (
+              <Link
+                href="/bookkeeping"
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-[color:var(--text)] transition",
+                  pathname.startsWith("/bookkeeping")
+                    ? "bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)] font-medium"
+                    : "hover:bg-[color:var(--surface-muted)]",
+                )}
+              >
+                <BookOpen className="h-4 w-4" />
+                Bookkeeping
+              </Link>
+              ) : null}
             </div>
           </div>
 

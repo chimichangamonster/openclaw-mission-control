@@ -39,6 +39,8 @@ from app.models.personal_bookkeeping import (
     PersonalVendorRule,
 )
 from app.schemas.personal_bookkeeping import (
+    BulkImportPeriodResult,
+    BulkImportResult,
     PromoteToRuleRequest,
     ReconciliationMonthCreate,
     ReconciliationMonthRead,
@@ -528,6 +530,209 @@ async def upload_statement(
         inserted_count=inserted,
         skipped_count=skipped,
         classification_summary=summary,
+    )
+
+
+@router.post(
+    "/statements/bulk-import",
+    response_model=BulkImportResult,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_org_role("operator"))],
+)
+async def bulk_import_statement(
+    source: str = Form(...),
+    file: UploadFile = File(...),
+    org_ctx: OrganizationContext = ORG_ACTOR_DEP,
+    session: AsyncSession = SESSION_DEP,
+) -> BulkImportResult:
+    """Upload one file whose rows may span multiple months.
+
+    Groups parsed rows by ``YYYY-MM``, creates any missing draft months,
+    and imports rows into each. Rows that land in a locked month are
+    skipped (reported per-period so the caller can show what happened).
+
+    Escape hatch for the "I forgot to reconcile monthly" case — the
+    primary workflow is still one-file-one-month via POST
+    /months/{period}/statements.
+    """
+    if source not in STATEMENT_SOURCES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid source {source!r}. Expected one of {STATEMENT_SOURCES}.",
+        )
+
+    raw_bytes = await file.read()
+    if not raw_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Empty file."
+        )
+
+    file_sha = hashlib.sha256(raw_bytes).hexdigest()
+
+    # Reject exact-duplicate file uploads at the org level
+    dup = (
+        await session.execute(
+            select(PersonalStatementFile).where(
+                PersonalStatementFile.organization_id == org_ctx.organization.id,
+                PersonalStatementFile.sha256 == file_sha,
+            )
+        )
+    ).scalars().first()
+    if dup is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This exact statement file has already been uploaded.",
+        )
+
+    # Parse without a period filter — we want every row the file contains
+    try:
+        if source == "TD":
+            parsed: list[ParsedTransaction] = parse_td_csv(raw_bytes, period=None)
+        else:
+            parsed = parse_amex_xls(raw_bytes, period=None)
+    except Exception as exc:
+        logger.warning(
+            "personal_bookkeeping.bulk_parse_failed source=%s err=%s", source, exc
+        )
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Failed to parse {source} statement: {exc}",
+        ) from exc
+
+    if not parsed:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="No transactions found in file.",
+        )
+
+    # Group rows by period
+    by_period: dict[str, list[ParsedTransaction]] = {}
+    for p in parsed:
+        key = f"{p.txn_date.year:04d}-{p.txn_date.month:02d}"
+        by_period.setdefault(key, []).append(p)
+
+    # Pin the file to the earliest period it touches (retention uses that year)
+    earliest_period = min(by_period.keys())
+
+    # Encrypt + persist once
+    root = _statements_root()
+    org_dir = root / str(org_ctx.organization.id)
+    org_dir.mkdir(parents=True, exist_ok=True)
+    disk_path = org_dir / f"{file_sha}.enc"
+    disk_path.write_bytes(encrypt_bytes(raw_bytes))
+
+    statement = PersonalStatementFile(
+        organization_id=org_ctx.organization.id,
+        reconciliation_month_id=None,  # spans multiple months — no single FK
+        period=earliest_period,
+        source=source,
+        original_filename=file.filename or f"{source.lower()}-bulk-{earliest_period}",
+        content_type=file.content_type or "application/octet-stream",
+        sha256=file_sha,
+        byte_size=len(raw_bytes),
+        file_path=str(disk_path),
+        retention_until=_retention_date_for(earliest_period),
+        uploaded_by_user_id=org_ctx.member.user_id,
+    )
+    session.add(statement)
+    await session.flush()
+
+    # Preload existing row-hashes once for the whole org
+    existing_hashes = set(
+        (
+            await session.execute(
+                select(PersonalTransaction.original_row_hash).where(
+                    PersonalTransaction.organization_id == org_ctx.organization.id,
+                )
+            )
+        ).scalars().all()
+    )
+
+    per_period_results: list[BulkImportPeriodResult] = []
+    total_inserted = 0
+    total_skipped = 0
+    touched_months: list[PersonalReconciliationMonth] = []
+
+    for period, rows in sorted(by_period.items()):
+        month = await _get_or_create_month(session, org_ctx.organization.id, period)
+
+        if month.status == "locked":
+            # Can't write — report and move on, don't fail the whole import
+            per_period_results.append(
+                BulkImportPeriodResult(
+                    period=period,
+                    inserted_count=0,
+                    skipped_count=len(rows),
+                    classification_summary={},
+                    month_status=month.status,
+                    month_locked_and_skipped=True,
+                )
+            )
+            total_skipped += len(rows)
+            continue
+
+        inserted = 0
+        skipped = 0
+        summary: dict[str, int] = {}
+
+        for p in rows:
+            if p.row_hash in existing_hashes:
+                skipped += 1
+                continue
+            cls = await classify(
+                description=p.description,
+                incoming=p.incoming,
+                source=p.source,
+                organization_id=org_ctx.organization.id,
+                session=session,
+            )
+            txn = PersonalTransaction(
+                organization_id=org_ctx.organization.id,
+                reconciliation_month_id=month.id,
+                statement_file_id=statement.id,
+                source=p.source,
+                txn_date=p.txn_date,
+                description=p.description,
+                amount=p.amount,
+                incoming=p.incoming,
+                bucket=cls.bucket,
+                t2125_line=cls.t2125_line,
+                category=cls.category,
+                needs_receipt=cls.needs_receipt,
+                user_note=cls.note or None,
+                classified_by="auto",
+                original_row_hash=p.row_hash,
+            )
+            session.add(txn)
+            existing_hashes.add(p.row_hash)
+            inserted += 1
+            summary[cls.bucket] = summary.get(cls.bucket, 0) + 1
+
+        total_inserted += inserted
+        total_skipped += skipped
+        touched_months.append(month)
+        per_period_results.append(
+            BulkImportPeriodResult(
+                period=period,
+                inserted_count=inserted,
+                skipped_count=skipped,
+                classification_summary=summary,
+                month_status=month.status,
+                month_locked_and_skipped=False,
+            )
+        )
+
+    await session.flush()
+    for m in touched_months:
+        await _recompute_month_totals(session, m)
+    await session.commit()
+
+    return BulkImportResult(
+        statement_file_id=statement.id,
+        source=source,
+        total_inserted=total_inserted,
+        total_skipped=total_skipped,
+        per_period=per_period_results,
     )
 
 

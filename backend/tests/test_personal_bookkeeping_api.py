@@ -195,6 +195,15 @@ TD_CSV = (
 
 TD_CSV_OVERLAP = TD_CSV + '"2026-05-15","OPENROUTER","15.00","","1439.88"\n'
 
+# Spans Apr + May + Jun 2026 — the "I forgot to reconcile monthly" case.
+TD_CSV_MULTIMONTH = (
+    '"2026-04-08","VERCEL INC","29.00","","1000.00"\n'
+    '"2026-04-22","UBER EATS","20.00","","980.00"\n'
+    '"2026-05-03","OPENROUTER","15.00","","965.00"\n'
+    '"2026-05-20","E-TRANSFER ***xyz","","400.00","1365.00"\n'
+    '"2026-06-07","SPOTIFY","10.99","","1354.01"\n'
+)
+
 
 
 
@@ -461,6 +470,82 @@ class TestStatementUpload:
                 files={"file": ("empty.csv", b"", "text/csv")},
             )
             assert resp.status_code == 400
+
+
+class TestBulkImport:
+    @pytest.mark.asyncio
+    async def test_bulk_import_splits_across_months(self, env):
+        async with AsyncClient(
+            transport=ASGITransport(app=env["app"]), base_url="http://t"
+        ) as c:
+            resp = await c.post(
+                "/api/v1/personal-bookkeeping/statements/bulk-import",
+                data={"source": "TD"},
+                files={"file": ("multi.csv", TD_CSV_MULTIMONTH.encode(), "text/csv")},
+            )
+            assert resp.status_code == 201, resp.text
+            body = resp.json()
+            assert body["total_inserted"] == 5
+            assert body["total_skipped"] == 0
+            periods = {p["period"]: p for p in body["per_period"]}
+            assert set(periods.keys()) == {"2026-04", "2026-05", "2026-06"}
+            assert periods["2026-04"]["inserted_count"] == 2
+            assert periods["2026-05"]["inserted_count"] == 2
+            assert periods["2026-06"]["inserted_count"] == 1
+
+            # All three months were auto-created as drafts
+            months = (
+                await c.get("/api/v1/personal-bookkeeping/months")
+            ).json()
+            created_periods = {m["period"] for m in months}
+            assert {"2026-04", "2026-05", "2026-06"}.issubset(created_periods)
+
+    @pytest.mark.asyncio
+    async def test_bulk_import_skips_locked_month(self, env):
+        async with AsyncClient(
+            transport=ASGITransport(app=env["app"]), base_url="http://t"
+        ) as c:
+            # Pre-lock April (empty month)
+            await c.post(
+                "/api/v1/personal-bookkeeping/months", json={"period": "2026-04"}
+            )
+            await c.post("/api/v1/personal-bookkeeping/months/2026-04/lock")
+
+            resp = await c.post(
+                "/api/v1/personal-bookkeeping/statements/bulk-import",
+                data={"source": "TD"},
+                files={"file": ("multi.csv", TD_CSV_MULTIMONTH.encode(), "text/csv")},
+            )
+            assert resp.status_code == 201
+            body = resp.json()
+            periods = {p["period"]: p for p in body["per_period"]}
+            # April was locked — its rows reported as skipped, not inserted
+            assert periods["2026-04"]["month_locked_and_skipped"] is True
+            assert periods["2026-04"]["inserted_count"] == 0
+            assert periods["2026-04"]["skipped_count"] == 2
+            # May and June still imported fine
+            assert periods["2026-05"]["inserted_count"] == 2
+            assert periods["2026-06"]["inserted_count"] == 1
+            assert body["total_inserted"] == 3
+            assert body["total_skipped"] == 2
+
+    @pytest.mark.asyncio
+    async def test_bulk_import_rejects_duplicate_file(self, env):
+        async with AsyncClient(
+            transport=ASGITransport(app=env["app"]), base_url="http://t"
+        ) as c:
+            r1 = await c.post(
+                "/api/v1/personal-bookkeeping/statements/bulk-import",
+                data={"source": "TD"},
+                files={"file": ("multi.csv", TD_CSV_MULTIMONTH.encode(), "text/csv")},
+            )
+            assert r1.status_code == 201
+            r2 = await c.post(
+                "/api/v1/personal-bookkeeping/statements/bulk-import",
+                data={"source": "TD"},
+                files={"file": ("multi.csv", TD_CSV_MULTIMONTH.encode(), "text/csv")},
+            )
+            assert r2.status_code == 409
 
 
 # ===========================================================================
