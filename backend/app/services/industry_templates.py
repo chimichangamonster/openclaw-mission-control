@@ -494,6 +494,324 @@ TEMPLATES: dict[str, IndustryTemplate] = {
             ),
         ],
     ),
+    "waste_consulting": IndustryTemplate(
+        id="waste_consulting",
+        name="Waste Consulting",
+        description="Waste-audit and hard-to-dispose advisory. RFP scanning, opportunity qualification, bid-prep research, Alberta regulatory context.",
+        icon="🧪",
+        feature_flags={
+            "document_generation": True,
+            "email": True,
+            "cron_jobs": True,
+            "approvals": True,
+        },
+        skills=[
+            "doc-gen",
+            "competitor-intel",
+            "lead-qualifier",
+            "client-pipeline",
+            "discovery-prep",
+            "rfp-scan",
+            "rfp-qualifier",
+            "bid-prep",
+        ],
+        default_config={
+            "rfp_sources": [
+                ConfigItem(
+                    "apc",
+                    "Alberta Purchasing Connection",
+                    {
+                        "url": "https://purchasing.alberta.ca/search",
+                        "api_endpoint": "https://purchasing.alberta.ca/api/opportunity/search",
+                        "enabled": True,
+                        "auth_required": False,
+                        "notes": "Anonymous API. Free vendor account for document downloads (Samir TODO).",
+                    },
+                ),
+                ConfigItem(
+                    "merx",
+                    "MERX",
+                    {
+                        "url": "https://www.merx.com/public/solicitations/open",
+                        "enabled": False,
+                        "auth_required": False,
+                        "notes": "Discovery only (titles/dates/orgs free). Full RFP text requires Premium Local subscription (~$30/mo). Defer until APC hit rate known.",
+                    },
+                ),
+                ConfigItem(
+                    "bids_and_tenders",
+                    "BidsAndTenders.ca",
+                    {
+                        "url": "https://www.bidsandtenders.ca/",
+                        "enabled": False,
+                        "auth_required": True,
+                        "notes": "Per-municipality portals, login-gated. Defer until Samir identifies priority municipalities.",
+                    },
+                ),
+            ],
+            "rfp_keywords": [
+                ConfigItem(
+                    "waste_audit",
+                    "Waste audit keywords",
+                    {
+                        "terms": [
+                            "waste audit",
+                            "waste characterization",
+                            "waste stream assessment",
+                            "diversion study",
+                            "waste composition",
+                        ],
+                        "weight": 3,
+                    },
+                ),
+                ConfigItem(
+                    "hard_to_dispose",
+                    "Hard-to-dispose keywords",
+                    {
+                        "terms": [
+                            "hazardous waste",
+                            "contaminated soil",
+                            "asbestos",
+                            "biomedical",
+                            "e-waste",
+                            "industrial by-product",
+                            "hard-to-dispose",
+                            "specialty waste",
+                            "regulated waste",
+                        ],
+                        "weight": 3,
+                    },
+                ),
+                ConfigItem(
+                    "consulting",
+                    "Consulting/advisory keywords",
+                    {
+                        "terms": [
+                            "environmental consultant",
+                            "environmental consulting",
+                            "waste consultant",
+                            "third-party audit",
+                            "verification services",
+                            "advisory services",
+                            "environmental assessment",
+                        ],
+                        "weight": 3,
+                    },
+                ),
+                ConfigItem(
+                    "compliance",
+                    "Compliance/regulatory keywords",
+                    {
+                        "terms": [
+                            "compliance review",
+                            "regulatory audit",
+                            "environmental compliance",
+                            "due diligence",
+                            "environmental impact",
+                        ],
+                        "weight": 2,
+                    },
+                ),
+                ConfigItem(
+                    "exclude",
+                    "Exclusion keywords (hauling/equipment sales, not consulting)",
+                    {
+                        "terms": [
+                            "bin rental",
+                            "dumpster rental",
+                            "roll-off",
+                            "trash compactor",
+                            "garbage truck",
+                            "collection contract",
+                            "hauling contract",
+                        ],
+                        "weight": -3,
+                    },
+                ),
+            ],
+            "rfp_commodity_codes": [
+                ConfigItem(
+                    "environmental_services",
+                    "UNSPSC 76101600 - Environmental remediation",
+                    {"code_prefix": "761016", "weight": 3},
+                ),
+                ConfigItem(
+                    "recycling_services",
+                    "UNSPSC 76122300 - Recycling services",
+                    {"code_prefix": "761223", "weight": 2},
+                ),
+                ConfigItem(
+                    "environmental_impact",
+                    "UNSPSC 77101600 - Environmental impact assessment",
+                    {"code_prefix": "771016", "weight": 3},
+                ),
+                ConfigItem(
+                    "hazardous_materials",
+                    "UNSPSC 76101602/4 - Asbestos, mold, hazmat",
+                    {"code_prefix": "761016", "weight": 2},
+                ),
+            ],
+            "geo_scoring": [
+                ConfigItem(
+                    "edmonton_metro",
+                    "Edmonton metro (priority)",
+                    {
+                        "regions": [
+                            "Edmonton",
+                            "Strathcona County",
+                            "St. Albert",
+                            "Sherwood Park",
+                            "Leduc",
+                            "Fort Saskatchewan",
+                            "Spruce Grove",
+                            "Stony Plain",
+                        ],
+                        "weight": 3,
+                    },
+                ),
+                ConfigItem(
+                    "alberta_major",
+                    "Calgary + other major Alberta centres",
+                    {
+                        "regions": ["Calgary", "Red Deer", "Lethbridge", "Medicine Hat", "Grande Prairie", "Fort McMurray"],
+                        "weight": 2,
+                    },
+                ),
+                ConfigItem(
+                    "alberta_other",
+                    "Rest of Alberta (rural, smaller municipalities)",
+                    {"regions": ["Alberta"], "weight": 1},
+                ),
+            ],
+            "regulatory_bodies": [
+                ConfigItem(
+                    "aepa",
+                    "Alberta Environment and Protected Areas",
+                    {
+                        "jurisdiction": "Alberta",
+                        "governs": "EPEA, Hazardous Waste Regulation, Waste Control Regulation",
+                        "url": "https://www.alberta.ca/environment-and-parks",
+                    },
+                ),
+                ConfigItem(
+                    "tdgr",
+                    "Transportation of Dangerous Goods Regulations",
+                    {
+                        "jurisdiction": "Federal (Canada)",
+                        "governs": "TDGR — transport of hazardous waste between facilities",
+                    },
+                ),
+                ConfigItem(
+                    "cepa",
+                    "Canadian Environmental Protection Act",
+                    {
+                        "jurisdiction": "Federal (Canada)",
+                        "governs": "CEPA 1999 — federal environmental protection baseline",
+                    },
+                ),
+                ConfigItem(
+                    "whmis",
+                    "Workplace Hazardous Materials Information System",
+                    {
+                        "jurisdiction": "Federal + Provincial",
+                        "governs": "WHMIS 2015 — hazardous material classification, labelling, training",
+                    },
+                ),
+            ],
+            "brand_voice": [
+                ConfigItem(
+                    "tone",
+                    "Tone",
+                    {"value": "Practical, technically grounded, regulation-literate"},
+                ),
+                ConfigItem(
+                    "voice",
+                    "Voice",
+                    {"value": "We solve the waste problems no one else wants to touch"},
+                ),
+                ConfigItem(
+                    "audience",
+                    "Audience",
+                    {
+                        "value": "Municipal procurement, facility managers, school-division operations, industrial site owners"
+                    },
+                ),
+                ConfigItem(
+                    "avoid",
+                    "Avoid",
+                    {"value": "Greenwashing, unsubstantiated claims, overpromising diversion rates"},
+                ),
+                ConfigItem(
+                    "keywords",
+                    "Keywords",
+                    {
+                        "value": "waste audit, diversion, compliance, hazardous waste, third-party verification, Alberta regulations"
+                    },
+                ),
+                ConfigItem("location", "Location", {"value": "Edmonton, AB"}),
+            ],
+            "chat_suggestions": [
+                ConfigItem(
+                    "new_rfps",
+                    "New RFPs today",
+                    {"prompt": "What new RFPs came in from APC this morning?"},
+                ),
+                ConfigItem(
+                    "qualify_rfp",
+                    "Qualify an RFP",
+                    {"prompt": "Score this RFP against our ICP and tell me if it's worth bidding on"},
+                ),
+                ConfigItem(
+                    "bid_prep",
+                    "Prep a bid",
+                    {"prompt": "Pull regulatory context and background for the top-scored RFP"},
+                ),
+                ConfigItem(
+                    "pipeline_status",
+                    "Pipeline status",
+                    {"prompt": "What's in the RFP Pipeline this week?"},
+                ),
+            ],
+        },
+        onboarding_steps=[
+            OnboardingStep(
+                "validate_rfp_sources",
+                "Validate RFP source list",
+                "Confirm APC is enabled. Review MERX and BidsAndTenders as opt-ins once scan hit rate is known.",
+                1,
+            ),
+            OnboardingStep(
+                "review_keywords",
+                "Review RFP keyword weights",
+                "Default keyword lists (waste audit / hard-to-dispose / consulting / compliance / exclude). Adjust weights and add firm-specific terms.",
+                2,
+            ),
+            OnboardingStep(
+                "review_commodity_codes",
+                "Review UNSPSC commodity codes",
+                "Default environmental services / recycling / impact assessment codes. Add firm-specific specialties.",
+                3,
+            ),
+            OnboardingStep(
+                "configure_geo_scoring",
+                "Configure geographic scoring",
+                "Default Edmonton-priority / Alberta-wide scoring. Adjust if your service area is narrower or wider.",
+                4,
+            ),
+            OnboardingStep(
+                "create_apc_account",
+                "Create free APC vendor account",
+                "Required for full RFP document downloads (not just listings). Free.",
+                5,
+            ),
+            OnboardingStep(
+                "first_pipeline_task",
+                "Move a first RFP through the pipeline",
+                "Take a scanned RFP, qualify it, run bid-prep, update the board card. Validates the workflow end-to-end.",
+                6,
+            ),
+        ],
+    ),
     "clean_technology": IndustryTemplate(
         id="clean_technology",
         name="Clean Technology & Equipment Sales",
@@ -741,6 +1059,10 @@ CATEGORY_LABELS: dict[str, str] = {
     "sales_stages": "Sales Pipeline Stages",
     "regulatory_bodies": "Regulatory Bodies",
     "chat_suggestions": "Chat Suggestions",
+    "rfp_sources": "RFP Sources",
+    "rfp_keywords": "RFP Keyword Weights",
+    "rfp_commodity_codes": "UNSPSC Commodity Codes",
+    "geo_scoring": "Geographic Scoring",
 }
 
 
@@ -804,6 +1126,24 @@ _INDUSTRY_KEYWORDS: dict[str, list[str]] = {
         "gc",
         "infrastructure",
         "civil",
+    ],
+    "waste_consulting": [
+        "waste consulting",
+        "waste consultant",
+        "waste audit",
+        "waste advisory",
+        "waste characterization",
+        "waste stream assessment",
+        "diversion study",
+        "environmental consulting",
+        "environmental consultant",
+        "third-party audit",
+        "third party audit",
+        "hard-to-dispose",
+        "hard to dispose",
+        "waste diversion strategy",
+        "environmental impact assessment",
+        "waste compliance",
     ],
     "waste_management": [
         "waste",
