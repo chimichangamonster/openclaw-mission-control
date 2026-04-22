@@ -18,11 +18,95 @@ from app.api.deps import ORG_ACTOR_DEP, require_org_role
 from app.core.time import utcnow
 from app.db.session import async_session_maker
 from app.models.org_config import OrgConfigData
+from app.models.organization_settings import OrganizationSettings
+from app.services.industry_templates import get_template
 from app.services.organizations import OrganizationContext
 
 router = APIRouter(prefix="/org-config", tags=["org-config"])
 
 _ADMIN_DEP = Depends(require_org_role("admin"))
+
+# Generic fallback suggestions used when an org has no custom config AND no
+# industry template. Kept intentionally vertical-agnostic.
+_FALLBACK_CHAT_SUGGESTIONS: list[dict[str, str]] = [
+    {"key": "check_email", "label": "Check my email", "prompt": "Check my email"},
+    {"key": "weekly_summary", "label": "What's new this week?", "prompt": "What's new this week?"},
+    {"key": "generate_report", "label": "Generate a report", "prompt": "Generate a report"},
+    {"key": "draft_doc", "label": "Draft a document", "prompt": "Help me draft a document"},
+]
+
+
+@router.get("/chat-suggestions/resolved")
+async def resolve_chat_suggestions(org_ctx: OrganizationContext = ORG_ACTOR_DEP) -> Any:
+    """Resolve chat suggestions via cascade: org config > industry template > fallback.
+
+    Returns ``{source: "org"|"template"|"fallback", suggestions: [{key, label, prompt}]}``.
+    Empty-but-present org config counts as "org" source — an admin can explicitly
+    blank the suggestions to opt out of template defaults.
+    """
+    org_id = org_ctx.organization.id
+
+    async with async_session_maker() as session:
+        org_items_result = await session.execute(
+            select(OrgConfigData)
+            .where(
+                OrgConfigData.organization_id == org_id,
+                OrgConfigData.category == "chat_suggestions",
+                OrgConfigData.is_active == True,  # noqa: E712
+            )
+            .order_by(OrgConfigData.sort_order)  # type: ignore[arg-type]
+        )
+        org_items = org_items_result.scalars().all()
+
+        # Layer 1: any org-configured suggestions win
+        if org_items:
+            return {
+                "source": "org",
+                "suggestions": [_suggestion_from_config(item) for item in org_items],
+            }
+
+        # Layer 2: industry template defaults
+        settings_result = await session.execute(
+            select(OrganizationSettings).where(OrganizationSettings.organization_id == org_id)
+        )
+        settings = settings_result.scalars().first()
+        template_id = settings.industry_template_id if settings else None
+
+        if template_id:
+            template = get_template(template_id)
+            if template:
+                tmpl_items = template.default_config.get("chat_suggestions", [])
+                if tmpl_items:
+                    return {
+                        "source": "template",
+                        "template_id": template_id,
+                        "suggestions": [
+                            {
+                                "key": item.key,
+                                "label": item.label,
+                                "prompt": item.value.get("prompt", item.label),
+                            }
+                            for item in tmpl_items
+                        ],
+                    }
+
+        # Layer 3: generic fallback
+        return {"source": "fallback", "suggestions": list(_FALLBACK_CHAT_SUGGESTIONS)}
+
+
+def _suggestion_from_config(item: OrgConfigData) -> dict[str, str]:
+    """Flatten an OrgConfigData chat_suggestions row into {key, label, prompt}.
+
+    Falls back to ``label`` as the prompt if ``value.prompt`` is missing — lets
+    an admin add quick-and-dirty suggestions without the value JSON shape.
+    """
+    value = item.value or {}
+    prompt = value.get("prompt") if isinstance(value, dict) else None
+    return {
+        "key": item.key,
+        "label": item.label,
+        "prompt": prompt or item.label,
+    }
 
 
 class ConfigItemCreate(BaseModel):

@@ -144,6 +144,12 @@ TEMPLATES: dict[str, IndustryTemplate] = {
                 ),
                 ConfigItem("location", "Location", {"value": "Calgary, AB"}),
             ],
+            "chat_suggestions": [
+                ConfigItem("job_costs", "Today's job costs", {"prompt": "What did today's jobs cost to run?"}),
+                ConfigItem("invoice_status", "Invoice status", {"prompt": "Which invoices are still outstanding?"}),
+                ConfigItem("crew_schedule", "Crew schedule", {"prompt": "Who's on which site this week?"}),
+                ConfigItem("weekly_report", "Weekly report", {"prompt": "Generate this week's project status report"}),
+            ],
         },
         onboarding_steps=[
             OnboardingStep(
@@ -280,6 +286,12 @@ TEMPLATES: dict[str, IndustryTemplate] = {
                 ),
                 ConfigItem("location", "Location", {"value": "Edmonton, AB"}),
             ],
+            "chat_suggestions": [
+                ConfigItem("triage_emails", "Triage emails", {"prompt": "Triage my inbox for today"}),
+                ConfigItem("overdue_pickups", "Overdue pickups", {"prompt": "Any overdue pickups or missed routes?"}),
+                ConfigItem("quote_job", "Quote a job", {"prompt": "Draft a quote for a new junk removal job"}),
+                ConfigItem("competitor_scan", "Competitor summary", {"prompt": "What did this week's competitor scan find?"}),
+            ],
         },
         onboarding_steps=[
             OnboardingStep(
@@ -366,6 +378,12 @@ TEMPLATES: dict[str, IndustryTemplate] = {
                 ),
                 ConfigItem("location", "Location", {"value": "Calgary, AB"}),
             ],
+            "chat_suggestions": [
+                ConfigItem("open_roles", "Open roles", {"prompt": "What roles are we trying to fill this week?"}),
+                ConfigItem("timesheets_due", "Timesheets due", {"prompt": "Which timesheets are outstanding?"}),
+                ConfigItem("candidate_shortlist", "Candidate shortlist", {"prompt": "Shortlist candidates for the latest role"}),
+                ConfigItem("margin_check", "Margin check", {"prompt": "What are my margins on active placements?"}),
+            ],
         },
         onboarding_steps=[
             OnboardingStep(
@@ -447,6 +465,12 @@ TEMPLATES: dict[str, IndustryTemplate] = {
                 ConfigItem("proposal", "Proposal", {"typical_days": 3}),
                 ConfigItem("implementation", "Implementation", {"typical_days": 30}),
                 ConfigItem("review", "Review & Handoff", {"typical_days": 5}),
+            ],
+            "chat_suggestions": [
+                ConfigItem("pipeline_status", "Pipeline status", {"prompt": "What's in my client pipeline this week?"}),
+                ConfigItem("project_burn", "Project burn", {"prompt": "Which projects are over 75% of budget?"}),
+                ConfigItem("discovery_prep", "Discovery prep", {"prompt": "Prep me for my next discovery call"}),
+                ConfigItem("proposal_draft", "Proposal draft", {"prompt": "Draft a proposal for the latest qualified lead"}),
             ],
         },
         onboarding_steps=[
@@ -650,6 +674,12 @@ TEMPLATES: dict[str, IndustryTemplate] = {
                     },
                 ),
             ],
+            "chat_suggestions": [
+                ConfigItem("pipeline_status", "Sales pipeline", {"prompt": "What's in the sales pipeline this week?"}),
+                ConfigItem("regulatory_updates", "Regulatory updates", {"prompt": "Any regulatory updates I should know about?"}),
+                ConfigItem("market_intel", "Market intel", {"prompt": "Summarize this week's waste market intel scan"}),
+                ConfigItem("roi_model", "ROI model", {"prompt": "Model ROI for a new prospect"}),
+            ],
         },
         onboarding_steps=[
             OnboardingStep(
@@ -710,6 +740,7 @@ CATEGORY_LABELS: dict[str, str] = {
     "product_catalog": "Product Catalog",
     "sales_stages": "Sales Pipeline Stages",
     "regulatory_bodies": "Regulatory Bodies",
+    "chat_suggestions": "Chat Suggestions",
 }
 
 

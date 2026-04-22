@@ -199,6 +199,23 @@ export default function ChatPage() {
     return () => { cancelled = true; };
   }, [isSignedIn]);
 
+  // Resolve chat suggestions via backend cascade (org config > industry template > fallback).
+  // On failure, state keeps its initial generic defaults.
+  useEffect(() => {
+    if (!isSignedIn) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const raw: any = await customFetch("/api/v1/org-config/chat-suggestions/resolved", { method: "GET" });
+        if (cancelled) return;
+        const data = raw?.data ?? raw;
+        const items: Array<{ key: string; label: string; prompt: string }> = data?.suggestions ?? [];
+        if (items.length > 0) setChatSuggestions(items);
+      } catch { /* keep fallback defaults */ }
+    })();
+    return () => { cancelled = true; };
+  }, [isSignedIn]);
+
   // Session resolution
   const [sessionKey, setSessionKey] = useState<string | null>(null);
   const [sessionTokens, setSessionTokens] = useState<{ total: number; input: number; output: number; model: string } | null>(null);
@@ -220,6 +237,14 @@ export default function ChatPage() {
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [agentTyping, setAgentTyping] = useState(false);
+
+  // Chat suggestions resolved via cascade (org config > industry template > fallback)
+  const [chatSuggestions, setChatSuggestions] = useState<Array<{ key: string; label: string; prompt: string }>>([
+    { key: "check_email", label: "Check my email", prompt: "Check my email" },
+    { key: "weekly_summary", label: "What's new this week?", prompt: "What's new this week?" },
+    { key: "generate_report", label: "Generate a report", prompt: "Generate a report" },
+    { key: "draft_doc", label: "Draft a document", prompt: "Help me draft a document" },
+  ]);
 
   // File uploads
   const [pendingFiles, setPendingFiles] = useState<ChatAttachment[]>([]);
@@ -1001,25 +1026,20 @@ export default function ChatPage() {
                 Hey! I&apos;m The Claw.
               </p>
               <p className="mt-1 text-sm text-center max-w-md">
-                I can help with trading, sports betting, emails, documents, and
-                more. I&apos;ll bring in the right specialist agent when needed.
+                I can help with emails, documents, reports, and more. I&apos;ll
+                bring in the right specialist agent when needed.
               </p>
               <div className="mt-6 flex flex-wrap justify-center gap-2">
-                {[
-                  "What's the market doing today?",
-                  "Any pending sports bets?",
-                  "Check my email",
-                  "Generate a proposal",
-                ].map((suggestion) => (
+                {chatSuggestions.map((suggestion) => (
                   <button
-                    key={suggestion}
+                    key={suggestion.key}
                     onClick={() => {
-                      setInput(suggestion);
+                      setInput(suggestion.prompt);
                       textareaRef.current?.focus();
                     }}
                     className="rounded-full border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-1.5 md:px-4 md:py-2 text-xs text-[color:var(--text)] hover:bg-[color:var(--surface-muted)] transition"
                   >
-                    {suggestion}
+                    {suggestion.label}
                   </button>
                 ))}
               </div>
