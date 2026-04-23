@@ -776,8 +776,8 @@ TEMPLATES: dict[str, IndustryTemplate] = {
         onboarding_steps=[
             OnboardingStep(
                 "validate_rfp_sources",
-                "Validate RFP source list",
-                "Confirm APC is enabled. Review MERX and BidsAndTenders as opt-ins once scan hit rate is known.",
+                "Confirm which RFP sources to monitor",
+                "Alberta Purchasing Connection (APC) is on by default. We'll walk you through adding MERX or BidsAndTenders later if the scan hit rate suggests it's worth the extra source.",
                 1,
             ),
             OnboardingStep(
@@ -800,8 +800,8 @@ TEMPLATES: dict[str, IndustryTemplate] = {
             ),
             OnboardingStep(
                 "create_apc_account",
-                "Create free APC vendor account",
-                "Required for full RFP document downloads (not just listings). Free.",
+                "Approve RFP document-download access",
+                "A free APC vendor account lets us pull the full RFP documents, not just the listings. We'll send you the signup link and walk you through it — takes about 5 minutes.",
                 5,
             ),
             OnboardingStep(
@@ -1026,8 +1026,8 @@ TEMPLATES: dict[str, IndustryTemplate] = {
             ),
             OnboardingStep(
                 "connect_email",
-                "Connect email account",
-                "Link your info@magnetiksolutions.com mailbox.",
+                "Authorize your sales inbox",
+                "You'll approve access to your info@magnetiksolutions.com mailbox so the agent can triage leads and draft replies. We handle the technical connection.",
                 5,
             ),
             OnboardingStep(
