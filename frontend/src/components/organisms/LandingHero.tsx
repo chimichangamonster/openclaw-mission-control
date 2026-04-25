@@ -78,7 +78,7 @@ export function LandingHero() {
               "Your Data, Your Server",
               "Configured for Your Industry",
               "Human Approves Everything",
-              "48 Business Skills",
+              "Plugs Into Your Stack",
             ].map((label) => (
               <div key={label} className="hero-feature">
                 <div className="feature-icon">&#10003;</div>
@@ -105,9 +105,9 @@ export function LandingHero() {
           </div>
           <div className="metrics-row">
             {[
-              { label: "Business Skills", value: "48" },
-              { label: "Industry Templates", value: "4" },
-              { label: "Setup Time", value: "1 day" },
+              { value: "Any doc", label: "PDFs, photos, spreadsheets" },
+              { value: "Any process", label: "Across your business" },
+              { value: "1 day", label: "From discovery to running" },
             ].map((item) => (
               <div key={item.label} className="metric">
                 <div className="metric-value">{item.value}</div>
@@ -214,10 +214,8 @@ export function LandingHero() {
         <div className="trust-header">
           <h2>What&apos;s possible for your industry</h2>
           <p>
-            Included capabilities ship with your $1,000 setup — existing skills,
-            just configured for your business. Custom workflows are built for
-            your specific needs at $150/hr and plug directly into the same
-            platform.
+            Pre-built capabilities, configured for your business. Custom
+            workflows scoped during discovery and built into the same platform.
           </p>
         </div>
 
@@ -321,7 +319,7 @@ export function LandingHero() {
             {section.custom.length > 0 && (
               <>
                 <p style={{ fontSize: "0.8rem", color: "var(--accent, #3b82f6)", marginBottom: "0.75rem", paddingLeft: "1rem", fontWeight: 500 }}>
-                  Custom development &mdash; $150/hr &mdash; scoped during discovery
+                  Custom development &mdash; scoped during discovery
                 </p>
                 <div className="trust-grid">
                   {section.custom.map((c) => (
@@ -337,86 +335,68 @@ export function LandingHero() {
         ))}
       </section>
 
-      {/* How It Works */}
-      <section className="pricing-section" id="pricing">
+      {/* What the platform does */}
+      <section
+        className="pricing-section"
+        id="pricing"
+        style={{ background: "white" }}
+      >
         <div className="pricing-header">
-          <h2>How it works</h2>
+          <h2>What the platform actually does</h2>
           <p>
-            You tell us about your business. We configure your AI assistant.
-            You start using it.
+            Two things your AI assistant has to do well: reach across your
+            business, and fit into the tools you already run on. Here&rsquo;s
+            what that looks like.
           </p>
         </div>
-        <div className="pricing-grid">
-          {[
-            {
-              tier: "You Host",
-              price: "$1,000",
-              period: " setup",
-              description: "Your own cloud server \u2014 you control everything",
-              features: [
-                "$1,000 one-time setup fee",
-                "Cloud VPS: $30\u201350/mo (you pay provider directly)",
-                "AI API: usage-based (you pay OpenRouter directly)",
-                "Your data stays on your server",
-                "Your own Discord server + AI bot",
-                "Full configuration: discovery, SOUL.md, skills, integrations",
-                "Optional monthly retainer for ongoing support",
-              ],
-            },
-            {
-              tier: "Mac Mini",
-              price: "$1,000",
-              period: " setup",
-              highlight: true,
-              description: "Run it at your office \u2014 near-zero recurring cost",
-              features: [
-                "$1,000 one-time setup fee",
-                "No monthly server cost \u2014 runs on your hardware",
-                "AI API: usage-based (you pay OpenRouter directly)",
-                "Local AI for basic tasks (optional, near-zero cost)",
-                "Your own Discord server + AI bot",
-                "Full configuration: discovery, SOUL.md, skills, integrations",
-                "Optional monthly retainer for ongoing support",
-              ],
-            },
-            {
-              tier: "We Host",
-              price: "$250",
-              period: "/mo",
-              description: "We run everything on Canadian infrastructure",
-              features: [
-                "Setup fee included",
-                "Dedicated Canadian server",
-                "AI costs included in monthly price",
-                "Monitoring and maintenance included",
-                "Your own Discord server + AI bot",
-                "Priority support",
-              ],
-            },
-          ].map((plan) => (
-            <div
-              key={plan.tier}
-              className={`pricing-card ${plan.highlight ? "pricing-highlight" : ""}`}
-            >
-              <div className="pricing-card-header">
-                <h3>{plan.tier}</h3>
-                <div className="pricing-amount">
-                  <span className="pricing-price">{plan.price}</span>
-                  <span className="pricing-period">{plan.period}</span>
-                </div>
-                <p className="pricing-description">{plan.description}</p>
-              </div>
-              <ul className="pricing-features">
-                {plan.features.map((f) => (
-                  <li key={f}>
-                    <span className="pricing-check">&#10003;</span>
-                    {f}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
+        <div
+          className="trust-grid"
+          style={{ maxWidth: "1100px", margin: "0 auto 2.5rem" }}
+        >
+          <div className="trust-card">
+            <h3>Works across your business</h3>
+            <p>
+              Invoicing, document intake, scheduling, expense capture,
+              competitor intelligence, proposal drafting, bookkeeping, social
+              media drafting, lead qualification, project tracking &mdash; one
+              assistant that handles work across departments, not a tool you
+              switch between for each task. New verticals built during
+              onboarding when your work doesn&rsquo;t match what&rsquo;s already
+              there.
+            </p>
+          </div>
+          <div className="trust-card">
+            <h3>Fits into what you already use</h3>
+            <p>
+              Connects to Microsoft 365, Google Workspace, Zoho, your
+              accounting system, your messaging platform. Bring your own AI
+              provider key, run on a Canadian server, or self-host on hardware
+              at your office &mdash; your choice. Your existing tools stay
+              where they are. The assistant adapts.
+            </p>
+          </div>
         </div>
+        <p
+          style={{
+            textAlign: "center",
+            fontSize: "16px",
+            color: "var(--text-secondary, #64748b)",
+            maxWidth: "640px",
+            margin: "0 auto",
+          }}
+        >
+          <strong style={{ color: "var(--text-primary, #1e293b)" }}>
+            Want to see if it fits your business?
+          </strong>{" "}
+          Tell us what you do and we&rsquo;ll show you what&rsquo;s possible.
+          &rarr;{" "}
+          <a
+            href="mailto:info@vantagesolutions.ca"
+            style={{ color: "var(--accent, #3b82f6)", fontWeight: 500 }}
+          >
+            info@vantagesolutions.ca
+          </a>
+        </p>
       </section>
 
       {/* CTA */}

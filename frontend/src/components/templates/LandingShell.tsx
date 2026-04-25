@@ -32,7 +32,7 @@ export function LandingShell({ children }: { children: ReactNode }) {
           <div className="nav-links">
             <Link href="#capabilities">Capabilities</Link>
             <Link href="#use-cases">Industries</Link>
-            <Link href="#pricing">Pricing</Link>
+            <Link href="#pricing">Contact</Link>
           </div>
 
           <div className="nav-cta">
@@ -79,7 +79,7 @@ export function LandingShell({ children }: { children: ReactNode }) {
             <div className="footer-links">
               <Link href="#capabilities">Capabilities</Link>
               <Link href="#use-cases">Industries</Link>
-              <Link href="#pricing">Pricing</Link>
+              <Link href="#pricing">Contact</Link>
             </div>
           </div>
 
@@ -123,7 +123,7 @@ export function LandingShell({ children }: { children: ReactNode }) {
           <div className="footer-bottom-links">
             <Link href="#capabilities">Capabilities</Link>
             <Link href="#use-cases">Industries</Link>
-            <Link href="#pricing">Pricing</Link>
+            <Link href="#pricing">Contact</Link>
           </div>
         </div>
       </footer>
