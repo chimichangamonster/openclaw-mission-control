@@ -397,6 +397,19 @@ async def stream_task_comment_feed(
 # ---------------------------------------------------------------------------
 
 
+def _should_deliver_event(event_org_id: str, subscriber_org_id: str) -> bool:
+    """Decide whether a broadcast event should reach a given SSE subscriber.
+
+    The broadcast hub is global; every subscriber sees every gateway event.
+    We must filter by org so Org A never sees Org B's activity. Events with
+    an empty ``organization_id`` (untagged) are dropped — never leak by
+    default.
+    """
+    if not event_org_id:
+        return False
+    return event_org_id == subscriber_org_id
+
+
 @router.get("/live/stream")
 async def stream_live_activity(
     request: Request,
@@ -431,6 +444,7 @@ async def stream_live_activity(
         member = await ensure_member_for_user(session, auth.user)
     if member is None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
+    subscriber_org_id = str(member.organization_id)
     from app.services.openclaw.event_broadcast import broadcast as hub
 
     queue = hub.subscribe()
@@ -442,9 +456,11 @@ async def stream_live_activity(
                     break
                 try:
                     event = await asyncio.wait_for(queue.get(), timeout=1.0)
-                    yield {"event": "activity", "data": json.dumps(event.to_dict())}
                 except TimeoutError:
                     continue
+                if not _should_deliver_event(event.organization_id, subscriber_org_id):
+                    continue
+                yield {"event": "activity", "data": json.dumps(event.to_dict())}
         finally:
             hub.unsubscribe(queue)
 
