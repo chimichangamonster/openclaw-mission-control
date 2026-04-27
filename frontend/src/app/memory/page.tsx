@@ -21,6 +21,7 @@ import {
 import { useAuth } from "@/auth/clerk";
 import { DashboardPageLayout } from "@/components/templates/DashboardPageLayout";
 import { Button } from "@/components/ui/button";
+import { useNotifications } from "@/components/providers/NotificationProvider";
 import { customFetch } from "@/api/mutator";
 import { cn } from "@/lib/utils";
 
@@ -102,6 +103,7 @@ async function fetchReport(path: string): Promise<MemoryFile> {
 export default function MemoryPage() {
   const { isSignedIn } = useAuth();
   const searchParams = useSearchParams();
+  const { unreadReportsCount, markReportsRead } = useNotifications();
   const initialTab = (() => {
     const t = searchParams?.get("tab");
     return t === "knowledge" || t === "reports" ? t : "files";
@@ -176,6 +178,17 @@ export default function MemoryPage() {
       loadReports();
     }
   }, [isSignedIn, loadFiles, loadKnowledge, loadReports]);
+
+  // While the Reports tab is active: clear the unread badge AND refetch
+  // the report list whenever a new silent-disk cron report lands (the
+  // unread counter ticks up via NotificationProvider's SSE listener).
+  useEffect(() => {
+    if (!isSignedIn || tab !== "reports") return;
+    if (unreadReportsCount > 0) {
+      loadReports();
+      markReportsRead();
+    }
+  }, [isSignedIn, tab, unreadReportsCount, loadReports, markReportsRead]);
 
   const openFile = async (name: string) => {
     try {

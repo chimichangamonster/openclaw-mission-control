@@ -33,6 +33,7 @@ DEFAULT_FEATURE_FLAGS = {
     "agent_memory": True,
     "observability": True,
     "personal_bookkeeping": False,
+    "org_context": False,
 }
 
 

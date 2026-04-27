@@ -16,6 +16,7 @@ from app.api.agent import router as agent_router
 from app.api.agent_contacts import router as agent_contacts_router
 from app.api.agent_email import router as agent_email_router
 from app.api.agent_memory_vector import router as agent_memory_vector_router
+from app.api.agent_org_context import router as agent_org_context_router
 from app.api.agent_polymarket import router as agent_polymarket_router
 from app.api.agents import router as agents_router
 from app.api.approvals import router as approvals_router
@@ -53,6 +54,7 @@ from app.api.microsoft_graph import router as microsoft_graph_router
 from app.api.model_registry import router as model_registry_router
 from app.api.observability import router as observability_router
 from app.api.org_config import router as org_config_router
+from app.api.org_context import router as org_context_router
 from app.api.organization_settings import router as org_settings_router
 from app.api.organizations import router as organizations_router
 from app.api.paper_bets import router as paper_bets_router
@@ -993,6 +995,8 @@ api_v1.include_router(email_oauth_router)
 api_v1.include_router(agent_email_router)
 api_v1.include_router(agent_memory_vector_router)
 api_v1.include_router(memory_vector_router)
+api_v1.include_router(org_context_router)
+api_v1.include_router(agent_org_context_router)
 api_v1.include_router(agent_contacts_router)
 api_v1.include_router(contacts_router)
 api_v1.include_router(polymarket_router)

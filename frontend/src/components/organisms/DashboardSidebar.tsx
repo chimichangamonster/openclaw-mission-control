@@ -38,6 +38,7 @@ import { useAuth } from "@/auth/clerk";
 import { customFetch } from "@/api/mutator";
 import { useFeatureFlags } from "@/lib/use-feature-flags";
 import { useOrganizationMembership } from "@/lib/use-organization-membership";
+import { useNotifications } from "@/components/providers/NotificationProvider";
 import { useQuery } from "@tanstack/react-query";
 import { OrgSwitcher } from "@/components/organisms/OrgSwitcher";
 import { cn } from "@/lib/utils";
@@ -48,6 +49,7 @@ export function DashboardSidebar() {
   const { isSignedIn } = useAuth();
   const { isAdmin } = useOrganizationMembership(isSignedIn);
   const { isFeatureEnabled } = useFeatureFlags(Boolean(isSignedIn));
+  const { unreadReportsCount } = useNotifications();
   const healthQuery = useQuery({
     queryKey: ["/api/v1/system/health"],
     queryFn: async () => {
@@ -267,7 +269,9 @@ export function DashboardSidebar() {
             </p>
             <div className="mt-1 space-y-1">
               <Link
-                href="/memory"
+                href={
+                  unreadReportsCount > 0 ? "/memory?tab=reports" : "/memory"
+                }
                 className={cn(
                   "flex items-center gap-3 rounded-lg px-3 py-2.5 text-[color:var(--text)] transition",
                   pathname === "/memory"
@@ -276,7 +280,15 @@ export function DashboardSidebar() {
                 )}
               >
                 <Folder className="h-4 w-4" />
-                Memory
+                <span className="flex-1">Memory</span>
+                {unreadReportsCount > 0 ? (
+                  <span
+                    aria-label={`${unreadReportsCount} unread report${unreadReportsCount === 1 ? "" : "s"}`}
+                    className="ml-auto inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-semibold leading-5 text-white"
+                  >
+                    {unreadReportsCount > 99 ? "99+" : unreadReportsCount}
+                  </span>
+                ) : null}
               </Link>
               {isFeatureEnabled("agent_memory") ? (
               <Link
@@ -290,6 +302,20 @@ export function DashboardSidebar() {
               >
                 <Brain className="h-4 w-4" />
                 Vector Memory
+              </Link>
+              ) : null}
+              {isFeatureEnabled("org_context") ? (
+              <Link
+                href="/org-context"
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-[color:var(--text)] transition",
+                  pathname.startsWith("/org-context")
+                    ? "bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)] font-medium"
+                    : "hover:bg-[color:var(--surface-muted)]",
+                )}
+              >
+                <BookOpen className="h-4 w-4" />
+                Org Context
               </Link>
               ) : null}
               {isFeatureEnabled("observability") ? (

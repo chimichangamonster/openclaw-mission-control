@@ -50,7 +50,7 @@ def _resolve_cron_file(org_ctx: OrganizationContext) -> Path:
     return workspace.parent / "cron" / "jobs.json"
 
 
-def _read_jobs(cron_file: Path) -> list[dict[str, Any]]:
+def _read_jobs(cron_file: Path, org_id: str | None = None) -> list[dict[str, Any]]:
     """Read cron jobs from a gateway's jobs.json file."""
     if not cron_file.exists():
         return []
@@ -62,7 +62,14 @@ def _read_jobs(cron_file: Path) -> list[dict[str, Any]]:
             return data
         return []
     except (json.JSONDecodeError, OSError) as exc:
-        logger.warning("cron.read_failed", extra={"error": str(exc), "path": str(cron_file)})
+        logger.warning(
+            "cron.read_failed",
+            extra={
+                "error": str(exc),
+                "path": str(cron_file),
+                "organization_id": org_id,
+            },
+        )
         return []
 
 
@@ -127,7 +134,14 @@ async def _rpc_call(
     try:
         return await openclaw_call(method, params, config=config, org_id=org_id)
     except OpenClawGatewayError as exc:
-        logger.warning("cron.rpc_failed", extra={"method": method, "error": str(exc)})
+        logger.warning(
+            "cron.rpc_failed",
+            extra={
+                "method": method,
+                "error": str(exc),
+                "organization_id": org_id,
+            },
+        )
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
 
 
@@ -243,9 +257,10 @@ async def list_cron_jobs(
         return [_normalize_job(j) for j in jobs]
     except HTTPException:
         # Gateway unavailable — fall back to file read
-        logger.info("cron.list_fallback_to_file")
+        org_id = str(org_ctx.organization.id)
+        logger.info("cron.list_fallback_to_file", extra={"organization_id": org_id})
         cron_file = _resolve_cron_file(org_ctx)
-        jobs = _read_jobs(cron_file)
+        jobs = _read_jobs(cron_file, org_id=org_id)
         return [_normalize_job(j) for j in jobs]
 
 

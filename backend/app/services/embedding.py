@@ -205,6 +205,84 @@ async def forget_memory(org_id: UUID, memory_id: UUID) -> bool:
     return True
 
 
+async def search_org_context(
+    org_id: UUID,
+    query: str,
+    *,
+    limit: int = 5,
+    category_filter: str | None = None,
+    include_private: bool = False,
+) -> list[dict[str, Any]]:
+    """Semantic search across org-context files for one organization.
+
+    Mirrors :func:`search_memory` but queries ``org_context_files`` and
+    surfaces the staleness-relevant metadata (``is_living_data``,
+    ``uploaded_at``) the calling skill needs to age-stamp citations.
+
+    Args:
+        org_id: Organization scope. Strictly enforced — never crosses orgs.
+        query: Natural-language query to embed and match against.
+        limit: Max number of hits.
+        category_filter: Optional category equality filter.
+        include_private: When True, returns rows regardless of visibility.
+            Defaults False — agents and members only see ``visibility="shared"``
+            rows. Set True for admin-side tooling.
+
+    Returns:
+        List of dicts with id, filename, category, snippet (extracted_text
+        truncated to ~600 chars), source, visibility, is_living_data,
+        uploaded_at, last_updated, similarity.
+
+    Rows lacking an embedding column are silently skipped — they cannot
+    rank in cosine search until Phase 2's upload pipeline embeds them.
+    """
+    query_embedding = await get_embedding(query, org_id)
+
+    where_clauses = ["organization_id = :org_id", "embedding IS NOT NULL"]
+    params: dict[str, Any] = {"org_id": org_id, "limit": limit}
+
+    if category_filter:
+        where_clauses.append("category = :category")
+        params["category"] = category_filter
+
+    if not include_private:
+        where_clauses.append("visibility = :visibility")
+        params["visibility"] = "shared"
+
+    where_sql = " AND ".join(where_clauses)
+
+    sql = text(f"""
+        SELECT id, filename, category, source, visibility, is_living_data,
+               extracted_text, uploaded_at, last_updated,
+               1 - (embedding <=> cast(:query_embedding AS vector)) AS similarity
+        FROM org_context_files
+        WHERE {where_sql}
+        ORDER BY embedding <=> cast(:query_embedding AS vector)
+        LIMIT :limit
+    """)
+    params["query_embedding"] = str(query_embedding)
+
+    async with async_session_maker() as session:
+        result = await session.execute(sql, params)
+        rows = result.mappings().all()
+
+    return [
+        {
+            "id": str(row["id"]),
+            "filename": row["filename"],
+            "category": row["category"],
+            "source": row["source"],
+            "visibility": row["visibility"],
+            "is_living_data": bool(row["is_living_data"]),
+            "snippet": (row["extracted_text"] or "")[:600],
+            "uploaded_at": row["uploaded_at"].isoformat() if row["uploaded_at"] else None,
+            "last_updated": row["last_updated"].isoformat() if row["last_updated"] else None,
+            "similarity": float(row["similarity"]),
+        }
+        for row in rows
+    ]
+
+
 async def forget_by_source(org_id: UUID, source: str) -> int:
     """Bulk delete memories by source prefix (org-scoped)."""
     async with async_session_maker() as session:

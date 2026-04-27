@@ -40,6 +40,7 @@ from app.models.organization_domains import OrganizationDomain
 from app.models.organization_invite_board_access import OrganizationInviteBoardAccess
 from app.models.organization_invites import OrganizationInvite
 from app.models.organization_members import OrganizationMember
+from app.models.org_context import OrgContextFile
 from app.models.organizations import Organization
 from app.models.paper_bets import PaperBet
 from app.models.paper_trading import PaperPortfolio, PaperPosition, PaperTrade
@@ -111,6 +112,7 @@ __all__ = [
     "OrganizationBoardAccess",
     "OrganizationInvite",
     "OrganizationInviteBoardAccess",
+    "OrgContextFile",
     "TaskDependency",
     "Task",
     "TaskFingerprint",

@@ -7,11 +7,13 @@ import {
   useEffect,
   useRef,
   useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 import { useAuth } from "@/auth/clerk";
 import { X, Bell, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useOrganizationMembership } from "@/lib/use-organization-membership";
 
 // ---------------------------------------------------------------------------
 // Toast types
@@ -33,12 +35,19 @@ interface NotificationContextValue {
   unreadSessions: Set<string>;
   /** Mark a session as read (user opened it). */
   markSessionRead: (sessionKey: string) => void;
+  /** Count of silent-disk cron reports landed since the user last opened
+   *  the Reports tab. Scoped to the current org via localStorage. */
+  unreadReportsCount: number;
+  /** Mark the Reports tab as read (clears badge for current org). */
+  markReportsRead: () => void;
 }
 
 const NotificationContext = createContext<NotificationContextValue>({
   notify: () => {},
   unreadSessions: new Set(),
   markSessionRead: () => {},
+  unreadReportsCount: 0,
+  markReportsRead: () => {},
 });
 
 export function useNotifications() {
@@ -98,12 +107,86 @@ function ToastContainer({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id
 // Provider
 // ---------------------------------------------------------------------------
 
+// ── Unread-reports store ──────────────────────────────────────────────
+// localStorage is the source of truth, scoped per-org. We expose it via a
+// small subscribe/getSnapshot store so consumers can read it through
+// useSyncExternalStore — that keeps render-time reads consistent across
+// org switches without setState-in-effect.
+
+const REPORTS_STORAGE_PREFIX = "vc:unreadReports:";
+
+type ReportsListener = () => void;
+const reportsListeners = new Set<ReportsListener>();
+
+function reportsKey(orgId: string | null | undefined): string | null {
+  return orgId ? `${REPORTS_STORAGE_PREFIX}${orgId}` : null;
+}
+
+function readUnreadReports(orgId: string | null | undefined): number {
+  const key = reportsKey(orgId);
+  if (!key || typeof window === "undefined") return 0;
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return 0;
+    const n = Number.parseInt(raw, 10);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function writeUnreadReports(orgId: string | null | undefined, count: number): void {
+  const key = reportsKey(orgId);
+  if (!key || typeof window === "undefined") return;
+  try {
+    if (count <= 0) {
+      window.localStorage.removeItem(key);
+    } else {
+      window.localStorage.setItem(key, String(count));
+    }
+  } catch {
+    /* ignore quota / disabled storage */
+  }
+  reportsListeners.forEach((fn) => fn());
+}
+
+function bumpUnreadReports(orgId: string | null | undefined): void {
+  if (!orgId) return;
+  writeUnreadReports(orgId, readUnreadReports(orgId) + 1);
+}
+
+function subscribeReports(listener: ReportsListener): () => void {
+  reportsListeners.add(listener);
+  return () => {
+    reportsListeners.delete(listener);
+  };
+}
+
+function useUnreadReportsCount(orgId: string | null | undefined): number {
+  return useSyncExternalStore(
+    subscribeReports,
+    () => readUnreadReports(orgId),
+    () => 0, // SSR snapshot
+  );
+}
+
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const { isSignedIn, getToken } = useAuth();
+  const { member } = useOrganizationMembership(isSignedIn);
+  const orgId = member?.organization_id ?? null;
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [unreadSessions, setUnreadSessions] = useState<Set<string>>(new Set());
+  const unreadReportsCount = useUnreadReportsCount(orgId);
   const activeSessionRef = useRef<string | null>(null);
   const sseRef = useRef<EventSource | null>(null);
+  const orgIdRef = useRef<string | null>(null);
+
+  // Keep the latest orgId in a ref so the SSE handler reads the current
+  // org without re-binding the listener on every org switch. Effect-only
+  // write — no setState, just mirroring an external React value into a ref.
+  useEffect(() => {
+    orgIdRef.current = orgId;
+  }, [orgId]);
 
   // ── Toast management ──────────────────────────────────────────────────
 
@@ -130,6 +213,15 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       next.delete(sessionKey);
       return next;
     });
+  }, []);
+
+  // ── Unread reports tracking (silent-disk cron outputs) ────────────────
+  // Count itself is sourced from useUnreadReportsCount() above (backed by
+  // localStorage via useSyncExternalStore). markReportsRead writes through
+  // the store, which notifies subscribers — no local setState needed.
+
+  const markReportsRead = useCallback(() => {
+    writeUnreadReports(orgIdRef.current, 0);
   }, []);
 
   // ── Global SSE listener for cron + agent events ───────────────────────
@@ -180,6 +272,10 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
                 href: "/memory?tab=reports",
                 variant: "success",
               });
+              // Bump the per-org unread-reports counter so the sidebar
+              // Memory entry can show a badge until the user opens the
+              // Reports tab.
+              bumpUnreadReports(orgIdRef.current);
             } else if (deliveryMode === "error") {
               notify({
                 title: "Cron delivery failed",
@@ -242,7 +338,15 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   }, [isSignedIn, getToken, notify]);
 
   return (
-    <NotificationContext.Provider value={{ notify, unreadSessions, markSessionRead }}>
+    <NotificationContext.Provider
+      value={{
+        notify,
+        unreadSessions,
+        markSessionRead,
+        unreadReportsCount,
+        markReportsRead,
+      }}
+    >
       {children}
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </NotificationContext.Provider>
