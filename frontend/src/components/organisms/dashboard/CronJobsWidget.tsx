@@ -102,7 +102,60 @@ export function CronJobsWidget() {
           <p className="text-xs text-slate-400">No cron jobs configured.</p>
         ) : null}
       </div>
+
+      <RecentRunsFeed jobs={enabled} />
     </Shell>
+  );
+}
+
+function RecentRunsFeed({ jobs }: { jobs: CronJob[] }) {
+  const recent = [...jobs]
+    .filter((j) => j.last_run)
+    .sort(
+      (a, b) =>
+        new Date(b.last_run!).getTime() - new Date(a.last_run!).getTime(),
+    )
+    .slice(0, 5);
+
+  if (recent.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="mt-3 space-y-1 border-t border-slate-100 pt-2">
+      <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+        Recent runs
+      </p>
+      <ul className="space-y-1">
+        {recent.map((job) => {
+          const ok = job.last_status === "ok";
+          const errored = job.last_status === "error";
+          return (
+            <li
+              key={job.id}
+              className="flex items-center justify-between gap-2 text-xs"
+            >
+              <span className="flex min-w-0 items-center gap-1.5">
+                <span
+                  className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                    errored
+                      ? "bg-rose-500"
+                      : ok
+                        ? "bg-emerald-500"
+                        : "bg-slate-300"
+                  }`}
+                  aria-hidden
+                />
+                <span className="truncate text-slate-700">{job.name}</span>
+              </span>
+              <span className="shrink-0 text-slate-400">
+                {formatRelativeTimestamp(job.last_run!)}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }
 
