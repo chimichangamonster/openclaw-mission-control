@@ -27,6 +27,7 @@ import {
   type Category,
   type OrgContextFile,
   type OrgContextFileDetail,
+  type OrgContextStats,
   type Visibility,
   deleteFile,
   getFile,
@@ -37,6 +38,13 @@ import {
 } from "@/lib/org-context-api";
 
 const STALENESS_THRESHOLD_DAYS = 60;
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
+}
 
 function ageBadge(ageDays: number, isLiving: boolean): {
   label: string;
@@ -111,24 +119,28 @@ function OrgContextPageInner() {
   const [files, setFiles] = useState<OrgContextFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterCategory, setFilterCategory] = useState<string>("");
-  const [stats, setStats] = useState<{
-    total: number;
-    by_category: { category: string; count: number }[];
-  } | null>(null);
+  const [stats, setStats] = useState<OrgContextStats | null>(null);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<OrgContextFileDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
 
-  // Upload form state
+  // Upload form state — bulk-upload aware (Session 4)
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [uploadFile_, setUploadFile_] = useState<File | null>(null);
+  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
   const [uploadCategory, setUploadCategory] = useState<Category>("other");
   const [uploadSource, setUploadSource] = useState("");
   const [uploadVisibility, setUploadVisibility] = useState<Visibility>("shared");
   const [uploadLiving, setUploadLiving] = useState(true);
   const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
+  // Per-file results from the most recent batch — survives until the next
+  // file selection so the operator can review what failed before retrying.
+  type UploadResult = {
+    filename: string;
+    status: "pending" | "success" | "error";
+    error?: string;
+  };
+  const [uploadResults, setUploadResults] = useState<UploadResult[]>([]);
 
   const [deleting, setDeleting] = useState<string | null>(null);
 
@@ -167,29 +179,54 @@ function OrgContextPageInner() {
     }
   };
 
+  // Bulk upload — sequential per-file, per-file failure isolation. One bad
+  // file does not abort the batch. Each file lands as its own row through
+  // the existing single-file endpoint (backend pipeline unchanged).
   const submitUpload = async () => {
-    if (!uploadFile_) return;
-    try {
-      setUploading(true);
-      setUploadError(null);
-      await uploadFile(uploadFile_, {
-        category: uploadCategory,
-        source: uploadSource || null,
-        visibility: uploadVisibility,
-        is_living_data: uploadLiving,
-      });
-      // Reset form
-      setUploadFile_(null);
+    if (uploadFiles.length === 0) return;
+    setUploading(true);
+
+    // Mirror state in a local array; React state updates are async and
+    // can't be reliably indexed during the loop.
+    const results: UploadResult[] = uploadFiles.map((f) => ({
+      filename: f.name,
+      status: "pending",
+    }));
+    setUploadResults([...results]);
+
+    for (let i = 0; i < uploadFiles.length; i++) {
+      try {
+        await uploadFile(uploadFiles[i], {
+          category: uploadCategory,
+          source: uploadSource || null,
+          visibility: uploadVisibility,
+          is_living_data: uploadLiving,
+        });
+        results[i] = { ...results[i], status: "success" };
+      } catch (e) {
+        const msg =
+          e instanceof Error ? e.message : "Upload failed — see console";
+        results[i] = { ...results[i], status: "error", error: msg };
+      }
+      // Snapshot after each file so the UI updates incrementally.
+      setUploadResults([...results]);
+    }
+
+    // Drop only the successfully-uploaded files from the queue so the
+    // operator can retry the failures without re-picking them.
+    const remaining = uploadFiles.filter(
+      (_, idx) => results[idx]?.status !== "success"
+    );
+    setUploadFiles(remaining);
+
+    if (remaining.length === 0) {
+      // Full batch success — reset all form state.
       setUploadSource("");
       if (fileInputRef.current) fileInputRef.current.value = "";
-      await refreshFiles();
-    } catch (e) {
-      setUploadError(
-        e instanceof Error ? e.message : "Upload failed — see console"
-      );
-    } finally {
-      setUploading(false);
     }
+
+    setUploading(false);
+    await refreshFiles();
   };
 
   const togglePatch = async (
@@ -239,15 +276,36 @@ function OrgContextPageInner() {
       title="Org-Context Files"
       description="Persistent organizational context — prospects, regulations, brand guides — that any chat, cron, or agent can query."
     >
-      {/* Stats strip */}
+      {/* Stats strip — file count + storage used + per-category breakdown */}
       {stats && (
-        <div className="mb-4 flex flex-wrap gap-3 text-xs text-[color:var(--text-quiet)]">
+        <div className="mb-4 flex flex-wrap items-center gap-3 text-xs text-[color:var(--text-quiet)]">
           <span>
-            <strong className="text-[color:var(--text)]">{stats.total}</strong> files
+            <strong className="text-[color:var(--text)]">{stats.total}</strong>{" "}
+            file{stats.total === 1 ? "" : "s"}
           </span>
+          <span aria-hidden="true">·</span>
+          <span>
+            <strong className="text-[color:var(--text)]">
+              {formatBytes(stats.total_bytes)}
+            </strong>{" "}
+            stored
+            {stats.files_with_unknown_size > 0 && (
+              <span
+                className="ml-1 text-amber-700"
+                title={`${stats.files_with_unknown_size} pre-Session-4 file${stats.files_with_unknown_size === 1 ? "" : "s"} predate(s) the size column — totals exclude them.`}
+              >
+                ({stats.files_with_unknown_size} unknown)
+              </span>
+            )}
+          </span>
+          {stats.by_category.length > 0 && <span aria-hidden="true">·</span>}
           {stats.by_category.map((c) => (
             <span key={c.category}>
-              {c.category}: <strong className="text-[color:var(--text)]">{c.count}</strong>
+              {c.category}:{" "}
+              <strong className="text-[color:var(--text)]">{c.count}</strong>
+              <span className="ml-1 text-[color:var(--text-quiet)]">
+                ({formatBytes(c.bytes)})
+              </span>
             </span>
           ))}
         </div>
@@ -267,10 +325,25 @@ function OrgContextPageInner() {
               <input
                 ref={fileInputRef}
                 type="file"
-                onChange={(e) => setUploadFile_(e.target.files?.[0] ?? null)}
+                multiple
+                onChange={(e) => {
+                  setUploadFiles(Array.from(e.target.files ?? []));
+                  // Clear stale results from previous batch on new selection
+                  setUploadResults([]);
+                }}
                 className="mb-2 w-full text-xs"
                 accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.txt,.csv,.md,.json"
               />
+              {uploadFiles.length > 0 && (
+                <p className="mb-2 text-[11px] text-[color:var(--text-quiet)]">
+                  {uploadFiles.length} file{uploadFiles.length === 1 ? "" : "s"} selected
+                  {" · "}
+                  {formatBytes(
+                    uploadFiles.reduce((sum, f) => sum + f.size, 0)
+                  )}{" "}
+                  total
+                </p>
+              )}
 
               <div className="mb-2 grid grid-cols-2 gap-2">
                 <label className="block text-xs">
@@ -348,27 +421,62 @@ function OrgContextPageInner() {
                 )}
               </p>
 
-              {uploadError && (
-                <p className="mb-2 rounded bg-rose-50 px-2 py-1 text-[11px] text-rose-700">
-                  {uploadError}
-                </p>
+              {/* Per-file results panel — survives until next file selection
+                  so the operator can review what failed before retrying. */}
+              {uploadResults.length > 0 && (
+                <ul className="mb-3 max-h-40 space-y-1 overflow-y-auto rounded border border-[color:var(--border)] bg-[color:var(--surface-muted)] p-2 text-[11px]">
+                  {uploadResults.map((r, idx) => (
+                    <li
+                      key={`${r.filename}-${idx}`}
+                      className="flex items-start gap-1.5"
+                    >
+                      <span
+                        className={cn(
+                          "mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full",
+                          r.status === "success"
+                            ? "bg-emerald-500"
+                            : r.status === "error"
+                              ? "bg-rose-500"
+                              : "animate-pulse bg-amber-400"
+                        )}
+                      />
+                      <span className="flex-1 min-w-0">
+                        <span className="block truncate font-medium">
+                          {r.filename}
+                        </span>
+                        {r.status === "error" && r.error && (
+                          <span className="block text-rose-700">
+                            {r.error}
+                          </span>
+                        )}
+                        {r.status === "pending" && (
+                          <span className="block text-[color:var(--text-quiet)]">
+                            queued...
+                          </span>
+                        )}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
               )}
 
               <Button
                 size="sm"
                 onClick={submitUpload}
-                disabled={!uploadFile_ || uploading}
+                disabled={uploadFiles.length === 0 || uploading}
                 className="w-full"
               >
                 {uploading ? (
                   <>
                     <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                    Uploading...
+                    Uploading {uploadResults.filter((r) => r.status === "pending").length === 0
+                      ? "..."
+                      : `(${uploadResults.filter((r) => r.status !== "pending").length}/${uploadResults.length})`}
                   </>
                 ) : (
                   <>
                     <Upload className="mr-1.5 h-3.5 w-3.5" />
-                    Upload + extract + embed
+                    Upload {uploadFiles.length > 0 ? `${uploadFiles.length} file${uploadFiles.length === 1 ? "" : "s"}` : ""} + extract + embed
                   </>
                 )}
               </Button>

@@ -62,6 +62,10 @@ class OrgContextFile(TenantScoped, table=True):
     content_type: str = Field(default="application/octet-stream")
     category: str = Field(default="other", index=True)
     source: str | None = None  # Optional human note: where this file came from
+    # Original upload size in bytes. Nullable because pre-Session-4 rows were
+    # created before the column existed (see migration d1a2b3c4e5f6) and we
+    # don't have the original byte counts to backfill.
+    size_bytes: int | None = None
 
     # Extracted + redacted plaintext (pipeline-populated in Phase 2).
     # Nullable in Phase 1 since CRUD admits empty rows.

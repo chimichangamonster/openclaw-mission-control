@@ -144,7 +144,14 @@ async def stats(
     org_ctx: OrganizationContext = ORG_MEMBER_DEP,
     session: AsyncSession = SESSION_DEP,
 ) -> dict[str, Any]:
-    """Summary counts grouped by category. Used by the admin landing page."""
+    """Summary counts and bytes grouped by category. Used by the admin
+    landing page's stats strip.
+
+    ``total_bytes`` and ``bytes_by_category`` sum over rows with non-NULL
+    ``size_bytes``. Pre-Session-4 rows had no size column, so they show up
+    in counts but contribute 0 to the bytes total. ``files_with_unknown_size``
+    surfaces this so the UI can flag "(some sizes unknown)" when relevant.
+    """
     org_id = org_ctx.organization.id
 
     total_q = (
@@ -155,14 +162,43 @@ async def stats(
     total = (await session.execute(total_q)).scalar() or 0
 
     by_cat_q = (
-        select(OrgContextFile.category, func.count().label("count"))
+        select(
+            OrgContextFile.category,
+            func.count().label("count"),
+            func.coalesce(func.sum(OrgContextFile.size_bytes), 0).label("bytes"),
+        )
         .where(OrgContextFile.organization_id == org_id)
         .group_by(OrgContextFile.category)
         .order_by(func.count().desc())
     )
-    by_cat = [{"category": r[0], "count": r[1]} for r in (await session.execute(by_cat_q)).all()]
+    by_cat = [
+        {"category": r[0], "count": r[1], "bytes": int(r[2])}
+        for r in (await session.execute(by_cat_q)).all()
+    ]
 
-    return {"total": total, "by_category": by_cat}
+    total_bytes_q = (
+        select(func.coalesce(func.sum(OrgContextFile.size_bytes), 0))
+        .select_from(OrgContextFile)
+        .where(OrgContextFile.organization_id == org_id)
+    )
+    total_bytes = (await session.execute(total_bytes_q)).scalar() or 0
+
+    unknown_size_q = (
+        select(func.count())
+        .select_from(OrgContextFile)
+        .where(
+            OrgContextFile.organization_id == org_id,
+            OrgContextFile.size_bytes.is_(None),  # type: ignore[union-attr]
+        )
+    )
+    files_with_unknown_size = (await session.execute(unknown_size_q)).scalar() or 0
+
+    return {
+        "total": total,
+        "by_category": by_cat,
+        "total_bytes": int(total_bytes),
+        "files_with_unknown_size": files_with_unknown_size,
+    }
 
 
 @router.get("/{file_id}", response_model=OrgContextFileDetail)
@@ -352,6 +388,7 @@ async def upload_file(
         is_living_data=is_living_data,
         extracted_text=redacted_text,
         embedding=embedding,
+        size_bytes=len(file_bytes),
         uploaded_by_user_id=org_ctx.member.user_id,
     )
     session.add(row)

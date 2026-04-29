@@ -64,7 +64,9 @@ export interface OrgContextFileDetail extends OrgContextFile {
 
 export interface OrgContextStats {
   total: number;
-  by_category: { category: string; count: number }[];
+  by_category: { category: string; count: number; bytes: number }[];
+  total_bytes: number;
+  files_with_unknown_size: number;
 }
 
 export interface UploadOptions {

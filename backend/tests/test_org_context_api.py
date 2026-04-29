@@ -292,12 +292,22 @@ async def test_admin_can_upload_list_get_patch_delete(env_admin):
         assert patched["category"] == "customers"
         assert patched["is_living_data"] is False
 
-        # Stats
+        # Stats — counts + bytes (Session 4 adds size_bytes column)
         stats_resp = await client.get("/api/v1/org-context/stats")
         assert stats_resp.status_code == 200
         stats = stats_resp.json()
         assert stats["total"] == 1
         assert any(c["category"] == "customers" for c in stats["by_category"])
+        # The uploaded text body is ~47 bytes; size_bytes captures the raw
+        # multipart payload, which the test framework sends directly.
+        uploaded_size = len(b"ICP: dealerships >$5M revenue, multi-location.")
+        assert stats["total_bytes"] == uploaded_size
+        assert stats["files_with_unknown_size"] == 0
+        customers_cat = next(
+            c for c in stats["by_category"] if c["category"] == "customers"
+        )
+        assert customers_cat["bytes"] == uploaded_size
+        assert customers_cat["count"] == 1
 
         # Delete
         del_resp = await client.delete(f"/api/v1/org-context/{file_id}")
