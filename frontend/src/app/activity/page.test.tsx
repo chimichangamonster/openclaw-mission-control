@@ -82,8 +82,14 @@ describe("/activity auth boundary", () => {
         </AuthProvider>,
       );
 
+      // LocalAuthLogin renders: "Self-host mode" badge + "Mission Control"
+      // heading + "Access token" labelled input. Asserting these three
+      // structural anchors is more durable than the prior
+      // "Local Authentication" heading match (the heading was renamed in
+      // commit 3905d7f without updating these tests).
+      expect(screen.getByText(/self-host mode/i)).toBeInTheDocument();
       expect(
-        screen.getByRole("heading", { name: /local authentication/i }),
+        screen.getByRole("heading", { name: /mission control/i }),
       ).toBeInTheDocument();
       expect(screen.getByLabelText(/access token/i)).toBeInTheDocument();
     } finally {
