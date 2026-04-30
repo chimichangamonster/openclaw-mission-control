@@ -6,8 +6,13 @@ import {
   Activity,
   BarChart3,
   Radio,
+  Bot,
+  Boxes,
+  Brain,
   CheckCircle2,
+  Clock,
   Eye,
+  EyeOff,
   FileText,
   Folder,
   Building2,
@@ -19,6 +24,8 @@ import {
   MessageSquare,
   Moon,
   Network,
+  Settings,
+  Store,
   Sun,
   TrendingUp,
   Shield,
@@ -31,6 +38,8 @@ import { useTheme } from "next-themes";
 import { useAuth } from "@/auth/clerk";
 import { customFetch } from "@/api/mutator";
 import { useFeatureFlags } from "@/lib/use-feature-flags";
+import { usePlatformRole } from "@/lib/use-platform-role";
+import { useSidebarFullView } from "@/lib/use-sidebar-full-view";
 import { useNotifications } from "@/components/providers/NotificationProvider";
 import { useQuery } from "@tanstack/react-query";
 import { OrgSwitcher } from "@/components/organisms/OrgSwitcher";
@@ -41,6 +50,9 @@ export function DashboardSidebar() {
   const { theme, setTheme } = useTheme();
   const { isSignedIn } = useAuth();
   const { isFeatureEnabled } = useFeatureFlags(Boolean(isSignedIn));
+  const { isPlatformOwner } = usePlatformRole(isSignedIn);
+  const { fullView, toggle: toggleFullView } = useSidebarFullView();
+  const showAdminItems = isPlatformOwner && fullView;
   const { unreadReportsCount } = useNotifications();
   const healthQuery = useQuery<{ status?: string } | undefined>({
     queryKey: ["/api/v1/system/health"],
@@ -297,6 +309,90 @@ export function DashboardSidebar() {
                 <Shield className="h-4 w-4" />
                 Audit Log
               </Link>
+              {showAdminItems && isFeatureEnabled("agent_memory") ? (
+                <Link
+                  href="/memory/vector"
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2.5 text-[color:var(--text)] transition",
+                    pathname.startsWith("/memory/vector")
+                      ? "bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)] font-medium"
+                      : "hover:bg-[color:var(--surface-muted)]",
+                  )}
+                >
+                  <Brain className="h-4 w-4" />
+                  Vector Memory
+                </Link>
+              ) : null}
+              {showAdminItems && isFeatureEnabled("org_context") ? (
+                <Link
+                  href="/org-context"
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2.5 text-[color:var(--text)] transition",
+                    pathname.startsWith("/org-context")
+                      ? "bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)] font-medium"
+                      : "hover:bg-[color:var(--surface-muted)]",
+                  )}
+                >
+                  <BookOpen className="h-4 w-4" />
+                  Org Context
+                </Link>
+              ) : null}
+              {showAdminItems && isFeatureEnabled("observability") ? (
+                <Link
+                  href="/observability"
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2.5 text-[color:var(--text)] transition",
+                    pathname.startsWith("/observability")
+                      ? "bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)] font-medium"
+                      : "hover:bg-[color:var(--surface-muted)]",
+                  )}
+                >
+                  <Activity className="h-4 w-4" />
+                  Observability
+                </Link>
+              ) : null}
+              {showAdminItems && isFeatureEnabled("cron_jobs") ? (
+                <Link
+                  href="/cron-jobs"
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2.5 text-[color:var(--text)] transition",
+                    pathname.startsWith("/cron-jobs")
+                      ? "bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)] font-medium"
+                      : "hover:bg-[color:var(--surface-muted)]",
+                  )}
+                >
+                  <Clock className="h-4 w-4" />
+                  Scheduled Tasks
+                </Link>
+              ) : null}
+              {showAdminItems && isFeatureEnabled("cost_tracker") ? (
+                <Link
+                  href="/costs"
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2.5 text-[color:var(--text)] transition",
+                    pathname.startsWith("/costs")
+                      ? "bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)] font-medium"
+                      : "hover:bg-[color:var(--surface-muted)]",
+                  )}
+                >
+                  <Folder className="h-4 w-4" />
+                  Cost & Usage
+                </Link>
+              ) : null}
+              {showAdminItems ? (
+                <Link
+                  href="/org-settings"
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2.5 text-[color:var(--text)] transition",
+                    pathname.startsWith("/org-settings")
+                      ? "bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)] font-medium"
+                      : "hover:bg-[color:var(--surface-muted)]",
+                  )}
+                >
+                  <Building2 className="h-4 w-4" />
+                  Org Settings
+                </Link>
+              ) : null}
             </div>
           </div>
 
@@ -425,8 +521,57 @@ export function DashboardSidebar() {
                 Approvals
               </Link>
               ) : null}
+              {showAdminItems ? (
+                <Link
+                  href="/custom-fields"
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2.5 text-[color:var(--text)] transition",
+                    pathname.startsWith("/custom-fields")
+                      ? "bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)] font-medium"
+                      : "hover:bg-[color:var(--surface-muted)]",
+                  )}
+                >
+                  <Settings className="h-4 w-4" />
+                  Custom fields
+                </Link>
+              ) : null}
             </div>
           </div>
+
+          {showAdminItems ? (
+            <div>
+              <p className="px-3 text-[11px] font-semibold uppercase tracking-wider text-[color:var(--text-quiet)]">
+                Skills
+              </p>
+              <div className="mt-1 space-y-1">
+                <Link
+                  href="/skills/marketplace"
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2.5 text-[color:var(--text)] transition",
+                    pathname === "/skills" ||
+                      pathname.startsWith("/skills/marketplace")
+                      ? "bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)] font-medium"
+                      : "hover:bg-[color:var(--surface-muted)]",
+                  )}
+                >
+                  <Store className="h-4 w-4" />
+                  Skill Library
+                </Link>
+                <Link
+                  href="/skills/packs"
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2.5 text-[color:var(--text)] transition",
+                    pathname.startsWith("/skills/packs")
+                      ? "bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)] font-medium"
+                      : "hover:bg-[color:var(--surface-muted)]",
+                  )}
+                >
+                  <Boxes className="h-4 w-4" />
+                  Packs
+                </Link>
+              </div>
+            </div>
+          ) : null}
 
           <div>
             <p className="px-3 text-[11px] font-semibold uppercase tracking-wider text-[color:var(--text-quiet)]">
@@ -445,6 +590,34 @@ export function DashboardSidebar() {
                 <Building2 className="h-4 w-4" />
                 Organization
               </Link>
+              {showAdminItems ? (
+                <Link
+                  href="/gateways"
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2.5 text-[color:var(--text)] transition",
+                    pathname.startsWith("/gateways")
+                      ? "bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)] font-medium"
+                      : "hover:bg-[color:var(--surface-muted)]",
+                  )}
+                >
+                  <Network className="h-4 w-4" />
+                  Gateways
+                </Link>
+              ) : null}
+              {showAdminItems ? (
+                <Link
+                  href="/agents"
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2.5 text-[color:var(--text)] transition",
+                    pathname.startsWith("/agents")
+                      ? "bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)] font-medium"
+                      : "hover:bg-[color:var(--surface-muted)]",
+                  )}
+                >
+                  <Bot className="h-4 w-4" />
+                  Agents
+                </Link>
+              ) : null}
             </div>
           </div>
           <div className="mt-2">
@@ -476,13 +649,30 @@ export function DashboardSidebar() {
             />
             {statusLabel}
           </div>
-          <button
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            className="rounded-md p-1.5 text-[color:var(--text-quiet)] hover:bg-[color:var(--surface-muted)] hover:text-[color:var(--text)] transition"
-            title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-          >
-            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          </button>
+          <div className="flex items-center gap-1">
+            {isPlatformOwner ? (
+              <button
+                onClick={toggleFullView}
+                className="rounded-md p-1.5 text-[color:var(--text-quiet)] hover:bg-[color:var(--surface-muted)] hover:text-[color:var(--text)] transition"
+                title={
+                  fullView
+                    ? "Hide admin items (platform owner)"
+                    : "Show all admin items (platform owner)"
+                }
+                aria-label="Toggle full sidebar view"
+                aria-pressed={fullView}
+              >
+                {fullView ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+              </button>
+            ) : null}
+            <button
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              className="rounded-md p-1.5 text-[color:var(--text-quiet)] hover:bg-[color:var(--surface-muted)] hover:text-[color:var(--text)] transition"
+              title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+            >
+              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </button>
+          </div>
         </div>
       </div>
     </aside>
