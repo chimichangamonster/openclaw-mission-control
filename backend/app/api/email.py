@@ -7,7 +7,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import Response
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.api.deps import ORG_MEMBER_DEP, ORG_RATE_LIMIT_DEP, SESSION_DEP, require_feature
 from app.core.logging import get_logger
@@ -110,6 +110,38 @@ async def list_email_accounts(
         )
     result = await session.execute(stmt)
     return list(result.scalars().all())
+
+
+@router.get("/unread-count")
+async def get_unread_email_count(
+    ctx: OrganizationContext = ORG_MEMBER_DEP,
+    session: AsyncSession = SESSION_DEP,
+) -> dict[str, int]:
+    """Total unread inbox messages across the caller's accessible mailboxes.
+
+    Mirrors the visibility filter from `list_email_accounts`: non-admins see
+    shared accounts plus their own private accounts. Used by the sidebar
+    Email badge.
+    """
+    from sqlalchemy import or_
+
+    stmt = (
+        select(func.count(EmailMessage.id))  # type: ignore[arg-type]
+        .join(EmailAccount, EmailAccount.id == EmailMessage.email_account_id)  # type: ignore[arg-type]
+        .where(EmailAccount.organization_id == ctx.organization.id)  # type: ignore[arg-type]
+        .where(EmailMessage.is_read.is_(False))  # type: ignore[union-attr]
+        .where(EmailMessage.folder == "inbox")  # type: ignore[arg-type]
+    )
+    if not is_org_admin(ctx.member):
+        stmt = stmt.where(
+            or_(
+                EmailAccount.visibility == "shared",  # type: ignore[arg-type]
+                EmailAccount.user_id == ctx.member.user_id,  # type: ignore[arg-type]
+            )
+        )
+    result = await session.execute(stmt)
+    count = result.scalar_one() or 0
+    return {"count": int(count)}
 
 
 @router.get("/accounts/{account_id}", response_model=EmailAccountRead)

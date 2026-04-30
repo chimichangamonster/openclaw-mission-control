@@ -282,3 +282,126 @@ async def test_toggle_visibility_roundtrip():
         result = await session.execute(stmt)
         accounts = list(result.scalars().all())
         assert len(accounts) == 1
+
+
+# ---------------------------------------------------------------------------
+# Unread-count aggregate (sidebar badge endpoint)
+# ---------------------------------------------------------------------------
+
+
+async def _seed_unread_mix(session: AsyncSession) -> dict:
+    """Seed: shared account (2 unread + 1 read inbox + 1 unread archive),
+    a private account owned by MEMBER_USER_ID (3 unread inbox), and a
+    private account owned by OWNER_USER_ID (1 unread inbox)."""
+    shared_account = EmailAccount(
+        id=uuid4(), organization_id=ORG_ID, user_id=OWNER_USER_ID,
+        provider="microsoft", email_address="shared@x.ca", visibility="shared",
+        sync_enabled=True,
+    )
+    other_private = EmailAccount(
+        id=uuid4(), organization_id=ORG_ID, user_id=MEMBER_USER_ID,
+        provider="microsoft", email_address="samir@x.ca", visibility="private",
+        sync_enabled=True,
+    )
+    own_private = EmailAccount(
+        id=uuid4(), organization_id=ORG_ID, user_id=OWNER_USER_ID,
+        provider="microsoft", email_address="owner-private@x.ca", visibility="private",
+        sync_enabled=True,
+    )
+    session.add_all([shared_account, other_private, own_private])
+
+    def _msg(account_id, *, is_read: bool, folder: str = "inbox"):
+        return EmailMessage(
+            id=uuid4(), organization_id=ORG_ID, email_account_id=account_id,
+            provider_message_id=str(uuid4()), subject="x",
+            sender_email="x@example.com", body_text="x",
+            received_at=utcnow(), folder=folder, triage_status="pending",
+            is_read=is_read, is_starred=False, has_attachments=False,
+        )
+
+    session.add_all([
+        _msg(shared_account.id, is_read=False),
+        _msg(shared_account.id, is_read=False),
+        _msg(shared_account.id, is_read=True),
+        _msg(shared_account.id, is_read=False, folder="archive"),
+        _msg(other_private.id, is_read=False),
+        _msg(other_private.id, is_read=False),
+        _msg(other_private.id, is_read=False),
+        _msg(own_private.id, is_read=False),
+    ])
+    await session.commit()
+    return {
+        "shared": shared_account,
+        "other_private": other_private,
+        "own_private": own_private,
+    }
+
+
+@pytest.mark.asyncio
+async def test_unread_count_owner_yours_plus_shared():
+    """Henry (non-admin owner of shared + own_private): 2 + 1 = 3.
+    The archived message and Samir's 3 private unread are excluded."""
+    maker = await _make_session()
+    async with maker() as session:
+        await _seed_unread_mix(session)
+        from sqlalchemy import func, or_
+
+        stmt = (
+            select(func.count(EmailMessage.id))
+            .join(EmailAccount, EmailAccount.id == EmailMessage.email_account_id)
+            .where(EmailAccount.organization_id == ORG_ID)
+            .where(EmailMessage.is_read.is_(False))
+            .where(EmailMessage.folder == "inbox")
+            .where(
+                or_(
+                    EmailAccount.visibility == "shared",
+                    EmailAccount.user_id == OWNER_USER_ID,
+                )
+            )
+        )
+        count = (await session.execute(stmt)).scalar_one()
+        assert count == 3
+
+
+@pytest.mark.asyncio
+async def test_unread_count_member_excludes_other_users_private():
+    """Samir: shared (2) + his own private (3) = 5. Owner's private excluded."""
+    maker = await _make_session()
+    async with maker() as session:
+        await _seed_unread_mix(session)
+        from sqlalchemy import func, or_
+
+        stmt = (
+            select(func.count(EmailMessage.id))
+            .join(EmailAccount, EmailAccount.id == EmailMessage.email_account_id)
+            .where(EmailAccount.organization_id == ORG_ID)
+            .where(EmailMessage.is_read.is_(False))
+            .where(EmailMessage.folder == "inbox")
+            .where(
+                or_(
+                    EmailAccount.visibility == "shared",
+                    EmailAccount.user_id == MEMBER_USER_ID,
+                )
+            )
+        )
+        count = (await session.execute(stmt)).scalar_one()
+        assert count == 5
+
+
+@pytest.mark.asyncio
+async def test_unread_count_admin_sees_all_inbox_unread():
+    """Admin: no visibility filter. 2 (shared) + 3 (other private) + 1 (own private) = 6."""
+    maker = await _make_session()
+    async with maker() as session:
+        await _seed_unread_mix(session)
+        from sqlalchemy import func
+
+        stmt = (
+            select(func.count(EmailMessage.id))
+            .join(EmailAccount, EmailAccount.id == EmailMessage.email_account_id)
+            .where(EmailAccount.organization_id == ORG_ID)
+            .where(EmailMessage.is_read.is_(False))
+            .where(EmailMessage.folder == "inbox")
+        )
+        count = (await session.execute(stmt)).scalar_one()
+        assert count == 6

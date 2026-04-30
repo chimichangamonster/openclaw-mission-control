@@ -50,11 +50,11 @@ export function TermsGate({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Don't block while loading or if not signed in
-  if (loading || !isSignedIn) return <>{children}</>;
+  // Don't block while loading, if not signed in, or before status resolves
+  if (loading || !isSignedIn || status === null) return <>{children}</>;
 
   // If terms are accepted, render children normally
-  if (status?.terms_accepted) return <>{children}</>;
+  if (status.terms_accepted) return <>{children}</>;
 
   // Show terms acceptance modal
   return (

@@ -54,7 +54,7 @@ export function DashboardSidebar() {
   const { isPlatformOwner } = usePlatformRole(isSignedIn);
   const { fullView, toggle: toggleFullView } = useSidebarFullView();
   const showAdminItems = isPlatformOwner && fullView;
-  const { unreadReportsCount } = useNotifications();
+  const { unreadReportsCount, unreadEmailCount } = useNotifications();
   const healthQuery = useQuery<{ status?: string } | undefined>({
     queryKey: ["/api/v1/system/health"],
     queryFn: async () => {
@@ -224,8 +224,16 @@ export function DashboardSidebar() {
                     : "hover:bg-[color:var(--surface-muted)]",
                 )}
               >
-                <Mail className="h-4 w-4" />
-                Email
+                <Mail className="h-4 w-4 shrink-0" />
+                <span className="flex-1">Email</span>
+                {unreadEmailCount > 0 ? (
+                  <span
+                    aria-label={`${unreadEmailCount} unread email${unreadEmailCount === 1 ? "" : "s"}`}
+                    className="ml-auto inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-semibold leading-5 text-white"
+                  >
+                    {unreadEmailCount > 99 ? "99+" : unreadEmailCount}
+                  </span>
+                ) : null}
               </Link>
               ) : null}
               {isFeatureEnabled("google_calendar") ? (

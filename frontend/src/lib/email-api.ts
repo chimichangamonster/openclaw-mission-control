@@ -63,6 +63,14 @@ export async function fetchEmailAccounts(): Promise<EmailAccount[]> {
   return res.data;
 }
 
+export async function fetchUnreadEmailCount(): Promise<number> {
+  const res = await customFetch<{ data: { count: number } }>(
+    `${V1}/email/unread-count`,
+    { method: "GET" },
+  );
+  return res.data?.count ?? 0;
+}
+
 export async function deleteEmailAccount(accountId: string): Promise<void> {
   await customFetch(`${V1}/email/accounts/${accountId}`, {
     method: "DELETE",

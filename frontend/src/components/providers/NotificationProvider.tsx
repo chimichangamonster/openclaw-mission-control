@@ -14,6 +14,8 @@ import { useAuth } from "@/auth/clerk";
 import { X, Bell, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useOrganizationMembership } from "@/lib/use-organization-membership";
+import { fetchUnreadEmailCount } from "@/lib/email-api";
+import { useFeatureFlags } from "@/lib/use-feature-flags";
 
 // ---------------------------------------------------------------------------
 // Toast types
@@ -40,6 +42,13 @@ interface NotificationContextValue {
   unreadReportsCount: number;
   /** Mark the Reports tab as read (clears badge for current org). */
   markReportsRead: () => void;
+  /** Total unread inbox emails across the caller's accessible mailboxes
+   *  (own + shared) for the current org. Polled from the backend; refreshed
+   *  by SSE email events when available. 0 when the email feature is off. */
+  unreadEmailCount: number;
+  /** Force-refresh the unread email count (e.g., after the user opens
+   *  /email and marks messages read). */
+  refreshUnreadEmailCount: () => void;
 }
 
 const NotificationContext = createContext<NotificationContextValue>({
@@ -48,6 +57,8 @@ const NotificationContext = createContext<NotificationContextValue>({
   markSessionRead: () => {},
   unreadReportsCount: 0,
   markReportsRead: () => {},
+  unreadEmailCount: 0,
+  refreshUnreadEmailCount: () => {},
 });
 
 export function useNotifications() {
@@ -174,12 +185,16 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const { isSignedIn, getToken } = useAuth();
   const { member } = useOrganizationMembership(isSignedIn);
   const orgId = member?.organization_id ?? null;
+  const { isFeatureEnabled } = useFeatureFlags(Boolean(isSignedIn));
+  const emailEnabled = isFeatureEnabled("email");
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [unreadSessions, setUnreadSessions] = useState<Set<string>>(new Set());
+  const [unreadEmailCount, setUnreadEmailCount] = useState<number>(0);
   const unreadReportsCount = useUnreadReportsCount(orgId);
   const activeSessionRef = useRef<string | null>(null);
   const sseRef = useRef<EventSource | null>(null);
   const orgIdRef = useRef<string | null>(null);
+  const emailEnabledRef = useRef<boolean>(false);
 
   // Keep the latest orgId in a ref so the SSE handler reads the current
   // org without re-binding the listener on every org switch. Effect-only
@@ -187,6 +202,51 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     orgIdRef.current = orgId;
   }, [orgId]);
+
+  useEffect(() => {
+    emailEnabledRef.current = emailEnabled;
+  }, [emailEnabled]);
+
+  // ── Unread email tracking ─────────────────────────────────────────────
+  // Single aggregate endpoint (sums own + shared mailboxes for the caller),
+  // polled every 60s. SSE email events trigger an immediate refresh so the
+  // badge updates without waiting for the next tick.
+
+  const refreshUnreadEmailCount = useCallback(async () => {
+    if (!isSignedIn || !emailEnabledRef.current) {
+      setUnreadEmailCount(0);
+      return;
+    }
+    try {
+      const count = await fetchUnreadEmailCount();
+      setUnreadEmailCount(count);
+    } catch {
+      // Silent — endpoint may be unavailable during deploy or feature off.
+    }
+  }, [isSignedIn]);
+
+  useEffect(() => {
+    // Initial fetch deferred to a microtask so the setState inside
+    // refreshUnreadEmailCount doesn't run synchronously in the effect
+    // body (react-hooks/set-state-in-effect). Polling only runs while
+    // signed in and email is enabled; refreshUnreadEmailCount internally
+    // resets to 0 in disabled states.
+    const initial = window.setTimeout(() => {
+      void refreshUnreadEmailCount();
+    }, 0);
+    if (!isSignedIn || !emailEnabled) {
+      return () => window.clearTimeout(initial);
+    }
+    const id = window.setInterval(() => {
+      void refreshUnreadEmailCount();
+    }, 60_000);
+    return () => {
+      window.clearTimeout(initial);
+      window.clearInterval(id);
+    };
+    // orgId is in the dep list so a switch to an org without email access
+    // refreshes the count immediately.
+  }, [isSignedIn, emailEnabled, orgId, refreshUnreadEmailCount]);
 
   // ── Toast management ──────────────────────────────────────────────────
 
@@ -306,6 +366,15 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
             });
           }
 
+          // ── Email events: refresh unread count ───────────────
+          // The backend emits activity events when email syncs land,
+          // when a message is marked read, archived, or replied to.
+          // Trigger a refresh so the sidebar badge stays in sync without
+          // waiting for the next 60s poll.
+          if (eventType.startsWith("email.")) {
+            void refreshUnreadEmailCount();
+          }
+
           // ── Agent responded in a session (unread tracking) ────
           if (eventType.includes("responded") || eventType.includes("completed")) {
             // If there's a session key in metadata, mark it as unread
@@ -335,7 +404,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       sseRef.current?.close();
       sseRef.current = null;
     };
-  }, [isSignedIn, getToken, notify]);
+  }, [isSignedIn, getToken, notify, refreshUnreadEmailCount]);
 
   return (
     <NotificationContext.Provider
@@ -345,6 +414,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         markSessionRead,
         unreadReportsCount,
         markReportsRead,
+        unreadEmailCount,
+        refreshUnreadEmailCount,
       }}
     >
       {children}
