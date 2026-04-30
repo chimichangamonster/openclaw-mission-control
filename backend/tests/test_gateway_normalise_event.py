@@ -7,6 +7,7 @@ Locks in the 2026-04-14 schema fix that replaced the fantasy
 """
 
 from app.services.openclaw.gateway_event_listener import (
+    DeltaBuffer,
     _extract_delivery_mode,
     _is_default_label,
     _normalise_event,
@@ -34,8 +35,8 @@ def test_default_label_rejects_user_renames():
 # ── chat events ────────────────────────────────────────────────────────────
 
 
-def test_chat_delta_skipped():
-    """Delta tokens flood the panel — must return None."""
+def test_chat_delta_skipped_when_streaming_disabled():
+    """Delta tokens flood the panel — default behavior returns None."""
     payload = {
         "runId": "r1",
         "sessionKey": "vantage:the-claw:chat-abc",
@@ -48,6 +49,40 @@ def test_chat_delta_skipped():
         },
     }
     assert _normalise_event("chat", payload) is None
+    assert _normalise_event("chat", payload, streaming_enabled=False) is None
+
+
+def test_chat_delta_passes_through_when_streaming_enabled():
+    """When chat_token_streaming flag is on, deltas emit token_delta events."""
+    payload = {
+        "runId": "r1",
+        "sessionKey": "vantage:the-claw:chat-abc",
+        "seq": 5,
+        "state": "delta",
+        "message": {
+            "role": "assistant",
+            "content": [{"type": "text", "text": "Hello"}],
+            "timestamp": 1234567890,
+        },
+    }
+    evt = _normalise_event("chat", payload, streaming_enabled=True)
+    assert evt is not None
+    assert evt.event_type == "agent.token_delta"
+    assert evt.channel == "vantage:the-claw:chat-abc"
+    assert evt.metadata["delta"] == "Hello"
+    assert evt.metadata["runId"] == "r1"
+
+
+def test_chat_delta_with_empty_text_skipped_even_when_enabled():
+    """Empty/unparseable delta payloads skip — no point flushing nothing."""
+    payload = {
+        "runId": "r1",
+        "sessionKey": "s1",
+        "seq": 5,
+        "state": "delta",
+        "message": {"role": "assistant", "content": []},
+    }
+    assert _normalise_event("chat", payload, streaming_enabled=True) is None
 
 
 def test_chat_final_with_message_emits_responded():
@@ -327,3 +362,83 @@ def test_cron_error_includes_delivery_mode():
     assert event is not None
     assert event.event_type == "cron.error"
     assert event.metadata["delivery_mode"] == "announce"
+
+
+# ── DeltaBuffer (token-streaming MVP item 71) ─────────────────────────────
+
+
+def test_delta_buffer_holds_under_threshold():
+    """Fewer than 5 tokens, sub-50ms — buffered, no flush."""
+    buf = DeltaBuffer()
+    assert buf.push("s1", "He", now=0.000) is None
+    assert buf.push("s1", "llo", now=0.005) is None
+    assert buf.push("s1", " ", now=0.010) is None
+    assert buf.pending("s1") == "Hello "
+
+
+def test_delta_buffer_flushes_at_5_tokens():
+    """5th token flushes the accumulated string."""
+    buf = DeltaBuffer()
+    buf.push("s1", "a", now=0.000)
+    buf.push("s1", "b", now=0.001)
+    buf.push("s1", "c", now=0.002)
+    buf.push("s1", "d", now=0.003)
+    flushed = buf.push("s1", "e", now=0.004)
+    assert flushed == "abcde"
+    assert buf.pending("s1") == ""
+
+
+def test_delta_buffer_lazy_flushes_on_age_exceeded():
+    """If first-token age exceeds 50ms when next event arrives, flush stale buffer first.
+
+    The next push starts a new buffer with its own delta.
+    """
+    buf = DeltaBuffer()
+    buf.push("s1", "stale", now=0.000)
+    buf.push("s1", "_data", now=0.020)
+    # 70ms after first token — next push should flush the old buffer
+    flushed = buf.push("s1", "_NEW", now=0.070)
+    assert flushed == "stale_data"
+    # New buffer holds only the latest delta
+    assert buf.pending("s1") == "_NEW"
+
+
+def test_delta_buffer_force_flush_on_final():
+    """chat:final force-flushes whatever is buffered."""
+    buf = DeltaBuffer()
+    buf.push("s1", "partial", now=0.000)
+    buf.push("s1", " thought", now=0.010)
+    flushed = buf.flush("s1")
+    assert flushed == "partial thought"
+    assert buf.pending("s1") == ""
+
+
+def test_delta_buffer_force_flush_on_empty_returns_none():
+    """flush() on a session with no buffered tokens returns None — nothing to emit."""
+    buf = DeltaBuffer()
+    assert buf.flush("s1") is None
+
+
+def test_delta_buffer_isolates_sessions():
+    """Each session_key has its own buffer."""
+    buf = DeltaBuffer()
+    buf.push("s1", "a", now=0.000)
+    buf.push("s2", "x", now=0.000)
+    buf.push("s1", "b", now=0.001)
+    assert buf.pending("s1") == "ab"
+    assert buf.pending("s2") == "x"
+    flushed = buf.flush("s1")
+    assert flushed == "ab"
+    # s2 untouched
+    assert buf.pending("s2") == "x"
+
+
+def test_delta_buffer_drop_removes_session_state():
+    """drop() clears state for a session_key — used on disconnect or final."""
+    buf = DeltaBuffer()
+    buf.push("s1", "a", now=0.000)
+    buf.drop("s1")
+    assert buf.pending("s1") == ""
+    # Subsequent push starts fresh (would not flush stale data)
+    buf.push("s1", "b", now=10.0)  # huge gap, but no prior state to flush
+    assert buf.pending("s1") == "b"

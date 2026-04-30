@@ -34,6 +34,7 @@ DEFAULT_FEATURE_FLAGS = {
     "observability": True,
     "personal_bookkeeping": False,
     "org_context": False,
+    "chat_token_streaming": False,
 }
 
 

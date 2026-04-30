@@ -31,6 +31,12 @@ interface ChatActivityPanelProps {
   onToggle: () => void;
   onAbort?: () => void;
   agentTyping: boolean;
+  /**
+   * In-flight assistant text accumulated from token-stream deltas (item 71 MVP).
+   * Empty string when nothing is streaming. Renders inline below the typing
+   * indicator when expanded; replaces the collapsed-bar preview when active.
+   */
+  streamingDraft?: string;
 }
 
 function eventIcon(eventType: string) {
@@ -76,22 +82,26 @@ export function ChatActivityPanel({
   onToggle,
   onAbort,
   agentTyping,
+  streamingDraft = "",
 }: ChatActivityPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const isStreaming = streamingDraft.length > 0;
 
-  // Auto-scroll to bottom when new events arrive
+  // Auto-scroll to bottom when new events arrive or streaming text grows
   useEffect(() => {
     if (isOpen && scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [events.length, isOpen]);
+  }, [events.length, streamingDraft, isOpen]);
 
   const lastEvent = events.length > 0 ? events[events.length - 1] : null;
-  const lastMessage = lastEvent
-    ? safeMessage(lastEvent.message) || formatEventType(lastEvent.event_type)
-    : agentTyping
-      ? "Agent is working..."
-      : "";
+  const collapsedPreview = isStreaming
+    ? streamingDraft
+    : lastEvent
+      ? safeMessage(lastEvent.message) || formatEventType(lastEvent.event_type)
+      : agentTyping
+        ? "Agent is working..."
+        : "";
 
   return (
     <div
@@ -109,8 +119,13 @@ export function ChatActivityPanel({
           "h-3.5 w-3.5",
           agentTyping ? "text-blue-500 animate-pulse" : "text-[color:var(--text-quiet)]",
         )} />
-        <span className="flex-1 truncate text-xs text-[color:var(--text-quiet)]">
-          {lastMessage}
+        <span
+          className={cn(
+            "flex-1 truncate text-xs",
+            isStreaming ? "text-[color:var(--text)]" : "text-[color:var(--text-quiet)]",
+          )}
+        >
+          {collapsedPreview}
         </span>
         {events.length > 0 && (
           <span className="rounded-full bg-[color:var(--surface)] px-1.5 py-0.5 text-[10px] tabular-nums text-[color:var(--text-quiet)]">
@@ -143,11 +158,24 @@ export function ChatActivityPanel({
           ref={scrollRef}
           className="max-h-36 overflow-y-auto border-t border-[color:var(--border)] sm:max-h-48"
         >
-          {events.length === 0 ? (
+          {isStreaming && (
+            <div className="border-b border-[color:var(--border)] bg-[color:var(--surface)] px-4 py-2">
+              <div className="mb-1 flex items-center gap-1.5">
+                <Activity className="h-3 w-3 animate-pulse text-blue-500" />
+                <span className="text-[10px] uppercase tracking-wide text-[color:var(--text-quiet)]">
+                  Streaming
+                </span>
+              </div>
+              <p className="whitespace-pre-wrap text-xs text-[color:var(--text)]">
+                {streamingDraft}
+              </p>
+            </div>
+          )}
+          {events.length === 0 && !isStreaming ? (
             <div className="px-4 py-3 text-center text-xs text-[color:var(--text-quiet)]">
               Waiting for agent activity...
             </div>
-          ) : (
+          ) : events.length === 0 ? null : (
             <div className="divide-y divide-[color:var(--border)]">
               {events.map((event, idx) => (
                 <div

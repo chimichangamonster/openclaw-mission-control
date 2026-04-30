@@ -101,6 +101,91 @@ def _extract_delivery_mode(payload: dict[str, Any]) -> str | None:
     return None
 
 
+_DELTA_FLUSH_TOKEN_THRESHOLD = 5
+_DELTA_FLUSH_AGE_SECONDS = 0.05
+
+
+class DeltaBuffer:
+    """Per-session streaming-token buffer for chat_token_streaming MVP.
+
+    Threshold semantics: flush when token count >= 5 OR first-token age >= 50ms,
+    whichever comes first. Lazy: age-based flush happens when the *next* token
+    arrives, not via a background timer. Final flush on chat:final guarantees
+    no tokens are lost. Lifetime is one listener connection — instantiated in
+    ``_listen`` and discarded when the WebSocket disconnects.
+
+    Reason for "lazy": pauses >50ms mid-turn aren't observed in practice for
+    smooth providers (Sonnet). If Personal-org dogfood logs show frequent
+    age-exceeded flushes, promote to a background flusher task. See item 71
+    decision record.
+    """
+
+    def __init__(self) -> None:
+        self._state: dict[str, dict[str, Any]] = {}
+
+    def push(self, session_key: str, delta: str, *, now: float) -> str | None:
+        """Append a delta to the session's buffer. Return flushed text if a
+        threshold is crossed, else ``None`` (buffered).
+        """
+        if not delta:
+            return None
+        state = self._state.get(session_key)
+        if state is None:
+            self._state[session_key] = {
+                "buffer": delta,
+                "token_count": 1,
+                "first_token_at": now,
+            }
+            return None
+
+        # Lazy age-based flush: if the existing buffer is too old, flush it
+        # first and start a fresh buffer with the new delta.
+        if (now - state["first_token_at"]) >= _DELTA_FLUSH_AGE_SECONDS:
+            flushed = state["buffer"]
+            self._state[session_key] = {
+                "buffer": delta,
+                "token_count": 1,
+                "first_token_at": now,
+            }
+            logger.info(
+                "delta_buffer.flush_age_exceeded session=%s flushed_chars=%d",
+                session_key,
+                len(flushed),
+            )
+            return flushed
+
+        # Append. If we hit the token-count threshold, flush.
+        state["buffer"] += delta
+        state["token_count"] += 1
+        if state["token_count"] >= _DELTA_FLUSH_TOKEN_THRESHOLD:
+            flushed = state["buffer"]
+            del self._state[session_key]
+            return flushed
+        return None
+
+    def flush(self, session_key: str) -> str | None:
+        """Force-flush whatever is buffered for this session (called on chat:final).
+
+        Returns the buffered text or ``None`` if nothing pending.
+        """
+        state = self._state.pop(session_key, None)
+        if state is None:
+            return None
+        buf = state["buffer"]
+        return buf if buf else None
+
+    def drop(self, session_key: str) -> None:
+        """Discard buffered state for this session without emitting (used on
+        disconnect or chat:error if we want to avoid a partial flush).
+        """
+        self._state.pop(session_key, None)
+
+    def pending(self, session_key: str) -> str:
+        """Test/inspection helper: peek at currently-buffered text."""
+        state = self._state.get(session_key)
+        return state["buffer"] if state else ""
+
+
 def _coerce_preview_text(value: Any) -> str:
     """Safely coerce a gateway event payload value into a preview string.
 
@@ -129,13 +214,21 @@ def _coerce_preview_text(value: Any) -> str:
     return ""
 
 
-def _normalise_event(event_name: str, payload: dict[str, Any]) -> LiveActivityEvent | None:
+def _normalise_event(
+    event_name: str,
+    payload: dict[str, Any],
+    *,
+    streaming_enabled: bool = False,
+) -> LiveActivityEvent | None:
     """Map a raw gateway event into a LiveActivityEvent.
 
     Real gateway schema (from upstream ``server-chat.ts``):
 
     - ``chat`` with ``state="delta"`` — streaming token chunk, many per turn.
-      Skip (returns None) — would flood the activity panel with duplicates.
+      Default: skip (returns None). When ``streaming_enabled`` is True (per-org
+      ``chat_token_streaming`` flag), emit ``agent.token_delta`` with the
+      partial text in ``metadata.delta`` — caller is responsible for debouncing
+      via ``DeltaBuffer`` before broadcasting.
     - ``chat`` with ``state="final"`` — turn completion. ``message`` is present
       unless it was a silent reply. THIS is the real "agent responded" signal.
     - ``chat`` with ``state="error"`` — turn error. ``errorMessage`` present.
@@ -154,7 +247,17 @@ def _normalise_event(event_name: str, payload: dict[str, Any]) -> LiveActivityEv
         state = payload.get("state", "")
 
         if state == "delta":
-            return None  # Streaming chunks — skip.
+            if not streaming_enabled:
+                return None  # Default: skip token chunks.
+            text = _coerce_preview_text(payload.get("message"))
+            if not text:
+                return None  # Empty/unparseable delta — nothing to emit.
+            return LiveActivityEvent(
+                event_type="agent.token_delta",
+                channel=str(session),
+                message="",
+                metadata={"delta": text, "runId": payload.get("runId")},
+            )
 
         if state == "final":
             msg = payload.get("message")
@@ -551,6 +654,40 @@ async def _maybe_autotitle_session(
         logger.info("session_titler.autotitle_failed key=%s", session_key, exc_info=True)
 
 
+async def _read_chat_token_streaming_flag(organization_id: str) -> bool:
+    """Read the per-org ``chat_token_streaming`` flag once at connect time.
+
+    Reads at connection start only — flipping the flag requires a backend
+    bounce to take effect on this listener. Acceptable for MVP-behind-flag.
+    Promote to a TTL cache if real flag-flip latency turns out to matter.
+    """
+    if not organization_id:
+        return False
+    try:
+        from sqlmodel import select as sql_select
+
+        from app.db.session import async_session_maker
+        from app.models.organization_settings import OrganizationSettings
+
+        async with async_session_maker() as db:
+            result = await db.execute(
+                sql_select(OrganizationSettings).where(
+                    OrganizationSettings.organization_id == organization_id
+                )
+            )
+            settings = result.scalars().first()
+            if settings is None:
+                return False
+            return bool(settings.feature_flags.get("chat_token_streaming", False))
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "gateway_event_listener.flag_read_failed org=%s error=%s",
+            organization_id[:8],
+            exc,
+        )
+        return False
+
+
 async def _listen(
     config: GatewayConfig,
     *,
@@ -602,6 +739,16 @@ async def _listen(
 
         label = f"org={organization_id[:8] or 'default'}"
         logger.info("gateway_event_listener.connected %s", label)
+
+        # Read chat_token_streaming flag once at connect time (D1: read-once,
+        # bounce to flip). Buffer lifetime = this connection.
+        streaming_enabled = await _read_chat_token_streaming_flag(organization_id)
+        delta_buffer = DeltaBuffer()
+        if streaming_enabled:
+            logger.info(
+                "gateway_event_listener.streaming_enabled %s — token deltas will pass through DeltaBuffer",
+                label,
+            )
 
         try:
             from app.core.prometheus import gateway_listener_connected
@@ -666,6 +813,56 @@ async def _listen(
                 ):
                     broadcast.publish(_tag(activity))
                 continue
+
+            # Streaming integration: token deltas go through DeltaBuffer for
+            # debounce; chat:final/error force-flushes any pending buffer for
+            # this session before the responded/error event is emitted.
+            if streaming_enabled and event_name == "chat":
+                state = payload.get("state", "")
+                session_key_for_buffer = payload.get("sessionKey") or ""
+                if state == "delta" and session_key_for_buffer:
+                    normalized = _normalise_event(
+                        event_name, payload, streaming_enabled=True
+                    )
+                    if normalized is not None:
+                        delta_text = normalized.metadata.get("delta", "")
+                        flushed = delta_buffer.push(
+                            session_key_for_buffer,
+                            delta_text,
+                            now=_time.monotonic(),
+                        )
+                        if flushed:
+                            broadcast.publish(
+                                _tag(
+                                    LiveActivityEvent(
+                                        event_type="agent.token_delta",
+                                        channel=session_key_for_buffer,
+                                        message="",
+                                        metadata={
+                                            "delta": flushed,
+                                            "runId": payload.get("runId"),
+                                        },
+                                    )
+                                )
+                            )
+                    continue
+                if state in ("final", "error") and session_key_for_buffer:
+                    flushed_tail = delta_buffer.flush(session_key_for_buffer)
+                    if flushed_tail:
+                        broadcast.publish(
+                            _tag(
+                                LiveActivityEvent(
+                                    event_type="agent.token_delta",
+                                    channel=session_key_for_buffer,
+                                    message="",
+                                    metadata={
+                                        "delta": flushed_tail,
+                                        "runId": payload.get("runId"),
+                                        "final": True,
+                                    },
+                                )
+                            )
+                        )
 
             normalized = _normalise_event(event_name, payload)
             if normalized:

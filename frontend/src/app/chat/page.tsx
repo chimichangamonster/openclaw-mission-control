@@ -260,6 +260,10 @@ export default function ChatPage() {
   const manualPanelOverride = useRef(false);
   const MAX_ACTIVITY_EVENTS = 15;
 
+  // Token streaming (item 71 MVP — gated by per-org chat_token_streaming flag).
+  // Accumulated tokens for the in-flight turn. Cleared when the agent responds.
+  const [streamingDraft, setStreamingDraft] = useState("");
+
   // Refs
   const messagesRef = useRef<ChatMessage[]>([]);
   useEffect(() => { messagesRef.current = messages; }, [messages]);
@@ -427,6 +431,19 @@ export default function ChatPage() {
 
           if (!shouldAcceptActivityEvent(data, sessionKeyRef.current)) return;
 
+          // Token deltas (item 71 MVP) — accumulate into streaming draft,
+          // skip the activity-event buffer so they don't flood the 15-event ring.
+          if (eventType === "agent.token_delta") {
+            const delta = (data.metadata as { delta?: unknown })?.delta;
+            if (typeof delta === "string" && delta.length > 0) {
+              setStreamingDraft((prev) => prev + delta);
+              if (!manualPanelOverride.current) {
+                setActivityPanelOpen(true);
+              }
+            }
+            return;
+          }
+
           // Accumulate for activity panel
           setActivityEvents((prev) => {
             const next = [...prev, data];
@@ -459,6 +476,7 @@ export default function ChatPage() {
             eventType.includes("completed")
           ) {
             setAgentTyping(false);
+            setStreamingDraft("");
             if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
             // Auto-collapse activity panel
             if (!manualPanelOverride.current) {
@@ -1108,13 +1126,14 @@ export default function ChatPage() {
         </div>
 
         {/* ─── Activity panel ────────────────────────────────────────── */}
-        {(activityEvents.length > 0 || agentTyping) && (
+        {(activityEvents.length > 0 || agentTyping || streamingDraft.length > 0) && (
           <ChatActivityPanel
             events={activityEvents}
             isOpen={activityPanelOpen}
             onToggle={toggleActivityPanel}
             onAbort={abortChat}
             agentTyping={agentTyping}
+            streamingDraft={streamingDraft}
           />
         )}
         </ChatErrorBoundary>
