@@ -54,6 +54,7 @@ const TRIAGE_CATEGORIES = [
 
 import { useAuth } from "@/auth/clerk";
 import { DashboardPageLayout } from "@/components/templates/DashboardPageLayout";
+import { useNotifications } from "@/components/providers/NotificationProvider";
 import { Button } from "@/components/ui/button";
 import {
   type EmailAttachment,
@@ -68,6 +69,7 @@ import {
 } from "@/lib/email-api";
 export default function EmailMessagePage() {
   const { isSignedIn } = useAuth();
+  const { refreshUnreadEmailCount } = useNotifications();
   const params = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -93,6 +95,7 @@ export default function EmailMessagePage() {
       setMessage(msg);
       if (!msg.is_read) {
         await updateEmailMessage(accountId, messageId, { is_read: true });
+        refreshUnreadEmailCount();
       }
       if (msg.has_attachments) {
         try {
@@ -108,7 +111,7 @@ export default function EmailMessagePage() {
     } finally {
       setLoading(false);
     }
-  }, [accountId, messageId]);
+  }, [accountId, messageId, refreshUnreadEmailCount]);
 
   useEffect(() => {
     if (isSignedIn) loadMessage();

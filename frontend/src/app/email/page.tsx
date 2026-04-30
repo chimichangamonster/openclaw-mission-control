@@ -21,6 +21,7 @@ import {
 import { useAuth } from "@/auth/clerk";
 import { DashboardPageLayout } from "@/components/templates/DashboardPageLayout";
 import { FeatureGate } from "@/components/molecules/FeatureGate";
+import { useNotifications } from "@/components/providers/NotificationProvider";
 import { Button } from "@/components/ui/button";
 import {
   type EmailAccount,
@@ -102,6 +103,7 @@ function inferPriority(msg: EmailMessage): string | null {
 
 export default function EmailPage() {
   const { isSignedIn } = useAuth();
+  const { refreshUnreadEmailCount } = useNotifications();
   const [accounts, setAccounts] = useState<EmailAccount[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(
     null,
@@ -157,6 +159,9 @@ export default function EmailPage() {
   const handleArchive = async (msg: EmailMessage) => {
     await archiveEmail(msg.email_account_id, msg.id);
     setMessages((prev) => prev.filter((m) => m.id !== msg.id));
+    // Archive moves the message out of inbox; if it was unread, the badge
+    // count drops by one. Refresh so the sidebar updates immediately.
+    if (!msg.is_read) refreshUnreadEmailCount();
   };
 
   const handleMarkRead = async (msg: EmailMessage) => {
@@ -164,6 +169,7 @@ export default function EmailPage() {
       is_read: !msg.is_read,
     });
     setMessages((prev) => prev.map((m) => (m.id === updated.id ? updated : m)));
+    refreshUnreadEmailCount();
   };
 
   const handleRecategorize = async (msg: EmailMessage, newCategory: string) => {
