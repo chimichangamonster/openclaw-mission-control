@@ -23,6 +23,8 @@ export interface UserRead {
   name?: string | null;
   /** Internal notes for operators. */
   notes?: string | null;
+  /** Platform-level role for cross-org administration. 'owner' = full access. 'operator' = infra-only. None = regular user. */
+  platform_role?: string | null;
   /** Preferred short name used in UI. */
   preferred_name?: string | null;
   /** Preferred pronouns. */

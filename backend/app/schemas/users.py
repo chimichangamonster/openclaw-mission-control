@@ -80,3 +80,12 @@ class UserRead(UserBase):
         description="Whether this user has tenant-wide super-admin privileges.",
         examples=[False],
     )
+    platform_role: str | None = Field(
+        default=None,
+        description=(
+            "Platform-level role for cross-org administration. "
+            "'owner' = full access (Henz). 'operator' = infra-only. "
+            "None = regular user."
+        ),
+        examples=["owner"],
+    )

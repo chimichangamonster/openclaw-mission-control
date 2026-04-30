@@ -6,17 +6,11 @@ import { useState } from "react";
 import { SignOutButton, useUser } from "@/auth/clerk";
 import { clearLocalAuthToken, isLocalAuthMode } from "@/auth/localAuth";
 import {
-  Activity,
-  Bot,
-  Boxes,
   ChevronDown,
-  LayoutDashboard,
   LogOut,
-  Plus,
-  Server,
   Settings,
-  Store,
-  Trello,
+  Sparkles,
+  UserCircle,
 } from "lucide-react";
 
 import {
@@ -24,6 +18,9 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { useAuth } from "@/auth/clerk";
+import { useOrganizationMembership } from "@/lib/use-organization-membership";
+import { usePlatformRole } from "@/lib/use-platform-role";
 import { cn } from "@/lib/utils";
 
 type UserMenuProps = {
@@ -39,6 +36,9 @@ export function UserMenu({
 }: UserMenuProps) {
   const [open, setOpen] = useState(false);
   const { user } = useUser();
+  const { isSignedIn } = useAuth();
+  const { isAdmin } = useOrganizationMembership(isSignedIn);
+  const { isPlatformOwner } = usePlatformRole(isSignedIn);
   const localMode = isLocalAuthMode();
   if (!user && !localMode) return null;
 
@@ -130,52 +130,36 @@ export function UserMenu({
           </div>
         </div>
         <div className="p-2">
-          <div className="grid grid-cols-2 gap-2">
-            <Link
-              href="/boards"
-              className="flex w-full items-center justify-center gap-2 rounded-xl border border-[color:var(--neutral-300,var(--border-strong))] bg-[color:var(--surface)] px-3 py-2 text-sm font-semibold text-[color:var(--neutral-800,var(--text))] transition hover:border-[color:var(--primary-navy,var(--accent-strong))] hover:bg-[color:var(--neutral-100,var(--surface-muted))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent-teal,var(--accent))] focus-visible:ring-offset-2"
-              onClick={() => setOpen(false)}
-            >
-              <Trello className="h-4 w-4 text-[color:var(--neutral-700,var(--text-quiet))]" />
-              Open boards
-            </Link>
-            <Link
-              href="/boards/new"
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-[color:var(--primary-navy,var(--accent))] px-3 py-2 text-sm font-semibold text-white shadow-[0_2px_8px_rgba(10,22,40,0.15)] transition hover:bg-[color:var(--secondary-navy,var(--accent-strong))] hover:translate-y-[-1px] hover:shadow-[0_4px_12px_rgba(10,22,40,0.20)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent-teal,var(--accent))] focus-visible:ring-offset-2"
-              onClick={() => setOpen(false)}
-            >
-              <Plus className="h-4 w-4 opacity-90" />
-              Create board
-            </Link>
-          </div>
+          <Link
+            href="/settings"
+            className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-[color:var(--neutral-800,var(--text))] transition hover:bg-[color:var(--neutral-100,var(--surface-muted))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent-teal,var(--accent))] focus-visible:ring-offset-2"
+            onClick={() => setOpen(false)}
+          >
+            <UserCircle className="h-4 w-4 text-[color:var(--neutral-700,var(--text-quiet))]" />
+            Account settings
+          </Link>
 
-          <div className="my-2 h-px bg-[color:var(--neutral-200,var(--border))]" />
-
-          {(
-            [
-              { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-              { href: "/activity", label: "Activity", icon: Activity },
-              { href: "/agents", label: "Agents", icon: Bot },
-              { href: "/gateways", label: "Gateways", icon: Server },
-              {
-                href: "/skills/marketplace",
-                label: "Skills marketplace",
-                icon: Store,
-              },
-              { href: "/skills/packs", label: "Skill packs", icon: Boxes },
-              { href: "/settings", label: "Settings", icon: Settings },
-            ] as const
-          ).map((item) => (
+          {isAdmin ? (
             <Link
-              key={item.href}
-              href={item.href}
+              href="/admin"
               className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-[color:var(--neutral-800,var(--text))] transition hover:bg-[color:var(--neutral-100,var(--surface-muted))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent-teal,var(--accent))] focus-visible:ring-offset-2"
               onClick={() => setOpen(false)}
             >
-              <item.icon className="h-4 w-4 text-[color:var(--neutral-700,var(--text-quiet))]" />
-              {item.label}
+              <Settings className="h-4 w-4 text-[color:var(--neutral-700,var(--text-quiet))]" />
+              Admin
             </Link>
-          ))}
+          ) : null}
+
+          {isPlatformOwner ? (
+            <Link
+              href="/platform"
+              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-[color:var(--neutral-800,var(--text))] transition hover:bg-[color:var(--neutral-100,var(--surface-muted))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent-teal,var(--accent))] focus-visible:ring-offset-2"
+              onClick={() => setOpen(false)}
+            >
+              <Sparkles className="h-4 w-4 text-[color:var(--neutral-700,var(--text-quiet))]" />
+              Platform Owner
+            </Link>
+          ) : null}
 
           <div className="my-2 h-px bg-[color:var(--neutral-200,var(--border))]" />
 

@@ -6,8 +6,6 @@ import {
   Activity,
   BarChart3,
   Radio,
-  Bot,
-  Boxes,
   CheckCircle2,
   Eye,
   FileText,
@@ -23,13 +21,9 @@ import {
   Network,
   Sun,
   TrendingUp,
-  Settings,
   Shield,
-  Store,
-  Clock,
   Tags,
   Star,
-  Brain,
   BookOpen,
 } from "lucide-react";
 import { useTheme } from "next-themes";
@@ -37,7 +31,6 @@ import { useTheme } from "next-themes";
 import { useAuth } from "@/auth/clerk";
 import { customFetch } from "@/api/mutator";
 import { useFeatureFlags } from "@/lib/use-feature-flags";
-import { useOrganizationMembership } from "@/lib/use-organization-membership";
 import { useNotifications } from "@/components/providers/NotificationProvider";
 import { useQuery } from "@tanstack/react-query";
 import { OrgSwitcher } from "@/components/organisms/OrgSwitcher";
@@ -47,21 +40,23 @@ export function DashboardSidebar() {
   const pathname = usePathname();
   const { theme, setTheme } = useTheme();
   const { isSignedIn } = useAuth();
-  const { isAdmin } = useOrganizationMembership(isSignedIn);
   const { isFeatureEnabled } = useFeatureFlags(Boolean(isSignedIn));
   const { unreadReportsCount } = useNotifications();
-  const healthQuery = useQuery({
+  const healthQuery = useQuery<{ status?: string } | undefined>({
     queryKey: ["/api/v1/system/health"],
     queryFn: async () => {
-      const res: any = await customFetch("/api/v1/system/health", { method: "GET" });
-      return res?.data ?? res;
+      const res = (await customFetch("/api/v1/system/health", { method: "GET" })) as {
+        data?: { status?: string };
+        status?: string;
+      };
+      return (res?.data ?? res) as { status?: string } | undefined;
     },
     refetchInterval: 30_000,
     refetchOnMount: "always" as const,
     retry: false,
   });
 
-  const healthData = healthQuery.data as { status?: string } | undefined;
+  const healthData = healthQuery.data;
   const okValue = healthData?.status === "healthy"
     ? true
     : healthData?.status === "degraded" || healthData?.status === "down"
@@ -290,76 +285,6 @@ export function DashboardSidebar() {
                   </span>
                 ) : null}
               </Link>
-              {isFeatureEnabled("agent_memory") ? (
-              <Link
-                href="/memory/vector"
-                className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-[color:var(--text)] transition",
-                  pathname.startsWith("/memory/vector")
-                    ? "bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)] font-medium"
-                    : "hover:bg-[color:var(--surface-muted)]",
-                )}
-              >
-                <Brain className="h-4 w-4" />
-                Vector Memory
-              </Link>
-              ) : null}
-              {isFeatureEnabled("org_context") ? (
-              <Link
-                href="/org-context"
-                className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-[color:var(--text)] transition",
-                  pathname.startsWith("/org-context")
-                    ? "bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)] font-medium"
-                    : "hover:bg-[color:var(--surface-muted)]",
-                )}
-              >
-                <BookOpen className="h-4 w-4" />
-                Org Context
-              </Link>
-              ) : null}
-              {isFeatureEnabled("observability") ? (
-              <Link
-                href="/observability"
-                className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-[color:var(--text)] transition",
-                  pathname.startsWith("/observability")
-                    ? "bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)] font-medium"
-                    : "hover:bg-[color:var(--surface-muted)]",
-                )}
-              >
-                <Activity className="h-4 w-4" />
-                Observability
-              </Link>
-              ) : null}
-              {isFeatureEnabled("cron_jobs") ? (
-              <Link
-                href="/cron-jobs"
-                className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-[color:var(--text)] transition",
-                  pathname.startsWith("/cron-jobs")
-                    ? "bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)] font-medium"
-                    : "hover:bg-[color:var(--surface-muted)]",
-                )}
-              >
-                <Clock className="h-4 w-4" />
-                Scheduled Tasks
-              </Link>
-              ) : null}
-              {isFeatureEnabled("cost_tracker") ? (
-              <Link
-                href="/costs"
-                className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-[color:var(--text)] transition",
-                  pathname.startsWith("/costs")
-                    ? "bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)] font-medium"
-                    : "hover:bg-[color:var(--surface-muted)]",
-                )}
-              >
-                <Folder className="h-4 w-4" />
-                Cost & Usage
-              </Link>
-              ) : null}
               <Link
                 href="/audit"
                 className={cn(
@@ -371,18 +296,6 @@ export function DashboardSidebar() {
               >
                 <Shield className="h-4 w-4" />
                 Audit Log
-              </Link>
-              <Link
-                href="/org-settings"
-                className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-[color:var(--text)] transition",
-                  pathname.startsWith("/org-settings")
-                    ? "bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)] font-medium"
-                    : "hover:bg-[color:var(--surface-muted)]",
-                )}
-              >
-                <Building2 className="h-4 w-4" />
-                Org Settings
               </Link>
             </div>
           </div>
@@ -512,63 +425,12 @@ export function DashboardSidebar() {
                 Approvals
               </Link>
               ) : null}
-              {isAdmin ? (
-                <Link
-                  href="/custom-fields"
-                  className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2.5 text-[color:var(--text)] transition",
-                    pathname.startsWith("/custom-fields")
-                      ? "bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)] font-medium"
-                      : "hover:bg-[color:var(--surface-muted)]",
-                  )}
-                >
-                  <Settings className="h-4 w-4" />
-                  Custom fields
-                </Link>
-              ) : null}
             </div>
           </div>
 
           <div>
-            {isAdmin ? (
-              <>
-                <p className="px-3 text-[11px] font-semibold uppercase tracking-wider text-[color:var(--text-quiet)]">
-                  Skills
-                </p>
-                <div className="mt-1 space-y-1">
-                  <Link
-                    href="/skills/marketplace"
-                    className={cn(
-                      "flex items-center gap-3 rounded-lg px-3 py-2.5 text-[color:var(--text)] transition",
-                      pathname === "/skills" ||
-                        pathname.startsWith("/skills/marketplace")
-                        ? "bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)] font-medium"
-                        : "hover:bg-[color:var(--surface-muted)]",
-                    )}
-                  >
-                    <Store className="h-4 w-4" />
-                    Skill Library
-                  </Link>
-                  <Link
-                    href="/skills/packs"
-                    className={cn(
-                      "flex items-center gap-3 rounded-lg px-3 py-2.5 text-[color:var(--text)] transition",
-                      pathname.startsWith("/skills/packs")
-                        ? "bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)] font-medium"
-                        : "hover:bg-[color:var(--surface-muted)]",
-                    )}
-                  >
-                    <Boxes className="h-4 w-4" />
-                    Packs
-                  </Link>
-                </div>
-              </>
-            ) : null}
-          </div>
-
-          <div>
             <p className="px-3 text-[11px] font-semibold uppercase tracking-wider text-[color:var(--text-quiet)]">
-              Administration
+              Organization
             </p>
             <div className="mt-1 space-y-1">
               <Link
@@ -583,34 +445,6 @@ export function DashboardSidebar() {
                 <Building2 className="h-4 w-4" />
                 Organization
               </Link>
-              {isAdmin ? (
-                <Link
-                  href="/gateways"
-                  className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2.5 text-[color:var(--text)] transition",
-                    pathname.startsWith("/gateways")
-                      ? "bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)] font-medium"
-                      : "hover:bg-[color:var(--surface-muted)]",
-                  )}
-                >
-                  <Network className="h-4 w-4" />
-                  Gateways
-                </Link>
-              ) : null}
-              {isAdmin ? (
-                <Link
-                  href="/agents"
-                  className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2.5 text-[color:var(--text)] transition",
-                    pathname.startsWith("/agents")
-                      ? "bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)] font-medium"
-                      : "hover:bg-[color:var(--surface-muted)]",
-                  )}
-                >
-                  <Bot className="h-4 w-4" />
-                  Agents
-                </Link>
-              ) : null}
             </div>
           </div>
           <div className="mt-2">
