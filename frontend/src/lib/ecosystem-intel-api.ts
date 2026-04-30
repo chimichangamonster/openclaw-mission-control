@@ -42,6 +42,7 @@ export interface EcosystemRepo {
   first_seen_at: string;
   last_synced_at: string;
   growth_24h: number;
+  is_pinned: boolean;
 }
 
 export interface EcosystemStatus {

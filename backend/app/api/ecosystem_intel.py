@@ -103,6 +103,8 @@ async def list_ecosystem_repos(
         session, [r.id for r in repos], hours=24
     )
 
+    pinned_full_names = {f"{owner}/{name}" for owner, name in ecosystem_service.PINNED_REPOS}
+
     out: list[EcosystemRepoRead] = [
         EcosystemRepoRead(
             id=r.id,
@@ -122,6 +124,7 @@ async def list_ecosystem_repos(
             first_seen_at=r.first_seen_at,
             last_synced_at=r.last_synced_at,
             growth_24h=deltas.get(str(r.id), 0),
+            is_pinned=r.full_name in pinned_full_names,
         )
         for r in repos
     ]

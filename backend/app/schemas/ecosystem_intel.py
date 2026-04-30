@@ -28,6 +28,7 @@ class EcosystemRepoRead(SQLModel):
     first_seen_at: datetime
     last_synced_at: datetime
     growth_24h: int = 0
+    is_pinned: bool = False
 
 
 class EcosystemRefreshResult(SQLModel):
