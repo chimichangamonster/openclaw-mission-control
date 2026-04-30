@@ -585,7 +585,10 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
     retention_task = asyncio.create_task(_data_retention_loop())
 
-    # Background task: refresh ecosystem-intel feed every 24 hours.
+    # Background task: refresh ecosystem-intel feed every 7 days.
+    # Cadence chosen because the page is checked manually before scoping
+    # decisions, not browsed daily — weekly pull keeps the data fresh enough
+    # for trend-watching without burning GitHub API quota or noise.
     # Skipped at app boot if no GITHUB_API_TOKEN is configured (the service
     # also short-circuits with an explicit error in that case).
     async def _ecosystem_intel_loop() -> None:
@@ -593,12 +596,14 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         from app.db.session import async_session_maker
         from app.services.ecosystem_intel import refresh_ecosystem
 
+        ecosystem_refresh_interval_seconds = 604800  # 7 days
+
         # 15 min initial delay to let the rest of the app warm up.
         await asyncio.sleep(900)
         while True:
             if not cfg.github_api_token:
-                # No-op until the token is configured. Re-check every 24h.
-                await asyncio.sleep(86400)
+                # No-op until the token is configured. Re-check on schedule.
+                await asyncio.sleep(ecosystem_refresh_interval_seconds)
                 continue
             try:
                 async with async_session_maker() as bg_session:
@@ -611,7 +616,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
                 )
             except Exception:  # noqa: BLE001
                 logger.exception("ecosystem_intel.refresh_failed")
-            await asyncio.sleep(86400)
+            await asyncio.sleep(ecosystem_refresh_interval_seconds)
 
     ecosystem_task = asyncio.create_task(_ecosystem_intel_loop())
 

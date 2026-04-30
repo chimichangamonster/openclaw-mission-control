@@ -177,7 +177,7 @@ export default function EcosystemIntelPage() {
           signUpForceRedirectUrl: "/ecosystem-intel",
         }}
         title="Ecosystem Intel"
-        description="Trending repos in the Claude Code / agent ecosystem. Refreshes every 24h."
+        description="Trending repos in the Claude Code / agent ecosystem. Refreshes weekly; admin can refresh on demand."
       >
         <div className="space-y-4">
           {/* Header strip */}
@@ -438,7 +438,7 @@ export default function EcosystemIntelPage() {
           </div>
 
           <p className="text-xs text-[color:var(--text-muted)]">
-            Data from GitHub Search API. Refresh runs automatically every 24 hours; admin can
+            Data from GitHub Search API. Refresh runs automatically once a week; admin can
             trigger manual refresh.
           </p>
         </div>
