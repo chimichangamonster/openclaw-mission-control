@@ -44,48 +44,67 @@ GITHUB_SEARCH_URL = "https://api.github.com/search/repositories"
 # Per-category search queries. `q` is GitHub Search syntax; `sort` is `stars`
 # or `updated`; `order` is desc. `category` is the label we attach to results.
 #
-# Topic strings include MCP because the gateway speaks that protocol — tracking
+# **GitHub Search quirk discovered 2026-04-30:** Combining `topic:` qualifiers
+# with `OR`-grouped parentheses returns 0 results — `(topic:a OR topic:b)
+# stars:>500` is silently empty even when each topic individually has thousands
+# of matches. Workaround: one query per topic. Total query count stays well
+# under the 5000 req/hr authenticated rate limit.
+#
+# Topic list includes MCP because the gateway speaks that protocol — tracking
 # MCP server repos surfaces ecosystem integrations worth watching.
 SEARCH_QUERIES: list[dict[str, str]] = [
+    # AI/ML — core foundational topics
+    {"category": "ai_ml", "q": "topic:ai stars:>500", "sort": "stars"},
+    {"category": "ai_ml", "q": "topic:llm stars:>500", "sort": "stars"},
+    {"category": "ai_ml", "q": "topic:agent stars:>500", "sort": "stars"},
+    {"category": "ai_ml", "q": "topic:ai-agents stars:>200", "sort": "stars"},
+    # AI/ML — Claude / Anthropic / MCP ecosystem
+    {"category": "ai_ml", "q": "topic:claude stars:>100", "sort": "stars"},
+    {"category": "ai_ml", "q": "topic:claude-code stars:>50", "sort": "stars"},
+    {"category": "ai_ml", "q": "topic:anthropic stars:>50", "sort": "stars"},
+    {"category": "ai_ml", "q": "topic:mcp stars:>100", "sort": "stars"},
+    # AI/ML trending — recent-push date filter swapped at runtime
     {
-        "category": "ai_ml",
-        "q": (
-            "(topic:ai OR topic:llm OR topic:agent OR topic:ai-agents OR "
-            "topic:llm-agent OR topic:claude OR topic:claude-code OR "
-            "topic:anthropic OR topic:mcp OR topic:model-context-protocol) "
-            "stars:>100"
-        ),
+        "category": "ai_ml_trending",
+        "q": "topic:ai pushed:>2026-04-23 stars:>200",
         "sort": "stars",
     },
     {
         "category": "ai_ml_trending",
-        "q": (
-            "(topic:ai OR topic:llm OR topic:agent OR topic:ai-agents OR "
-            "topic:claude-code OR topic:mcp) "
-            "pushed:>2026-04-23 stars:>50"
-        ),
+        "q": "topic:llm pushed:>2026-04-23 stars:>100",
         "sort": "stars",
     },
     {
-        "category": "swe",
-        "q": "(topic:developer-tools OR topic:cli OR topic:productivity) stars:>500",
+        "category": "ai_ml_trending",
+        "q": "topic:claude-code pushed:>2026-04-23 stars:>20",
+        "sort": "stars",
+    },
+    # SWE — developer tooling
+    {"category": "swe", "q": "topic:developer-tools stars:>500", "sort": "stars"},
+    {"category": "swe", "q": "topic:cli stars:>500", "sort": "stars"},
+    {"category": "swe", "q": "topic:productivity stars:>500", "sort": "stars"},
+    # SWE trending
+    {
+        "category": "swe_trending",
+        "q": "topic:developer-tools pushed:>2026-04-23 stars:>100",
         "sort": "stars",
     },
     {
         "category": "swe_trending",
-        "q": (
-            "(topic:developer-tools OR topic:cli OR topic:productivity) "
-            "pushed:>2026-04-23 stars:>100"
-        ),
+        "q": "topic:cli pushed:>2026-04-23 stars:>100",
         "sort": "stars",
     },
+    # Skills ecosystem (Claude Code skill repos specifically)
+    {"category": "skills_ecosystem", "q": "topic:claude-skills stars:>5", "sort": "stars"},
     {
         "category": "skills_ecosystem",
-        "q": (
-            "(topic:claude-skills OR topic:claude-code-skills OR "
-            "topic:agent-skills OR topic:claude-code-agents OR "
-            "topic:claude-agents) stars:>10"
-        ),
+        "q": "topic:claude-code-skills stars:>5",
+        "sort": "stars",
+    },
+    {"category": "skills_ecosystem", "q": "topic:agent-skills stars:>5", "sort": "stars"},
+    {
+        "category": "skills_ecosystem",
+        "q": "topic:claude-agents stars:>5",
         "sort": "stars",
     },
 ]
