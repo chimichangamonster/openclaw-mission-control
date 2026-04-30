@@ -35,6 +35,7 @@ DEFAULT_FEATURE_FLAGS = {
     "personal_bookkeeping": False,
     "org_context": False,
     "chat_token_streaming": False,
+    "ecosystem_intel": False,
 }
 
 

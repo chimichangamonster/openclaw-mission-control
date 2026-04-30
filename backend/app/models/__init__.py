@@ -26,6 +26,7 @@ from app.models.budget import BudgetConfig, DailyAgentSpend
 from app.models.chat_projects import ChatProject
 from app.models.crypto_positions import CryptoPosition
 from app.models.crypto_trade_proposals import CryptoTradeProposal
+from app.models.ecosystem_repos import EcosystemRepo, EcosystemSnapshot
 from app.models.email_accounts import EmailAccount
 from app.models.email_attachments import EmailAttachment
 from app.models.email_messages import EmailMessage
@@ -89,6 +90,8 @@ __all__ = [
     "DailyAgentSpend",
     "CryptoPosition",
     "CryptoTradeProposal",
+    "EcosystemRepo",
+    "EcosystemSnapshot",
     "EmailAccount",
     "ExchangeAccount",
     "EmailAttachment",

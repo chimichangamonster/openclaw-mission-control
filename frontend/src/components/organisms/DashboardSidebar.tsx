@@ -25,6 +25,7 @@ import {
   Moon,
   Network,
   Settings,
+  Sparkles,
   Store,
   Sun,
   TrendingUp,
@@ -377,6 +378,20 @@ export function DashboardSidebar() {
                 >
                   <Folder className="h-4 w-4" />
                   Cost & Usage
+                </Link>
+              ) : null}
+              {showAdminItems && isFeatureEnabled("ecosystem_intel") ? (
+                <Link
+                  href="/ecosystem-intel"
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2.5 text-[color:var(--text)] transition",
+                    pathname.startsWith("/ecosystem-intel")
+                      ? "bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)] font-medium"
+                      : "hover:bg-[color:var(--surface-muted)]",
+                  )}
+                >
+                  <Sparkles className="h-4 w-4" />
+                  Ecosystem Intel
                 </Link>
               ) : null}
               {showAdminItems ? (

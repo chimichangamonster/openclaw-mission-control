@@ -36,6 +36,7 @@ from app.api.cron_jobs import router as cron_jobs_router
 from app.api.crypto_trading import router as crypto_trading_router
 from app.api.document_gen import router as document_gen_router
 from app.api.document_intake import router as document_intake_router
+from app.api.ecosystem_intel import router as ecosystem_intel_router
 from app.api.email import inline_router as email_inline_router
 from app.api.email import router as email_router
 from app.api.email_oauth import router as email_oauth_router
@@ -584,6 +585,36 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
     retention_task = asyncio.create_task(_data_retention_loop())
 
+    # Background task: refresh ecosystem-intel feed every 24 hours.
+    # Skipped at app boot if no GITHUB_API_TOKEN is configured (the service
+    # also short-circuits with an explicit error in that case).
+    async def _ecosystem_intel_loop() -> None:
+        from app.core.config import settings as cfg
+        from app.db.session import async_session_maker
+        from app.services.ecosystem_intel import refresh_ecosystem
+
+        # 15 min initial delay to let the rest of the app warm up.
+        await asyncio.sleep(900)
+        while True:
+            if not cfg.github_api_token:
+                # No-op until the token is configured. Re-check every 24h.
+                await asyncio.sleep(86400)
+                continue
+            try:
+                async with async_session_maker() as bg_session:
+                    result = await refresh_ecosystem(bg_session)
+                logger.info(
+                    "ecosystem_intel.scheduled_refresh fetched=%d upserted=%d error=%s",
+                    result.fetched,
+                    result.upserted,
+                    result.error,
+                )
+            except Exception:  # noqa: BLE001
+                logger.exception("ecosystem_intel.refresh_failed")
+            await asyncio.sleep(86400)
+
+    ecosystem_task = asyncio.create_task(_ecosystem_intel_loop())
+
     logger.info("app.lifecycle.started")
     try:
         yield
@@ -593,6 +624,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         watchdog_task.cancel()
         email_sync_task.cancel()
         retention_task.cancel()
+        ecosystem_task.cancel()
         for lt in listener_tasks:
             if not lt.done():
                 lt.cancel()
@@ -1017,6 +1049,7 @@ api_v1.include_router(cost_tracker_router)
 api_v1.include_router(org_settings_router)
 api_v1.include_router(cron_jobs_router)
 api_v1.include_router(chat_projects_router)
+api_v1.include_router(ecosystem_intel_router)
 api_v1.include_router(model_registry_router)
 api_v1.include_router(board_memory_router)
 api_v1.include_router(board_webhooks_router)

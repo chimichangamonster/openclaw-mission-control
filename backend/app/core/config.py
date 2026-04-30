@@ -151,6 +151,9 @@ class Settings(BaseSettings):
     openrouter_api_key: str = ""
     openrouter_management_key: str = ""
 
+    # GitHub (for ecosystem-intel page — public_repo read scope)
+    github_api_token: str = ""
+
     # OpenClaw gateway runtime compatibility
     gateway_min_version: str = "2026.02.9"
 
