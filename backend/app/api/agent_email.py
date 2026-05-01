@@ -390,6 +390,10 @@ async def agent_archive_email(
         from app.services.email.providers.microsoft import move_message as msft_move_message
 
         await msft_move_message(access_token, msg.provider_message_id, target_folder="archive")
+    elif account.provider == "google":
+        from app.services.email.providers.google import move_message as google_move_message
+
+        await google_move_message(access_token, msg.provider_message_id, target_folder="archive")
 
     msg.folder = "archive"
     msg.updated_at = utcnow()

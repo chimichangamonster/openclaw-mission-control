@@ -113,10 +113,11 @@ class Settings(BaseSettings):
     # Microsoft Graph OAuth (reuses client ID/secret, separate redirect URI)
     microsoft_graph_redirect_uri: str = ""
 
-    # Google Calendar OAuth
+    # Google OAuth (shared client for Calendar + Gmail; separate redirect URIs)
     google_oauth_client_id: str = ""
     google_oauth_client_secret: str = ""
-    google_oauth_redirect_uri: str = ""
+    google_oauth_redirect_uri: str = ""  # Calendar callback
+    google_email_redirect_uri: str = ""  # Gmail callback (falls back to google_oauth_redirect_uri)
 
     # Encryption (Fernet key — shared across email, polymarket, etc.)
     encryption_key: str = ""

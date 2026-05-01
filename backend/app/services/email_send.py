@@ -100,5 +100,22 @@ async def send_email(
             content_type=content_type,
             attachments=attachments,
         )
+    elif account.provider == "google":
+        from app.services.email.providers.google import send_message as google_send_message
+
+        sender = (
+            f"{account.display_name} <{account.email_address}>"
+            if account.display_name
+            else account.email_address
+        )
+        return await google_send_message(
+            access_token,
+            sender=sender,
+            to=to,
+            subject=subject,
+            body=body,
+            body_html=body_html,
+            attachments=attachments,
+        )
     else:
         raise ValueError(f"Unsupported email provider: {account.provider}")

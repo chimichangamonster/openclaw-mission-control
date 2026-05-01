@@ -58,6 +58,12 @@ async def _save_message(
         updated_at=now,
     )
     session.add(msg)
+    if raw.attachments:
+        # Flush so the message row exists before attachment FKs are checked.
+        # Gmail's parser produces inline attachments (HTML signature logos etc.);
+        # without this flush, autoflush during the next message's dedup query
+        # tries to insert attachments before their parent and the FK fails.
+        await session.flush()
 
     for att in raw.attachments:
         session.add(
@@ -158,6 +164,16 @@ async def _fetch_from_provider(
         )
         if next_delta:
             account.sync_cursor = next_delta
+        return messages
+    elif account.provider == "google":
+        from app.services.email.providers.google import fetch_messages as google_fetch_messages
+
+        messages, next_cursor = await google_fetch_messages(
+            access_token,
+            history_cursor=account.sync_cursor,
+        )
+        if next_cursor:
+            account.sync_cursor = next_cursor
         return messages
     else:
         raise ValueError(f"Unknown provider: {account.provider}")

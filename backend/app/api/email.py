@@ -297,11 +297,16 @@ async def get_email_message(
         inline_atts = list(att_result.scalars().all())
 
         # Lazy-fetch attachments from provider if none with content_id exist yet
-        if not inline_atts and msg.has_attachments and account.provider == "microsoft":
+        if not inline_atts and msg.has_attachments and account.provider in ("microsoft", "google"):
             try:
                 from uuid import uuid4 as _uuid4
 
-                from app.services.email.providers.microsoft import fetch_attachments
+                if account.provider == "microsoft":
+                    from app.services.email.providers.microsoft import fetch_attachments
+                else:
+                    from app.services.email.providers.google import (  # type: ignore[no-redef]
+                        fetch_attachments,
+                    )
 
                 access_token = await get_valid_access_token(session, account)
                 att_list = await fetch_attachments(access_token, msg.provider_message_id)
@@ -441,6 +446,23 @@ async def reply_to_email(
             body=payload.body_text,
             reply_to_message_id=msg.provider_message_id,
         )
+    elif account.provider == "google":
+        from app.services.email.providers.google import send_message as google_send_message
+
+        sender = (
+            f"{account.display_name} <{account.email_address}>"
+            if account.display_name
+            else account.email_address
+        )
+        await google_send_message(
+            access_token,
+            sender=sender,
+            to=msg.sender_email,
+            subject=f"Re: {msg.subject or ''}",
+            body=payload.body_text,
+            in_reply_to_message_id=msg.provider_message_id,
+            thread_id=msg.thread_id,
+        )
     return {"ok": True}
 
 
@@ -479,6 +501,21 @@ async def forward_email(
 
         await msft_send_message(
             access_token,
+            to=payload.to,
+            subject=f"Fwd: {msg.subject or ''}",
+            body=body,
+        )
+    elif account.provider == "google":
+        from app.services.email.providers.google import send_message as google_send_message
+
+        sender = (
+            f"{account.display_name} <{account.email_address}>"
+            if account.display_name
+            else account.email_address
+        )
+        await google_send_message(
+            access_token,
+            sender=sender,
             to=payload.to,
             subject=f"Fwd: {msg.subject or ''}",
             body=body,
@@ -539,6 +576,10 @@ async def archive_email(
         from app.services.email.providers.microsoft import move_message as msft_move_message
 
         await msft_move_message(access_token, msg.provider_message_id, target_folder="archive")
+    elif account.provider == "google":
+        from app.services.email.providers.google import move_message as google_move_message
+
+        await google_move_message(access_token, msg.provider_message_id, target_folder="archive")
 
     msg.folder = "archive"
     msg.updated_at = utcnow()
@@ -574,11 +615,16 @@ async def list_email_attachments(
     attachments = list(result.scalars().all())
 
     # Lazy-fetch from provider if DB is empty but message has attachments
-    if not attachments and msg.has_attachments and account.provider == "microsoft":
+    if not attachments and msg.has_attachments and account.provider in ("microsoft", "google"):
         try:
             from uuid import uuid4 as _uuid4
 
-            from app.services.email.providers.microsoft import fetch_attachments
+            if account.provider == "microsoft":
+                from app.services.email.providers.microsoft import fetch_attachments
+            else:
+                from app.services.email.providers.google import (  # type: ignore[no-redef]
+                    fetch_attachments,
+                )
 
             access_token = await get_valid_access_token(session, account)
             att_list = await fetch_attachments(access_token, msg.provider_message_id)
@@ -640,6 +686,16 @@ async def download_email_attachment(
         )
 
         content, filename, content_type = await msft_download_attachment(
+            access_token,
+            msg.provider_message_id,
+            att.provider_attachment_id or "",
+        )
+    elif account.provider == "google":
+        from app.services.email.providers.google import (
+            download_attachment as google_download_attachment,
+        )
+
+        content, filename, content_type = await google_download_attachment(
             access_token,
             msg.provider_message_id,
             att.provider_attachment_id or "",
@@ -722,6 +778,16 @@ async def get_inline_attachment(
         )
 
         content, filename, content_type = await msft_download_attachment(
+            access_token,
+            msg.provider_message_id,
+            att.provider_attachment_id or "",
+        )
+    elif account.provider == "google":
+        from app.services.email.providers.google import (
+            download_attachment as google_download_attachment,
+        )
+
+        content, filename, content_type = await google_download_attachment(
             access_token,
             msg.provider_message_id,
             att.provider_attachment_id or "",

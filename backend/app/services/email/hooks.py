@@ -91,6 +91,23 @@ async def _execute_email_reply(session: AsyncSession, payload: dict[str, Any]) -
             body=body_text,
             reply_to_message_id=msg.provider_message_id,
         )
+    elif account.provider == "google":
+        from app.services.email.providers.google import send_message as google_send_message
+
+        sender = (
+            f"{account.display_name} <{account.email_address}>"
+            if account.display_name
+            else account.email_address
+        )
+        await google_send_message(
+            access_token,
+            sender=sender,
+            to=msg.sender_email,
+            subject=f"Re: {msg.subject or ''}",
+            body=body_text,
+            in_reply_to_message_id=msg.provider_message_id,
+            thread_id=msg.thread_id,
+        )
 
     logger.info(
         "email.approval.sent",

@@ -15,7 +15,7 @@ export interface EmailAccount {
   id: string;
   organization_id: string;
   user_id: string;
-  provider: "zoho" | "microsoft";
+  provider: "zoho" | "microsoft" | "google";
   email_address: string;
   display_name: string | null;
   sync_enabled: boolean;
@@ -98,7 +98,7 @@ export async function triggerEmailSync(
 }
 
 export async function getOAuthUrl(
-  provider: "zoho" | "microsoft",
+  provider: "zoho" | "microsoft" | "google",
 ): Promise<{ authorization_url: string }> {
   const res = await customFetch<{
     data: { authorization_url: string; state: string };

@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 router = APIRouter(prefix="/email/oauth", tags=["email"])
 
-VALID_PROVIDERS = ("zoho", "microsoft")
+VALID_PROVIDERS = ("zoho", "microsoft", "google")
 _STATE_TTL_SECONDS = 300  # 5 minutes
 
 
@@ -40,7 +40,7 @@ def _redis_client() -> redis.Redis:
     description="Returns a redirect URL to the provider's OAuth2 consent screen.",
 )
 async def initiate_oauth(
-    provider: Literal["zoho", "microsoft"],
+    provider: Literal["zoho", "microsoft", "google"],
     ctx: OrganizationContext = ORG_MEMBER_DEP,
 ) -> dict[str, str]:
     """Generate and return the OAuth2 authorization URL."""
@@ -68,7 +68,7 @@ async def initiate_oauth(
     include_in_schema=False,
 )
 async def oauth_callback(
-    provider: Literal["zoho", "microsoft"],
+    provider: Literal["zoho", "microsoft", "google"],
     code: str = Query(...),
     state: str = Query(...),
     error: str | None = Query(default=None),

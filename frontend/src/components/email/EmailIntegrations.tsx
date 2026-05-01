@@ -55,7 +55,7 @@ export function EmailIntegrations() {
     loadAccounts();
   }, [loadAccounts]);
 
-  const handleConnect = async (provider: "zoho" | "microsoft") => {
+  const handleConnect = async (provider: "zoho" | "microsoft" | "google") => {
     try {
       setConnectingProvider(provider);
       const { authorization_url } = await getOAuthUrl(provider);
@@ -120,7 +120,13 @@ export function EmailIntegrations() {
   };
 
   const providerLabel = (p: string) =>
-    p === "zoho" ? "Zoho Mail" : p === "microsoft" ? "Microsoft Outlook" : p;
+    p === "zoho"
+      ? "Zoho Mail"
+      : p === "microsoft"
+        ? "Microsoft Outlook"
+        : p === "google"
+          ? "Google Workspace"
+          : p;
 
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -147,6 +153,16 @@ export function EmailIntegrations() {
           {connectingProvider === "microsoft"
             ? "Redirecting..."
             : "Connect Outlook"}
+        </Button>
+        <Button
+          variant="outline"
+          onClick={() => handleConnect("google")}
+          disabled={connectingProvider !== null}
+        >
+          <Mail className="h-4 w-4" />
+          {connectingProvider === "google"
+            ? "Redirecting..."
+            : "Connect Google Workspace"}
         </Button>
         <Button
           variant="outline"

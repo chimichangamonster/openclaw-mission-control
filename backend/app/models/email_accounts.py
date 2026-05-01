@@ -30,7 +30,7 @@ class EmailAccount(TenantScoped, table=True):
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     organization_id: UUID = Field(foreign_key="organizations.id", index=True)
     user_id: UUID = Field(foreign_key="users.id", index=True)
-    provider: str = Field(index=True)  # "zoho" or "microsoft"
+    provider: str = Field(index=True)  # "zoho", "microsoft", or "google"
     email_address: str = Field(index=True)
     display_name: str | None = None
     access_token_encrypted: str = ""
