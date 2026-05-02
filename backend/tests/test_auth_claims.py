@@ -17,6 +17,7 @@ class _FakeSession:
     added: list[Any] = field(default_factory=list)
     committed: int = 0
     refreshed: list[Any] = field(default_factory=list)
+    deleted: list[Any] = field(default_factory=list)
 
     def add(self, value: Any) -> None:
         self.added.append(value)
@@ -26,6 +27,9 @@ class _FakeSession:
 
     async def refresh(self, value: Any) -> None:
         self.refreshed.append(value)
+
+    async def delete(self, value: Any) -> None:
+        self.deleted.append(value)
 
 
 def test_extract_claim_email_prefers_direct_email() -> None:
@@ -163,3 +167,80 @@ async def test_get_or_sync_user_skips_commit_when_unchanged(
     assert existing.name == "Name"
     assert session.committed == 0
     assert session.refreshed == []
+
+
+@pytest.mark.asyncio
+async def test_get_or_sync_user_allowlist_uses_clerk_profile_when_jwt_lacks_email(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Regression: Clerk session JWTs typically only carry `sub`. The allowlist
+    check must consult the Clerk profile API (not the JWT claims) before
+    rejecting a new user, otherwise every Clerk-mode invitee with a sub-only
+    token gets blocked even when their email is on the allowlist.
+    Origin: 2026-05-02 — Samir (samir@wastegurus.ca) blocked despite being
+    allowlisted because session JWT had no email claim.
+    """
+    new_user = User(clerk_user_id="user_abc", email=None, name=None)
+
+    async def _fake_get_or_create(*_args: Any, **_kwargs: Any) -> tuple[User, bool]:
+        return new_user, True  # newly created — triggers allowlist branch
+
+    async def _fake_fetch(_clerk_user_id: str) -> tuple[str | None, str | None]:
+        return "samir@wastegurus.ca", "Samir"
+
+    monkeypatch.setattr(auth.crud, "get_or_create", _fake_get_or_create)
+    monkeypatch.setattr(auth, "_fetch_clerk_profile", _fake_fetch)
+    monkeypatch.setattr(
+        auth.settings,
+        "allowed_signup_emails",
+        "samir@wastegurus.ca,henry@vantageclaw.ai",
+    )
+
+    session = _FakeSession()
+    out = await auth._get_or_sync_user(
+        session,  # type: ignore[arg-type]
+        clerk_user_id="user_abc",
+        claims={"sub": "user_abc"},  # JWT with only `sub` — no email claim
+    )
+
+    assert out is new_user
+    assert new_user.email == "samir@wastegurus.ca"
+    assert new_user.name == "Samir"
+    assert session.deleted == []  # user was NOT rolled back
+
+
+@pytest.mark.asyncio
+async def test_get_or_sync_user_allowlist_blocks_when_clerk_profile_email_not_allowed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Allowlist still rejects when the resolved email (claim or profile) is
+    not on the list. Confirms the fix doesn't accidentally open the gate."""
+    new_user = User(clerk_user_id="user_xyz", email=None, name=None)
+
+    async def _fake_get_or_create(*_args: Any, **_kwargs: Any) -> tuple[User, bool]:
+        return new_user, True
+
+    async def _fake_fetch(_clerk_user_id: str) -> tuple[str | None, str | None]:
+        return "intruder@example.com", "Intruder"
+
+    monkeypatch.setattr(auth.crud, "get_or_create", _fake_get_or_create)
+    monkeypatch.setattr(auth, "_fetch_clerk_profile", _fake_fetch)
+    monkeypatch.setattr(
+        auth.settings,
+        "allowed_signup_emails",
+        "samir@wastegurus.ca,henry@vantageclaw.ai",
+    )
+
+    session = _FakeSession()
+
+    from fastapi import HTTPException
+
+    with pytest.raises(HTTPException) as exc_info:
+        await auth._get_or_sync_user(
+            session,  # type: ignore[arg-type]
+            clerk_user_id="user_xyz",
+            claims={"sub": "user_xyz"},
+        )
+
+    assert exc_info.value.status_code == 403
+    assert session.deleted == [new_user]  # user was rolled back

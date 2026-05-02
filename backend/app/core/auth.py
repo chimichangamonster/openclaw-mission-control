@@ -356,12 +356,25 @@ async def _get_or_sync_user(
         defaults=defaults,
     )
 
+    profile_email: str | None = None
+    profile_name: str | None = None
+    # Avoid a network roundtrip to Clerk on every request once core profile
+    # fields are present in our DB. On creation, also fetch when claims lack
+    # email/name so the allowlist check below has the real address to evaluate
+    # — Clerk session JWTs typically only carry `sub`.
+    should_fetch_profile = created or not user.email or not user.name
+    if should_fetch_profile:
+        profile_email, profile_name = await _fetch_clerk_profile(clerk_user_id)
+
     # Enforce signup allowlist: reject new users whose email is not permitted.
+    # Resolve email from Clerk profile first, then JWT claims — the session JWT
+    # is sub-only by default, so without the profile fetch every Clerk-mode
+    # invitee would be blocked even when allowlisted.
     if created:
         allowlist_raw = settings.allowed_signup_emails.strip()
         if allowlist_raw:
             allowed = {e.strip().lower() for e in allowlist_raw.split(",") if e.strip()}
-            resolved_email = (claim_email or "").lower()
+            resolved_email = (profile_email or claim_email or "").lower()
             if resolved_email not in allowed:
                 logger.warning(
                     "auth.signup.blocked email=%s clerk_user_id=%s",
@@ -375,14 +388,6 @@ async def _get_or_sync_user(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Signups are restricted. Contact the platform administrator.",
                 )
-
-    profile_email: str | None = None
-    profile_name: str | None = None
-    # Avoid a network roundtrip to Clerk on every request once core profile
-    # fields are present in our DB.
-    should_fetch_profile = created or not user.email or not user.name
-    if should_fetch_profile:
-        profile_email, profile_name = await _fetch_clerk_profile(clerk_user_id)
 
     email = profile_email or claim_email
     name = profile_name or claim_name
