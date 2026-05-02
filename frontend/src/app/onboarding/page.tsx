@@ -36,12 +36,16 @@ import {
   useGetMeApiV1UsersMeGet,
   useUpdateMeApiV1UsersMePatch,
 } from "@/api/generated/users/users";
+import {
+  type getMyMembershipApiV1OrganizationsMeMemberGetResponse,
+  useGetMyMembershipApiV1OrganizationsMeMemberGet,
+} from "@/api/generated/organizations/organizations";
 import { customFetch } from "@/api/mutator";
 import { DashboardShell } from "@/components/templates/DashboardShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import SearchableSelect from "@/components/ui/searchable-select";
-import { isOnboardingComplete } from "@/lib/onboarding";
+import { isOnboardingComplete, shouldSkipOrgSetupWizard } from "@/lib/onboarding";
 import { getSupportedTimezones } from "@/lib/timezones";
 
 
@@ -238,10 +242,33 @@ export default function OnboardingPage() {
     },
   });
 
+  const membershipQuery = useGetMyMembershipApiV1OrganizationsMeMemberGet<
+    getMyMembershipApiV1OrganizationsMeMemberGetResponse,
+    ApiError
+  >({
+    query: {
+      enabled: Boolean(isSignedIn),
+      retry: false,
+      refetchOnMount: "always",
+    },
+  });
+
+  const membership =
+    membershipQuery.data?.status === 200 ? membershipQuery.data.data : null;
+  const skipOrgWizard = shouldSkipOrgSetupWizard(membership);
+
   const updateMeMutation = useUpdateMeApiV1UsersMePatch<ApiError>({
     mutation: {
       onSuccess: () => {
         setProfileSaved(true);
+        // Invited members (non-admin) only need the user-profile step. The
+        // remaining steps (Industry / API Key / Features / Checklist) configure
+        // the org and are admin-only — short-circuit to dashboard so members
+        // don't see a misleading "set up your organization" wizard.
+        if (skipOrgWizard) {
+          router.replace("/dashboard");
+          return;
+        }
         setStep("industry");
         // Auto-detect industry after profile save
         customFetch<{ status: number; data: AutoDetectResult }>(
@@ -285,13 +312,19 @@ export default function OnboardingPage() {
     [timezones],
   );
 
-  // If profile already complete, skip to industry step
+  // If profile already complete, advance past Step 1. Invited members
+  // (non-admin) skip the org-setup wizard entirely and go to dashboard;
+  // admin/owner founders proceed to the Industry step.
   useEffect(() => {
     if (profile && isOnboardingComplete(profile) && !profileSaved) {
       setProfileSaved(true);
+      if (skipOrgWizard) {
+        router.replace("/dashboard");
+        return;
+      }
       setStep("industry");
     }
-  }, [profile, profileSaved]);
+  }, [profile, profileSaved, skipOrgWizard, router]);
 
   // Load templates
   useEffect(() => {
