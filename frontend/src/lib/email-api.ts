@@ -259,21 +259,37 @@ async function _authHeaders(): Promise<Record<string, string>> {
   return headers;
 }
 
-function _attachmentUrl(accountId: string, messageId: string, attachmentId: string): string {
-  return `${V1}/email/accounts/${accountId}/messages/${messageId}/attachments/${attachmentId}/download`;
+function _attachmentUrl(
+  accountId: string,
+  messageId: string,
+  attachmentId: string,
+  disposition: "inline" | "attachment" = "attachment",
+): string {
+  return `${V1}/email/accounts/${accountId}/messages/${messageId}/attachments/${attachmentId}/download?disposition=${disposition}`;
 }
 
 export async function fetchAttachmentBlob(
   accountId: string,
   messageId: string,
   attachmentId: string,
+  options?: { contentType?: string | null; disposition?: "inline" | "attachment" },
 ): Promise<string> {
   const { getApiBaseUrl } = await import("@/lib/api-base");
   const baseUrl = getApiBaseUrl();
   const headers = await _authHeaders();
-  const resp = await fetch(`${baseUrl}${_attachmentUrl(accountId, messageId, attachmentId)}`, { headers });
+  const disposition = options?.disposition ?? "attachment";
+  const resp = await fetch(
+    `${baseUrl}${_attachmentUrl(accountId, messageId, attachmentId, disposition)}`,
+    { headers },
+  );
   if (!resp.ok) throw new Error("Failed to fetch attachment");
-  const blob = await resp.blob();
+  const buf = await resp.arrayBuffer();
+  // Force the blob's MIME type so iframe-based PDF rendering and <img> rendering
+  // work reliably even if the response Content-Type is octet-stream or has params.
+  const declared = options?.contentType?.split(";")[0]?.trim();
+  const responseType = resp.headers.get("content-type")?.split(";")[0]?.trim();
+  const type = declared || responseType || "application/octet-stream";
+  const blob = new Blob([buf], { type });
   return URL.createObjectURL(blob);
 }
 

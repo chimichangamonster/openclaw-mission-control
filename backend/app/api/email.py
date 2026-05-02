@@ -725,10 +725,15 @@ async def download_email_attachment(
     account_id: UUID,
     message_id: UUID,
     attachment_id: UUID,
+    disposition: str = Query("attachment", regex="^(attachment|inline)$"),
     ctx: OrganizationContext = ORG_MEMBER_DEP,
     session: AsyncSession = SESSION_DEP,
 ) -> Response:
-    """Download an email attachment's content from the provider."""
+    """Download an email attachment's content from the provider.
+
+    Pass ``disposition=inline`` to render in an iframe/img instead of triggering
+    a browser download (used by the in-app attachment preview).
+    """
     account = await _get_account_or_404(account_id, ctx, session)
     msg = await _get_message_or_404(message_id, account, session)
     att = await session.get(EmailAttachment, attachment_id)
@@ -775,7 +780,8 @@ async def download_email_attachment(
         content=content,
         media_type=content_type,
         headers={
-            "Content-Disposition": f'attachment; filename="{att.filename or filename}"',
+            "Content-Disposition": f'{disposition}; filename="{att.filename or filename}"',
+            "X-Content-Type-Options": "nosniff",
         },
     )
 

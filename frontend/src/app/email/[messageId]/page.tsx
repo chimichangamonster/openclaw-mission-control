@@ -87,6 +87,9 @@ export default function EmailMessagePage() {
   const [previewAtt, setPreviewAtt] = useState<EmailAttachment | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  // Lazy-loaded blob URLs keyed by attachment id, used for inline image thumbnails
+  // rendered below the body (Gmail/Outlook-style auto-preview).
+  const [thumbUrls, setThumbUrls] = useState<Record<string, string>>({});
 
   const loadMessage = useCallback(async () => {
     if (!accountId || !messageId) return;
@@ -117,6 +120,46 @@ export default function EmailMessagePage() {
   useEffect(() => {
     if (isSignedIn) loadMessage();
   }, [isSignedIn, loadMessage]);
+
+  // Lazy-fetch blob URLs for image attachments so they render as inline
+  // thumbnails below the body (Gmail/Outlook style — no eye-click required).
+  useEffect(() => {
+    if (attachments.length === 0) return;
+    let cancelled = false;
+    const created: string[] = [];
+    (async () => {
+      for (const att of attachments) {
+        const ct = att.content_type?.toLowerCase() ?? "";
+        const fn = att.filename.toLowerCase();
+        const isImg = ct.startsWith("image/") || /\.(jpg|jpeg|png|gif|webp)$/.test(fn);
+        if (!isImg) continue;
+        try {
+          const inferred =
+            att.content_type ||
+            (fn.endsWith(".png") ? "image/png" :
+             fn.endsWith(".gif") ? "image/gif" :
+             fn.endsWith(".webp") ? "image/webp" :
+             "image/jpeg");
+          const url = await fetchAttachmentBlob(accountId, messageId, att.id, {
+            contentType: inferred,
+            disposition: "inline",
+          });
+          if (cancelled) {
+            URL.revokeObjectURL(url);
+            return;
+          }
+          created.push(url);
+          setThumbUrls((prev) => ({ ...prev, [att.id]: url }));
+        } catch {
+          // Skip silently — the tile list still has a download button as fallback.
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+      for (const url of created) URL.revokeObjectURL(url);
+    };
+  }, [attachments, accountId, messageId]);
 
   const isPreviewable = (att: EmailAttachment) => {
     const ct = att.content_type?.toLowerCase() ?? "";
@@ -161,7 +204,21 @@ export default function EmailMessagePage() {
     setPreviewAtt(att);
     setPreviewLoading(true);
     try {
-      const url = await fetchAttachmentBlob(accountId, messageId, att.id);
+      // Resolve a stable MIME type from the attachment metadata (or filename
+      // extension fallback) so the blob renders correctly in <iframe>/<img>.
+      const fn = (att.filename || "").toLowerCase();
+      const inferredType =
+        att.content_type ||
+        (fn.endsWith(".pdf") ? "application/pdf" :
+         fn.endsWith(".png") ? "image/png" :
+         fn.endsWith(".gif") ? "image/gif" :
+         fn.endsWith(".webp") ? "image/webp" :
+         (fn.endsWith(".jpg") || fn.endsWith(".jpeg")) ? "image/jpeg" :
+         null);
+      const url = await fetchAttachmentBlob(accountId, messageId, att.id, {
+        contentType: inferredType,
+        disposition: "inline",
+      });
       setPreviewUrl(url);
     } catch {
       setPreviewUrl(null);
@@ -364,6 +421,43 @@ export default function EmailMessagePage() {
               )}
             </div>
           </div>
+
+          {/* Image thumbnails (inline-rendered, Gmail/Outlook style) */}
+          {attachments.some((a) => isImage(a)) && (
+            <div className="rounded-xl border border-slate-200 bg-white p-4">
+              <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
+                {attachments.filter(isImage).map((att) => {
+                  const url = thumbUrls[att.id];
+                  return (
+                    <button
+                      key={att.id}
+                      type="button"
+                      onClick={() => openPreview(att)}
+                      className="group relative flex h-48 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-50 transition-shadow hover:shadow-md"
+                      title={`Open ${att.filename}`}
+                    >
+                      {url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={url}
+                          alt={att.filename}
+                          className="max-h-full max-w-full object-contain"
+                        />
+                      ) : (
+                        <div className="flex flex-col items-center gap-2 text-slate-400">
+                          <ImageIcon className="h-8 w-8" />
+                          <span className="text-xs">Loading...</span>
+                        </div>
+                      )}
+                      <div className="absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/60 to-transparent px-2 py-1 text-left text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">
+                        {att.filename}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Attachments */}
           {attachments.length > 0 && (

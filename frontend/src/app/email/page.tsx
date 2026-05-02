@@ -28,6 +28,7 @@ import { DashboardPageLayout } from "@/components/templates/DashboardPageLayout"
 import { FeatureGate } from "@/components/molecules/FeatureGate";
 import { useNotifications } from "@/components/providers/NotificationProvider";
 import { Button } from "@/components/ui/button";
+import { useGetMeApiV1UsersMeGet } from "@/api/generated/users/users";
 import {
   type EmailAccount,
   type EmailMessage,
@@ -42,6 +43,7 @@ import { cn } from "@/lib/utils";
 
 type Folder = "inbox" | "sent" | "archive" | "trash";
 type TriageFilter = "" | "pending" | "triaged" | "actioned" | "ignored" | "needs_review" | "spam";
+type VisibilityFilter = "all" | "shared" | "mine";
 
 /* ── Triage color maps ── */
 
@@ -110,10 +112,17 @@ function inferPriority(msg: EmailMessage): string | null {
 export default function EmailPage() {
   const { isSignedIn } = useAuth();
   const { refreshUnreadEmailCount } = useNotifications();
+  const meQuery = useGetMeApiV1UsersMeGet({
+    query: { enabled: Boolean(isSignedIn), retry: false },
+  });
+  const currentUserId =
+    meQuery.data?.status === 200 ? meQuery.data.data.id : null;
   const [accounts, setAccounts] = useState<EmailAccount[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(
     null,
   );
+  const [visibilityFilter, setVisibilityFilter] =
+    useState<VisibilityFilter>("all");
   const [messages, setMessages] = useState<EmailMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [folder, setFolder] = useState<Folder>("inbox");
@@ -142,6 +151,17 @@ export default function EmailPage() {
     }
   }, [selectedAccountId]);
 
+  /* ── Visibility-filtered account list (drives the sidebar + unified inbox scope) ── */
+  const visibleAccounts = useMemo(() => {
+    if (visibilityFilter === "shared") {
+      return accounts.filter((a) => a.visibility === "shared");
+    }
+    if (visibilityFilter === "mine" && currentUserId) {
+      return accounts.filter((a) => a.user_id === currentUserId);
+    }
+    return accounts;
+  }, [accounts, visibilityFilter, currentUserId]);
+
   const loadMessages = useCallback(async () => {
     if (accounts.length === 0) return;
     try {
@@ -153,9 +173,26 @@ export default function EmailPage() {
         q: searchQuery || undefined,
         limit: 50,
       };
-      const data = selectedAccountId
-        ? await fetchEmailMessages(selectedAccountId, params)
-        : await fetchAllEmailMessages(params);
+      let data: EmailMessage[];
+      if (selectedAccountId) {
+        data = await fetchEmailMessages(selectedAccountId, params);
+      } else if (visibilityFilter === "all") {
+        // Single backend call to the unified-inbox endpoint
+        data = await fetchAllEmailMessages(params);
+      } else {
+        // Visibility-scoped — fetch each visible account in parallel and merge
+        const perAccount = await Promise.all(
+          visibleAccounts.map((a) => fetchEmailMessages(a.id, params)),
+        );
+        data = perAccount
+          .flat()
+          .sort(
+            (a, b) =>
+              new Date(b.received_at).getTime() -
+              new Date(a.received_at).getTime(),
+          )
+          .slice(0, 50);
+      }
       setMessages(data);
     } catch {
       setMessages([]);
@@ -165,6 +202,8 @@ export default function EmailPage() {
   }, [
     accounts.length,
     selectedAccountId,
+    visibilityFilter,
+    visibleAccounts,
     folder,
     triageFilter,
     starredOnly,
@@ -183,8 +222,8 @@ export default function EmailPage() {
     if (selectedAccountId) {
       await triggerEmailSync(selectedAccountId);
     } else {
-      // "All accounts" — sync every visible account in parallel
-      await Promise.all(accounts.map((a) => triggerEmailSync(a.id)));
+      // "All accounts" — sync every visible account (respects current visibility filter)
+      await Promise.all(visibleAccounts.map((a) => triggerEmailSync(a.id)));
     }
     setTimeout(loadMessages, 2000);
   };
@@ -242,6 +281,30 @@ export default function EmailPage() {
     { key: "spam", label: "Spam" },
   ];
 
+  /* When the visibility tab changes, drop a selected account that's no longer in scope. */
+  useEffect(() => {
+    if (
+      selectedAccountId &&
+      !visibleAccounts.some((a) => a.id === selectedAccountId)
+    ) {
+      setSelectedAccountId(null);
+    }
+  }, [visibleAccounts, selectedAccountId]);
+
+  /* Counts for the visibility chip group (always computed against full account list). */
+  const visibilityCounts = useMemo(() => {
+    const sharedN = accounts.filter((a) => a.visibility === "shared").length;
+    const mineN = currentUserId
+      ? accounts.filter((a) => a.user_id === currentUserId).length
+      : 0;
+    return { all: accounts.length, shared: sharedN, mine: mineN };
+  }, [accounts, currentUserId]);
+
+  const showVisibilityTabs =
+    visibilityCounts.shared > 0 &&
+    visibilityCounts.mine > 0 &&
+    visibilityCounts.shared !== visibilityCounts.all;
+
   /* ── Currently-viewed account (drives the "Active inbox" banner) ── */
   const selectedAccount = useMemo(
     () => accounts.find((a) => a.id === selectedAccountId) ?? null,
@@ -253,7 +316,7 @@ export default function EmailPage() {
     () => Object.fromEntries(accounts.map((a) => [a.id, a])),
     [accounts],
   );
-  const showAccountChip = selectedAccountId === null && accounts.length > 1;
+  const showAccountChip = selectedAccountId === null && visibleAccounts.length > 1;
 
   /* ── Triage summary counts (computed from current messages when showing All) ── */
   const triageCounts = useMemo(() => {
@@ -300,7 +363,31 @@ export default function EmailPage() {
         <div className="flex flex-col md:flex-row gap-4 md:gap-6">
           {/* Mobile filter bar */}
           <div className="flex flex-col gap-2 md:hidden">
-            {accounts.length > 1 ? (
+            {showVisibilityTabs ? (
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {(
+                  [
+                    { key: "all", label: `All (${visibilityCounts.all})` },
+                    { key: "shared", label: `Shared (${visibilityCounts.shared})` },
+                    { key: "mine", label: `Mine (${visibilityCounts.mine})` },
+                  ] as { key: VisibilityFilter; label: string }[]
+                ).map((v) => (
+                  <button
+                    key={v.key}
+                    onClick={() => setVisibilityFilter(v.key)}
+                    className={cn(
+                      "shrink-0 rounded-full px-3 py-2 text-xs transition",
+                      visibilityFilter === v.key
+                        ? "bg-indigo-100 font-medium text-indigo-800"
+                        : "bg-slate-100 text-slate-700",
+                    )}
+                  >
+                    {v.label}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+            {visibleAccounts.length > 1 ? (
               <div className="flex gap-2 overflow-x-auto pb-1">
                 <button
                   onClick={() => setSelectedAccountId(null)}
@@ -313,7 +400,7 @@ export default function EmailPage() {
                 >
                   All accounts
                 </button>
-                {accounts.map((acct) => (
+                {visibleAccounts.map((acct) => (
                   <button
                     key={acct.id}
                     onClick={() => setSelectedAccountId(acct.id)}
@@ -386,8 +473,39 @@ export default function EmailPage() {
 
           {/* Sidebar filters (desktop) */}
           <div className="hidden md:block w-48 shrink-0 space-y-4">
+            {/* Visibility selector — only shown when org has both shared and private accounts */}
+            {showVisibilityTabs ? (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  View
+                </p>
+                <div className="mt-1 flex flex-col gap-1">
+                  {(
+                    [
+                      { key: "all", label: "All", n: visibilityCounts.all },
+                      { key: "shared", label: "Shared", n: visibilityCounts.shared },
+                      { key: "mine", label: "Mine", n: visibilityCounts.mine },
+                    ] as { key: VisibilityFilter; label: string; n: number }[]
+                  ).map((v) => (
+                    <button
+                      key={v.key}
+                      onClick={() => setVisibilityFilter(v.key)}
+                      className={cn(
+                        "flex items-center justify-between rounded-lg px-3 py-1.5 text-left text-sm transition",
+                        visibilityFilter === v.key
+                          ? "bg-indigo-100 font-medium text-indigo-800"
+                          : "text-slate-700 hover:bg-slate-100",
+                      )}
+                    >
+                      <span>{v.label}</span>
+                      <span className="text-xs text-slate-500">{v.n}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
             {/* Account selector */}
-            {accounts.length > 1 ? (
+            {visibleAccounts.length > 1 ? (
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
                   Account
@@ -404,7 +522,7 @@ export default function EmailPage() {
                   >
                     All accounts
                   </button>
-                  {accounts.map((acct) => (
+                  {visibleAccounts.map((acct) => (
                     <button
                       key={acct.id}
                       onClick={() => setSelectedAccountId(acct.id)}
@@ -552,14 +670,19 @@ export default function EmailPage() {
                   {selectedAccount.provider}
                 </span>
               </div>
-            ) : accounts.length > 1 ? (
+            ) : visibleAccounts.length > 1 ? (
               <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
                 <Inbox className="h-4 w-4 shrink-0 text-slate-500" />
                 <span className="truncate font-medium text-slate-800">
-                  All accounts
+                  {visibilityFilter === "shared"
+                    ? "Shared inboxes"
+                    : visibilityFilter === "mine"
+                      ? "My inboxes"
+                      : "All accounts"}
                 </span>
                 <span className="ml-auto shrink-0 text-xs text-slate-400">
-                  {accounts.length} mailboxes
+                  {visibleAccounts.length} mailbox
+                  {visibleAccounts.length === 1 ? "" : "es"}
                 </span>
               </div>
             ) : null}
@@ -721,8 +844,13 @@ export default function EmailPage() {
                           ) : null}
                           {showAccountChip && accountById[msg.email_account_id] ? (
                             <span
-                              className="ml-auto truncate rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600"
-                              title={accountById[msg.email_account_id].email_address}
+                              className={cn(
+                                "ml-auto truncate rounded px-1.5 py-0.5 text-[10px] font-medium",
+                                accountById[msg.email_account_id].visibility === "private"
+                                  ? "bg-amber-50 text-amber-700"
+                                  : "bg-slate-100 text-slate-600",
+                              )}
+                              title={`${accountById[msg.email_account_id].email_address} (${accountById[msg.email_account_id].visibility})`}
                             >
                               {accountById[msg.email_account_id].email_address}
                             </span>
