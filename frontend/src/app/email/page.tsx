@@ -16,8 +16,11 @@ import {
   Mail,
   MailOpen,
   RefreshCw,
+  Search,
   Send,
+  Star,
   Trash2,
+  X,
 } from "lucide-react";
 
 import { useAuth } from "@/auth/clerk";
@@ -28,6 +31,7 @@ import { Button } from "@/components/ui/button";
 import {
   type EmailAccount,
   type EmailMessage,
+  fetchAllEmailMessages,
   fetchEmailAccounts,
   fetchEmailMessages,
   archiveEmail,
@@ -114,12 +118,23 @@ export default function EmailPage() {
   const [loading, setLoading] = useState(true);
   const [folder, setFolder] = useState<Folder>("inbox");
   const [triageFilter, setTriageFilter] = useState<TriageFilter>("");
+  const [starredOnly, setStarredOnly] = useState(false);
+  const [searchInput, setSearchInput] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
 
+  // Debounce search input → query (300ms)
+  useEffect(() => {
+    const t = setTimeout(() => setSearchQuery(searchInput), 300);
+    return () => clearTimeout(t);
+  }, [searchInput]);
+
+  // selectedAccountId === null means "All accounts" (unified inbox).
+  // We default to All when 2+ accounts are connected, otherwise pick the only one.
   const loadAccounts = useCallback(async () => {
     try {
       const data = await fetchEmailAccounts();
       setAccounts(data);
-      if (data.length > 0 && !selectedAccountId) {
+      if (selectedAccountId === null && data.length === 1) {
         setSelectedAccountId(data[0].id);
       }
     } catch {
@@ -128,33 +143,49 @@ export default function EmailPage() {
   }, [selectedAccountId]);
 
   const loadMessages = useCallback(async () => {
-    if (!selectedAccountId) return;
+    if (accounts.length === 0) return;
     try {
       setLoading(true);
-      const data = await fetchEmailMessages(selectedAccountId, {
+      const params = {
         folder,
         triage_status: triageFilter || undefined,
+        is_starred: starredOnly ? true : undefined,
+        q: searchQuery || undefined,
         limit: 50,
-      });
+      };
+      const data = selectedAccountId
+        ? await fetchEmailMessages(selectedAccountId, params)
+        : await fetchAllEmailMessages(params);
       setMessages(data);
     } catch {
       setMessages([]);
     } finally {
       setLoading(false);
     }
-  }, [selectedAccountId, folder, triageFilter]);
+  }, [
+    accounts.length,
+    selectedAccountId,
+    folder,
+    triageFilter,
+    starredOnly,
+    searchQuery,
+  ]);
 
   useEffect(() => {
     if (isSignedIn) loadAccounts();
   }, [isSignedIn, loadAccounts]);
 
   useEffect(() => {
-    if (selectedAccountId) loadMessages();
-  }, [selectedAccountId, loadMessages]);
+    if (accounts.length > 0) loadMessages();
+  }, [accounts.length, loadMessages]);
 
   const handleSync = async () => {
-    if (!selectedAccountId) return;
-    await triggerEmailSync(selectedAccountId);
+    if (selectedAccountId) {
+      await triggerEmailSync(selectedAccountId);
+    } else {
+      // "All accounts" — sync every visible account in parallel
+      await Promise.all(accounts.map((a) => triggerEmailSync(a.id)));
+    }
     setTimeout(loadMessages, 2000);
   };
 
@@ -172,6 +203,17 @@ export default function EmailPage() {
     });
     setMessages((prev) => prev.map((m) => (m.id === updated.id ? updated : m)));
     refreshUnreadEmailCount();
+  };
+
+  const handleToggleStar = async (msg: EmailMessage) => {
+    const updated = await updateEmailMessage(msg.email_account_id, msg.id, {
+      is_starred: !msg.is_starred,
+    });
+    setMessages((prev) =>
+      starredOnly && !updated.is_starred
+        ? prev.filter((m) => m.id !== updated.id)
+        : prev.map((m) => (m.id === updated.id ? updated : m)),
+    );
   };
 
   const handleRecategorize = async (msg: EmailMessage, newCategory: string) => {
@@ -205,6 +247,13 @@ export default function EmailPage() {
     () => accounts.find((a) => a.id === selectedAccountId) ?? null,
     [accounts, selectedAccountId],
   );
+
+  /* ── Per-message account lookup (only used in unified-inbox mode) ── */
+  const accountById = useMemo(
+    () => Object.fromEntries(accounts.map((a) => [a.id, a])),
+    [accounts],
+  );
+  const showAccountChip = selectedAccountId === null && accounts.length > 1;
 
   /* ── Triage summary counts (computed from current messages when showing All) ── */
   const triageCounts = useMemo(() => {
@@ -253,6 +302,17 @@ export default function EmailPage() {
           <div className="flex flex-col gap-2 md:hidden">
             {accounts.length > 1 ? (
               <div className="flex gap-2 overflow-x-auto pb-1">
+                <button
+                  onClick={() => setSelectedAccountId(null)}
+                  className={cn(
+                    "shrink-0 rounded-full px-3 py-2 text-xs transition",
+                    selectedAccountId === null
+                      ? "bg-blue-100 font-medium text-blue-800"
+                      : "bg-slate-100 text-slate-700",
+                  )}
+                >
+                  All accounts
+                </button>
                 {accounts.map((acct) => (
                   <button
                     key={acct.id}
@@ -290,6 +350,23 @@ export default function EmailPage() {
               })}
             </div>
             <div className="flex gap-2 overflow-x-auto pb-1">
+              <button
+                onClick={() => setStarredOnly((v) => !v)}
+                className={cn(
+                  "flex shrink-0 items-center gap-1.5 rounded-full px-3 py-2 text-xs transition",
+                  starredOnly
+                    ? "bg-amber-100 font-medium text-amber-800"
+                    : "bg-slate-100 text-slate-700",
+                )}
+              >
+                <Star
+                  className={cn(
+                    "h-3.5 w-3.5",
+                    starredOnly && "fill-amber-500 text-amber-500",
+                  )}
+                />
+                Starred
+              </button>
               {triageOptions.map((t) => (
                 <button
                   key={t.key}
@@ -316,6 +393,17 @@ export default function EmailPage() {
                   Account
                 </p>
                 <div className="mt-1 space-y-1">
+                  <button
+                    onClick={() => setSelectedAccountId(null)}
+                    className={cn(
+                      "block w-full truncate rounded-lg px-3 py-2 text-left text-sm transition",
+                      selectedAccountId === null
+                        ? "bg-blue-100 font-medium text-blue-800"
+                        : "text-slate-700 hover:bg-slate-100",
+                    )}
+                  >
+                    All accounts
+                  </button>
                   {accounts.map((acct) => (
                     <button
                       key={acct.id}
@@ -383,12 +471,58 @@ export default function EmailPage() {
                 ))}
               </div>
             </div>
+
+            {/* Starred filter */}
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                Flags
+              </p>
+              <div className="mt-1 space-y-1">
+                <button
+                  onClick={() => setStarredOnly((v) => !v)}
+                  className={cn(
+                    "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition",
+                    starredOnly
+                      ? "bg-amber-100 font-medium text-amber-800"
+                      : "text-slate-700 hover:bg-slate-100",
+                  )}
+                >
+                  <Star
+                    className={cn(
+                      "h-4 w-4",
+                      starredOnly && "fill-amber-500 text-amber-500",
+                    )}
+                  />
+                  Starred only
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Message list */}
           <div className="min-w-0 flex-1 space-y-3">
+            {/* Search input */}
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                type="search"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                placeholder="Search subject, sender, or message body..."
+                className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-9 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+              />
+              {searchInput && (
+                <button
+                  onClick={() => setSearchInput("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                  title="Clear search"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
             {/* Active inbox banner — always shown so the user knows which mailbox they're viewing */}
-            {selectedAccount && (
+            {selectedAccount ? (
               <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
                 <Inbox className="h-4 w-4 shrink-0 text-slate-500" />
                 <span className="truncate font-medium text-slate-800">
@@ -418,7 +552,17 @@ export default function EmailPage() {
                   {selectedAccount.provider}
                 </span>
               </div>
-            )}
+            ) : accounts.length > 1 ? (
+              <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+                <Inbox className="h-4 w-4 shrink-0 text-slate-500" />
+                <span className="truncate font-medium text-slate-800">
+                  All accounts
+                </span>
+                <span className="ml-auto shrink-0 text-xs text-slate-400">
+                  {accounts.length} mailboxes
+                </span>
+              </div>
+            ) : null}
             {/* Triage summary banner */}
             {triageCounts && messages.length > 0 && (
               <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5 sm:gap-3 sm:px-4">
@@ -462,9 +606,25 @@ export default function EmailPage() {
                 Loading messages...
               </p>
             ) : messages.length === 0 ? (
-              <p className="py-8 text-center text-sm text-slate-500">
-                No messages in this folder.
-              </p>
+              <div className="py-8 text-center text-sm text-slate-500">
+                {searchQuery ? (
+                  <>
+                    <p>No messages match &ldquo;{searchQuery}&rdquo;.</p>
+                    <button
+                      onClick={() => setSearchInput("")}
+                      className="mt-2 text-blue-600 hover:text-blue-700"
+                    >
+                      Clear search
+                    </button>
+                  </>
+                ) : starredOnly ? (
+                  <p>No starred messages in this folder.</p>
+                ) : triageFilter ? (
+                  <p>No messages with that triage status.</p>
+                ) : (
+                  <p>No messages in this folder.</p>
+                )}
+              </div>
             ) : (
               <div className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">
                 {messages.map((msg) => {
@@ -559,6 +719,14 @@ export default function EmailPage() {
                           {msg.has_attachments ? (
                             <span className="text-xs text-slate-400">📎</span>
                           ) : null}
+                          {showAccountChip && accountById[msg.email_account_id] ? (
+                            <span
+                              className="ml-auto truncate rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600"
+                              title={accountById[msg.email_account_id].email_address}
+                            >
+                              {accountById[msg.email_account_id].email_address}
+                            </span>
+                          ) : null}
                         </div>
                         <p
                           className={cn(
@@ -580,6 +748,23 @@ export default function EmailPage() {
                         {new Date(msg.received_at).toLocaleDateString()}
                       </span>
                       <div className="flex gap-1">
+                        <button
+                          onClick={() => handleToggleStar(msg)}
+                          className={cn(
+                            "rounded p-2 sm:p-1 hover:bg-slate-100",
+                            msg.is_starred
+                              ? "text-amber-500 hover:text-amber-600"
+                              : "text-slate-400 hover:text-slate-600",
+                          )}
+                          title={msg.is_starred ? "Unstar" : "Star"}
+                        >
+                          <Star
+                            className={cn(
+                              "h-4 w-4 sm:h-3.5 sm:w-3.5",
+                              msg.is_starred && "fill-current",
+                            )}
+                          />
+                        </button>
                         <button
                           onClick={() => handleMarkRead(msg)}
                           className="rounded p-2 sm:p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"

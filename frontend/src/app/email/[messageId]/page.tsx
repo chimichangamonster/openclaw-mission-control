@@ -17,6 +17,7 @@ import {
   Paperclip,
   Presentation,
   Reply,
+  Star,
   Tag,
   X,
 } from "lucide-react";
@@ -203,6 +204,14 @@ export default function EmailMessagePage() {
     setMessage(updated);
   };
 
+  const handleToggleStar = async () => {
+    if (!message) return;
+    const updated = await updateEmailMessage(accountId, messageId, {
+      is_starred: !message.is_starred,
+    });
+    setMessage(updated);
+  };
+
   const handleRecategorize = async (newCategory: string) => {
     if (!message || newCategory === message.triage_category) return;
     const updated = await updateEmailMessage(accountId, messageId, {
@@ -277,6 +286,23 @@ export default function EmailMessagePage() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
+                <button
+                  onClick={handleToggleStar}
+                  className={cn(
+                    "rounded p-1 transition hover:bg-slate-100",
+                    message.is_starred
+                      ? "text-amber-500 hover:text-amber-600"
+                      : "text-slate-400 hover:text-slate-600",
+                  )}
+                  title={message.is_starred ? "Unstar" : "Star"}
+                >
+                  <Star
+                    className={cn(
+                      "h-4 w-4",
+                      message.is_starred && "fill-current",
+                    )}
+                  />
+                </button>
                 <span className={cn("rounded px-2 py-1 text-xs font-medium", TRIAGE_STATUS_COLORS[message.triage_status] ?? "bg-slate-100 text-slate-600")}>
                   {message.triage_status.replace("_", " ")}
                 </span>

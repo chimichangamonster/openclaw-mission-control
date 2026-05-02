@@ -7,7 +7,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import Response
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 
 from app.api.deps import ORG_MEMBER_DEP, ORG_RATE_LIMIT_DEP, SESSION_DEP, require_feature
 from app.core.logging import get_logger
@@ -93,8 +93,6 @@ async def list_email_accounts(
     session: AsyncSession = SESSION_DEP,
 ) -> list[EmailAccount]:
     """List connected email accounts for the current organization."""
-    from sqlalchemy import or_
-
     stmt = (
         select(EmailAccount)
         .where(EmailAccount.organization_id == ctx.organization.id)  # type: ignore[arg-type]
@@ -123,8 +121,6 @@ async def get_unread_email_count(
     shared accounts plus their own private accounts. Used by the sidebar
     Email badge.
     """
-    from sqlalchemy import or_
-
     stmt = (
         select(func.count(EmailMessage.id))  # type: ignore[arg-type]
         .join(EmailAccount, EmailAccount.id == EmailMessage.email_account_id)  # type: ignore[arg-type]
@@ -232,6 +228,64 @@ async def trigger_email_sync(
 # ---------------------------------------------------------------------------
 
 
+@router.get("/messages", response_model=list[EmailMessageRead])
+async def list_all_email_messages(
+    ctx: OrganizationContext = ORG_MEMBER_DEP,
+    session: AsyncSession = SESSION_DEP,
+    folder: str | None = Query(default=None),
+    triage_status: str | None = Query(default=None),
+    is_read: bool | None = Query(default=None),
+    is_starred: bool | None = Query(default=None),
+    q: str | None = Query(default=None, description="Search subject, sender, body"),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+) -> list[EmailMessage]:
+    """List messages across all accounts the caller can see (unified inbox).
+
+    Mirrors `list_email_accounts` visibility: non-admins see shared accounts
+    plus their own private accounts. Admins see everything in the org.
+    """
+    stmt = (
+        select(EmailMessage)
+        .join(EmailAccount, EmailAccount.id == EmailMessage.email_account_id)  # type: ignore[arg-type]
+        .where(EmailAccount.organization_id == ctx.organization.id)  # type: ignore[arg-type]
+        .order_by(EmailMessage.received_at.desc())  # type: ignore[attr-defined]
+        .offset(offset)
+        .limit(limit)
+    )
+    if not is_org_admin(ctx.member):
+        stmt = stmt.where(
+            or_(
+                EmailAccount.visibility == "shared",  # type: ignore[arg-type]
+                EmailAccount.user_id == ctx.member.user_id,  # type: ignore[arg-type]
+            )
+        )
+    if folder:
+        stmt = stmt.where(EmailMessage.folder == folder)  # type: ignore[arg-type]
+    if triage_status:
+        stmt = stmt.where(EmailMessage.triage_status == triage_status)  # type: ignore[arg-type]
+    if is_read is not None:
+        stmt = stmt.where(EmailMessage.is_read == is_read)  # type: ignore[arg-type]
+    if is_starred is not None:
+        stmt = stmt.where(EmailMessage.is_starred == is_starred)  # type: ignore[arg-type]
+    if q and q.strip():
+        pattern = f"%{q.strip()}%"
+        stmt = stmt.where(
+            or_(
+                EmailMessage.subject.ilike(pattern),  # type: ignore[union-attr]
+                EmailMessage.sender_email.ilike(pattern),  # type: ignore[union-attr]
+                EmailMessage.sender_name.ilike(pattern),  # type: ignore[union-attr]
+                EmailMessage.body_text.ilike(pattern),  # type: ignore[union-attr]
+            )
+        )
+
+    result = await session.execute(stmt)
+    messages = list(result.scalars().all())
+    for msg in messages:
+        msg.body_text = sanitize_text(msg.body_text)
+    return messages
+
+
 @router.get("/accounts/{account_id}/messages", response_model=list[EmailMessageRead])
 async def list_email_messages(
     account_id: UUID,
@@ -240,6 +294,8 @@ async def list_email_messages(
     folder: str | None = Query(default=None),
     triage_status: str | None = Query(default=None),
     is_read: bool | None = Query(default=None),
+    is_starred: bool | None = Query(default=None),
+    q: str | None = Query(default=None, description="Search subject, sender, body"),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
 ) -> list[EmailMessage]:
@@ -258,6 +314,18 @@ async def list_email_messages(
         stmt = stmt.where(EmailMessage.triage_status == triage_status)  # type: ignore[arg-type]
     if is_read is not None:
         stmt = stmt.where(EmailMessage.is_read == is_read)  # type: ignore[arg-type]
+    if is_starred is not None:
+        stmt = stmt.where(EmailMessage.is_starred == is_starred)  # type: ignore[arg-type]
+    if q and q.strip():
+        pattern = f"%{q.strip()}%"
+        stmt = stmt.where(
+            or_(
+                EmailMessage.subject.ilike(pattern),  # type: ignore[union-attr]
+                EmailMessage.sender_email.ilike(pattern),  # type: ignore[union-attr]
+                EmailMessage.sender_name.ilike(pattern),  # type: ignore[union-attr]
+                EmailMessage.body_text.ilike(pattern),  # type: ignore[union-attr]
+            )
+        )
 
     result = await session.execute(stmt)
     messages = list(result.scalars().all())

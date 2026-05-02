@@ -74,6 +74,31 @@ async def _require_shared_account(session: AsyncSession, msg: EmailMessage) -> E
     return account
 
 
+async def _enforce_email_to_llm_policy(
+    session: AsyncSession, organization_id: UUID
+) -> None:
+    """Reject the request if this org has disabled sending email content to LLMs.
+
+    Default is True (allowed). Setting `data_policy.allow_email_content_to_llm =
+    false` in OrganizationSettings opts the org out — agents (which are LLM-backed)
+    can no longer read message bodies through these endpoints.
+    """
+    from app.models.organization_settings import OrganizationSettings
+
+    stmt = select(OrganizationSettings).where(  # type: ignore[call-overload]
+        OrganizationSettings.organization_id == organization_id
+    )
+    result = await session.execute(stmt)
+    settings = result.scalar_one_or_none()
+    if settings is None:
+        return
+    if settings.data_policy.get("allow_email_content_to_llm", True) is False:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Email content access by agents is disabled for this organization.",
+        )
+
+
 async def _get_org_id(agent_ctx: AgentAuthContext) -> UUID:
     """Resolve organization_id from the agent's board."""
     agent = agent_ctx.agent
@@ -133,6 +158,8 @@ async def agent_list_email_messages(
     if board is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
 
+    await _enforce_email_to_llm_policy(session, board.organization_id)
+
     # Only include messages from shared (non-private) accounts
     shared_account_ids = select(EmailAccount.id).where(  # type: ignore[call-overload]
         EmailAccount.organization_id == board.organization_id,
@@ -179,6 +206,7 @@ async def agent_get_email_message(
     if msg is None or msg.organization_id != board.organization_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
     await _require_shared_account(session, msg)
+    await _enforce_email_to_llm_policy(session, board.organization_id)
     return _redact_message(msg)
 
 
@@ -251,6 +279,15 @@ async def agent_reply_to_email(
     if account is None or account.visibility == "private":
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
 
+    await _enforce_email_to_llm_policy(session, board.organization_id)
+
+    # Redact the original-message preview before persisting it on the approval row.
+    # Approval rows are read by humans during review and may surface in observability
+    # tools (Langfuse, audit logs) — credentials/financial data must not leak there.
+    redacted_preview, _, _, _ = redact_email_content(
+        msg.body_text, None, level=RedactionLevel.MODERATE
+    )
+
     # Create approval instead of sending directly
     approval = Approval(
         id=uuid4(),
@@ -267,7 +304,7 @@ async def agent_reply_to_email(
             "from_account": account.email_address,
             "original_subject": msg.subject,
             "original_sender": msg.sender_email,
-            "original_preview": (msg.body_text or "")[:200],
+            "original_preview": (redacted_preview or "")[:200],
         },
         confidence=80.0,
         status="pending",
@@ -423,11 +460,17 @@ async def agent_create_task_from_email(
     if msg is None or msg.organization_id != board.organization_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
     await _require_shared_account(session, msg)
+    await _enforce_email_to_llm_policy(session, board.organization_id)
 
+    # Redact body before persisting it into the task description — task descriptions
+    # are read back by other agents on the board and surfaced in board/task UIs.
+    redacted_body, _, _, _ = redact_email_content(
+        msg.body_text, None, level=RedactionLevel.MODERATE
+    )
     now = utcnow()
     description = f"From: {msg.sender_email}\n"
-    if msg.body_text:
-        description += f"\n{msg.body_text[:2000]}"
+    if redacted_body:
+        description += f"\n{redacted_body[:2000]}"
 
     task = Task(
         id=uuid4(),

@@ -114,6 +114,8 @@ export async function fetchEmailMessages(
     folder?: string;
     triage_status?: string;
     is_read?: boolean;
+    is_starred?: boolean;
+    q?: string;
     limit?: number;
     offset?: number;
   },
@@ -124,12 +126,46 @@ export async function fetchEmailMessages(
     searchParams.set("triage_status", params.triage_status);
   if (params?.is_read !== undefined)
     searchParams.set("is_read", String(params.is_read));
+  if (params?.is_starred !== undefined)
+    searchParams.set("is_starred", String(params.is_starred));
+  if (params?.q && params.q.trim()) searchParams.set("q", params.q.trim());
   if (params?.limit) searchParams.set("limit", String(params.limit));
   if (params?.offset) searchParams.set("offset", String(params.offset));
 
   const qs = searchParams.toString();
   const res = await customFetch<{ data: EmailMessage[] }>(
     `${V1}/email/accounts/${accountId}/messages${qs ? `?${qs}` : ""}`,
+    { method: "GET" },
+  );
+  return res.data;
+}
+
+export async function fetchAllEmailMessages(
+  params?: {
+    folder?: string;
+    triage_status?: string;
+    is_read?: boolean;
+    is_starred?: boolean;
+    q?: string;
+    limit?: number;
+    offset?: number;
+  },
+): Promise<EmailMessage[]> {
+  const searchParams = new URLSearchParams();
+  if (params?.folder) searchParams.set("folder", params.folder);
+  if (params?.triage_status)
+    searchParams.set("triage_status", params.triage_status);
+  if (params?.is_read !== undefined)
+    searchParams.set("is_read", String(params.is_read));
+  if (params?.is_starred !== undefined)
+    searchParams.set("is_starred", String(params.is_starred));
+  if (params?.q && params.q.trim()) searchParams.set("q", params.q.trim());
+  if (params?.limit) searchParams.set("limit", String(params.limit));
+  if (params?.offset) searchParams.set("offset", String(params.offset));
+
+  const qs = searchParams.toString();
+  const res = await customFetch<{ data: EmailMessage[] }>(
+    `${V1}/email/messages${qs ? `?${qs}` : ""}`,
     { method: "GET" },
   );
   return res.data;
@@ -151,6 +187,7 @@ export async function updateEmailMessage(
   messageId: string,
   data: {
     is_read?: boolean;
+    is_starred?: boolean;
     triage_status?: string;
     triage_category?: string;
     linked_task_id?: string;
