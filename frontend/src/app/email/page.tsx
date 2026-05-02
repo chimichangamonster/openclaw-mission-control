@@ -10,6 +10,8 @@ import {
   CheckCircle2,
   ChevronDown,
   Clock,
+  Eye,
+  EyeOff,
   Inbox,
   Mail,
   MailOpen,
@@ -198,6 +200,12 @@ export default function EmailPage() {
     { key: "spam", label: "Spam" },
   ];
 
+  /* ── Currently-viewed account (drives the "Active inbox" banner) ── */
+  const selectedAccount = useMemo(
+    () => accounts.find((a) => a.id === selectedAccountId) ?? null,
+    [accounts, selectedAccountId],
+  );
+
   /* ── Triage summary counts (computed from current messages when showing All) ── */
   const triageCounts = useMemo(() => {
     if (triageFilter !== "") return null; // Only show counts in "All" view
@@ -379,6 +387,38 @@ export default function EmailPage() {
 
           {/* Message list */}
           <div className="min-w-0 flex-1 space-y-3">
+            {/* Active inbox banner — always shown so the user knows which mailbox they're viewing */}
+            {selectedAccount && (
+              <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+                <Inbox className="h-4 w-4 shrink-0 text-slate-500" />
+                <span className="truncate font-medium text-slate-800">
+                  {selectedAccount.email_address}
+                </span>
+                <span
+                  className={cn(
+                    "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
+                    selectedAccount.visibility === "shared"
+                      ? "bg-blue-100 text-blue-700"
+                      : "bg-amber-100 text-amber-800",
+                  )}
+                  title={
+                    selectedAccount.visibility === "shared"
+                      ? "Shared with your organization — other members see this inbox"
+                      : "Private to you — only you and org admins see this inbox"
+                  }
+                >
+                  {selectedAccount.visibility === "shared" ? (
+                    <Eye className="h-3 w-3" />
+                  ) : (
+                    <EyeOff className="h-3 w-3" />
+                  )}
+                  {selectedAccount.visibility === "shared" ? "Shared" : "Private"}
+                </span>
+                <span className="ml-auto shrink-0 text-xs uppercase tracking-wider text-slate-400">
+                  {selectedAccount.provider}
+                </span>
+              </div>
+            )}
             {/* Triage summary banner */}
             {triageCounts && messages.length > 0 && (
               <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5 sm:gap-3 sm:px-4">
