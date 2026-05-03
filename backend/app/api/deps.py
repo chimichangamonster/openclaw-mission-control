@@ -257,6 +257,9 @@ def require_org_role(minimum_role: str) -> Callable[..., Any]:
     return _check
 
 
+ORG_OPERATOR_DEP = Depends(require_org_role("operator"))
+
+
 async def get_board_or_404(
     board_id: str,
     session: AsyncSession = SESSION_DEP,

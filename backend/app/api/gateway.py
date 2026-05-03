@@ -8,7 +8,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
 
-from app.api.deps import require_org_admin
+from app.api.deps import require_org_member, require_org_role
 from app.core.auth import AuthContext, get_auth_context
 from app.core.logging import get_logger
 from app.core.workspace import resolve_org_workspace
@@ -38,7 +38,13 @@ logger = get_logger(__name__)
 router = APIRouter(prefix="/gateways", tags=["gateways"])
 SESSION_DEP = Depends(get_session)
 AUTH_DEP = Depends(get_auth_context)
-ORG_ADMIN_DEP = Depends(require_org_admin)
+# Read-only gateway endpoints (status, list/get sessions, history, commands) are
+# member+. Mutating endpoints (create/rename/message/abort/compact/reset/upload)
+# are operator+. This matches the documented RBAC model in CLAUDE.md and aligns
+# with cron_jobs.py's layered access. Previously all 12 endpoints were admin+,
+# which broke the dashboard's Gateway Health panel and /chat for operator users.
+ORG_MEMBER_DEP = Depends(require_org_member)
+ORG_OPERATOR_DEP = Depends(require_org_role("operator"))
 BOARD_ID_QUERY = Query(default=None)
 
 # Chat upload constraints
@@ -71,7 +77,7 @@ async def upload_chat_file(
     file: UploadFile,
     board_id: str | None = BOARD_ID_QUERY,
     auth: AuthContext = AUTH_DEP,
-    ctx: OrganizationContext = ORG_ADMIN_DEP,
+    ctx: OrganizationContext = ORG_OPERATOR_DEP,
 ) -> ChatUploadResponse:
     """Upload a file to attach to a chat message.
 
@@ -201,7 +207,7 @@ async def gateways_status(
     params: GatewayResolveQuery = RESOLVE_INPUT_DEP,
     session: AsyncSession = SESSION_DEP,
     auth: AuthContext = AUTH_DEP,
-    ctx: OrganizationContext = ORG_ADMIN_DEP,
+    ctx: OrganizationContext = ORG_MEMBER_DEP,
 ) -> GatewaysStatusResponse:
     """Return gateway connectivity and session status."""
     service = GatewaySessionService(session)
@@ -217,7 +223,7 @@ async def list_gateway_sessions(
     board_id: str | None = BOARD_ID_QUERY,
     session: AsyncSession = SESSION_DEP,
     auth: AuthContext = AUTH_DEP,
-    ctx: OrganizationContext = ORG_ADMIN_DEP,
+    ctx: OrganizationContext = ORG_MEMBER_DEP,
 ) -> GatewaySessionsResponse:
     """List sessions for a gateway associated with a board."""
     service = GatewaySessionService(session)
@@ -234,7 +240,7 @@ async def create_gateway_session(
     board_id: str | None = BOARD_ID_QUERY,
     session: AsyncSession = SESSION_DEP,
     auth: AuthContext = AUTH_DEP,
-    ctx: OrganizationContext = ORG_ADMIN_DEP,
+    ctx: OrganizationContext = ORG_OPERATOR_DEP,
 ) -> CreateSessionResponse:
     """Create a new named chat session on the gateway."""
     service = GatewaySessionService(session)
@@ -253,7 +259,7 @@ async def rename_gateway_session(
     board_id: str | None = BOARD_ID_QUERY,
     session: AsyncSession = SESSION_DEP,
     auth: AuthContext = AUTH_DEP,
-    ctx: OrganizationContext = ORG_ADMIN_DEP,
+    ctx: OrganizationContext = ORG_OPERATOR_DEP,
 ) -> GatewaySessionResponse:
     """Rename an existing chat session."""
     service = GatewaySessionService(session)
@@ -272,7 +278,7 @@ async def get_gateway_session(
     board_id: str | None = BOARD_ID_QUERY,
     session: AsyncSession = SESSION_DEP,
     auth: AuthContext = AUTH_DEP,
-    ctx: OrganizationContext = ORG_ADMIN_DEP,
+    ctx: OrganizationContext = ORG_MEMBER_DEP,
 ) -> GatewaySessionResponse:
     """Get a specific gateway session by key."""
     service = GatewaySessionService(session)
@@ -290,7 +296,7 @@ async def get_session_history(
     board_id: str | None = BOARD_ID_QUERY,
     session: AsyncSession = SESSION_DEP,
     auth: AuthContext = AUTH_DEP,
-    ctx: OrganizationContext = ORG_ADMIN_DEP,
+    ctx: OrganizationContext = ORG_MEMBER_DEP,
 ) -> GatewaySessionHistoryResponse:
     """Fetch chat history for a gateway session."""
     service = GatewaySessionService(session)
@@ -309,7 +315,7 @@ async def send_gateway_session_message(
     board_id: str | None = BOARD_ID_QUERY,
     session: AsyncSession = SESSION_DEP,
     auth: AuthContext = AUTH_DEP,
-    ctx: OrganizationContext = ORG_ADMIN_DEP,
+    ctx: OrganizationContext = ORG_OPERATOR_DEP,
 ) -> OkResponse:
     """Send a message into a specific gateway session."""
     service = GatewaySessionService(session)
@@ -329,7 +335,7 @@ async def abort_gateway_session(
     board_id: str | None = BOARD_ID_QUERY,
     session: AsyncSession = SESSION_DEP,
     auth: AuthContext = AUTH_DEP,
-    ctx: OrganizationContext = ORG_ADMIN_DEP,
+    ctx: OrganizationContext = ORG_OPERATOR_DEP,
 ) -> OkResponse:
     """Abort (stop) an agent's in-progress response."""
     service = GatewaySessionService(session)
@@ -348,7 +354,7 @@ async def compact_gateway_session(
     board_id: str | None = BOARD_ID_QUERY,
     session: AsyncSession = SESSION_DEP,
     auth: AuthContext = AUTH_DEP,
-    ctx: OrganizationContext = ORG_ADMIN_DEP,
+    ctx: OrganizationContext = ORG_OPERATOR_DEP,
 ) -> OkResponse:
     """Compact a session's context (summarise and trim history)."""
     service = GatewaySessionService(session)
@@ -367,7 +373,7 @@ async def reset_gateway_session(
     board_id: str | None = BOARD_ID_QUERY,
     session: AsyncSession = SESSION_DEP,
     auth: AuthContext = AUTH_DEP,
-    ctx: OrganizationContext = ORG_ADMIN_DEP,
+    ctx: OrganizationContext = ORG_OPERATOR_DEP,
 ) -> OkResponse:
     """Reset a session (clear conversation history)."""
     service = GatewaySessionService(session)
@@ -383,7 +389,7 @@ async def reset_gateway_session(
 @router.get("/commands", response_model=GatewayCommandsResponse)
 async def gateway_commands(
     _auth: AuthContext = AUTH_DEP,
-    _ctx: OrganizationContext = ORG_ADMIN_DEP,
+    _ctx: OrganizationContext = ORG_MEMBER_DEP,
 ) -> GatewayCommandsResponse:
     """Return supported gateway protocol methods and events."""
     return GatewayCommandsResponse(
