@@ -763,14 +763,20 @@ export default function DashboardPage() {
   const gatewayConnectedCount = gatewaySnapshots.filter(
     (snapshot) => !snapshot.requestError && snapshot.connected,
   ).length;
-  const gatewayDisconnectedCount = gatewaySnapshots.filter(
-    (snapshot) => !snapshot.requestError && !snapshot.connected,
-  ).length;
   const gatewayUnavailableCount = gatewaySnapshots.filter(
     (snapshot) => Boolean(snapshot.requestError),
   ).length;
-  const gatewayHealthErrorCount = gatewaySnapshots.filter(
-    (snapshot) => Boolean(snapshot.error || snapshot.mainSessionError),
+  // Deduplicated "with issues" count — a single broken gateway is counted
+  // once even if it satisfies multiple failure modes (disconnected AND has
+  // error message AND has main_session_error). Pre-fix: a 2-gateway org
+  // with version-stamp errors rendered "Gateways with issues: 4" because
+  // the sum-of-overlapping-filters double-counted each broken snapshot.
+  const gatewayWithIssuesCount = gatewaySnapshots.filter(
+    (snapshot) =>
+      Boolean(snapshot.requestError) ||
+      !snapshot.connected ||
+      Boolean(snapshot.error) ||
+      Boolean(snapshot.mainSessionError),
   ).length;
 
   const countedSessions = gatewaySnapshots.reduce(
@@ -882,8 +888,8 @@ export default function DashboardPage() {
     },
     {
       label: "Gateways with issues",
-      value: formatCount(gatewayHealthErrorCount + gatewayDisconnectedCount),
-      tone: gatewayHealthErrorCount + gatewayDisconnectedCount > 0 ? "warning" : "success",
+      value: formatCount(gatewayWithIssuesCount),
+      tone: gatewayWithIssuesCount > 0 ? "warning" : "success",
     },
   ];
   const pendingApprovalItems = metrics?.pending_approvals.items ?? [];
