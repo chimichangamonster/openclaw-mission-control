@@ -43,7 +43,7 @@ class GoogleCalendarOAuthProvider:
             "scope": GOOGLE_CALENDAR_SCOPES,
             "state": state,
             "access_type": "offline",
-            "prompt": "consent",
+            "prompt": "select_account consent",
         }
         return f"{self.AUTH_URL}?{urlencode(params)}"
 

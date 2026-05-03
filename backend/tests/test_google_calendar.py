@@ -63,7 +63,7 @@ class TestGoogleCalendarOAuthProvider:
             assert "test-state-xyz" in url
             assert "calendar" in url
             assert "access_type=offline" in url
-            assert "prompt=consent" in url
+            assert "prompt=select_account+consent" in url
 
     def test_token_url_is_google(self):
         from app.services.google.calendar_oauth import GoogleCalendarOAuthProvider

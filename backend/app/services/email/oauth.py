@@ -50,6 +50,10 @@ class ZohoOAuthProvider(EmailOAuthProvider):
             "scope": self.SCOPES,
             "state": state,
             "access_type": "offline",
+            # Zoho OAuth2 may not support "select_account" prompt value (less
+            # standards-compliant than Microsoft/Google). Keep at "consent" only
+            # until Zoho docs are verified or a multi-Zoho-account use case
+            # actually triggers the need.
             "prompt": "consent",
         }
         return f"{self.AUTH_URL}?{urlencode(params)}"
@@ -139,7 +143,7 @@ class MicrosoftOAuthProvider(EmailOAuthProvider):
             "scope": self.SCOPES,
             "state": state,
             "response_mode": "query",
-            "prompt": "consent",
+            "prompt": "select_account consent",
         }
         base = self.AUTH_URL_TEMPLATE.format(tenant=self._tenant)
         return f"{base}?{urlencode(params)}"
@@ -235,7 +239,7 @@ class GoogleEmailOAuthProvider(EmailOAuthProvider):
             "scope": self.SCOPES,
             "state": state,
             "access_type": "offline",
-            "prompt": "consent",
+            "prompt": "select_account consent",
             "include_granted_scopes": "true",
         }
         return f"{self.AUTH_URL}?{urlencode(params)}"

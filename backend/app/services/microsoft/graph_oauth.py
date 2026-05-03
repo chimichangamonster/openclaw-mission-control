@@ -56,7 +56,7 @@ class MicrosoftGraphOAuthProvider:
             "scope": GRAPH_SCOPES,
             "state": state,
             "response_mode": "query",
-            "prompt": "consent",
+            "prompt": "select_account consent",
         }
         base = self.AUTH_URL_TEMPLATE.format(tenant=self._tenant)
         return f"{base}?{urlencode(params)}"
