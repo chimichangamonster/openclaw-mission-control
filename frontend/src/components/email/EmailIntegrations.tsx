@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
+  Bot,
+  BotOff,
   Eye,
   EyeOff,
   Mail,
@@ -101,8 +103,26 @@ export function EmailIntegrations() {
     }
   };
 
+  const handleToggleAgentAccess = async (account: EmailAccount) => {
+    try {
+      const newAccess =
+        account.agent_access === "enabled" ? "disabled" : "enabled";
+      const updated = await updateEmailAccount(account.id, {
+        agent_access: newAccess,
+      });
+      setAccounts((prev) =>
+        prev.map((a) => (a.id === updated.id ? updated : a)),
+      );
+    } catch {
+      setError("Failed to update AI processing.");
+    }
+  };
+
   const canToggleVisibility = (account: EmailAccount) =>
     isAdmin || account.user_id === member?.user_id;
+
+  // Same gate as visibility — only owner or admin can change AI processing.
+  const canToggleAgentAccess = canToggleVisibility;
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
@@ -215,6 +235,15 @@ export function EmailIntegrations() {
                       Shared
                     </span>
                   )}
+                  {account.agent_access === "disabled" ? (
+                    <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600">
+                      AI off
+                    </span>
+                  ) : (
+                    <span className="rounded bg-violet-100 px-1.5 py-0.5 text-xs text-violet-700">
+                      AI on
+                    </span>
+                  )}
                 </div>
                 {account.last_sync_at ? (
                   <p className="mt-1 text-xs text-slate-500">
@@ -244,6 +273,24 @@ export function EmailIntegrations() {
                       <Eye className="h-3.5 w-3.5" />
                     ) : (
                       <EyeOff className="h-3.5 w-3.5" />
+                    )}
+                  </Button>
+                ) : null}
+                {canToggleAgentAccess(account) ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleToggleAgentAccess(account)}
+                    title={
+                      account.agent_access === "enabled"
+                        ? "Turn off AI processing (agents won't read this inbox)"
+                        : "Turn on AI processing (agents can triage and act on this inbox)"
+                    }
+                  >
+                    {account.agent_access === "enabled" ? (
+                      <Bot className="h-3.5 w-3.5" />
+                    ) : (
+                      <BotOff className="h-3.5 w-3.5" />
                     )}
                   </Button>
                 ) : null}

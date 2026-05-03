@@ -157,7 +157,7 @@ async def update_email_account(
     ctx: OrganizationContext = ORG_MEMBER_DEP,
     session: AsyncSession = SESSION_DEP,
 ) -> EmailAccount:
-    """Update email account settings (sync toggle, display name, visibility)."""
+    """Update email account settings (sync toggle, display name, visibility, agent_access)."""
     account = await _get_account_or_404(account_id, ctx, session)
     if payload.sync_enabled is not None:
         account.sync_enabled = payload.sync_enabled
@@ -176,6 +176,19 @@ async def update_email_account(
                 detail="Only the account owner or an admin can change visibility.",
             )
         account.visibility = payload.visibility
+    if payload.agent_access is not None:
+        if payload.agent_access not in ("enabled", "disabled"):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="agent_access must be 'enabled' or 'disabled'",
+            )
+        # Only account owner or org admin can change agent_access
+        if account.user_id != ctx.member.user_id and not is_org_admin(ctx.member):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only the account owner or an admin can change agent access.",
+            )
+        account.agent_access = payload.agent_access
     account.updated_at = utcnow()
     session.add(account)
     await session.commit()

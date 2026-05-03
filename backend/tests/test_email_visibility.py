@@ -207,40 +207,51 @@ async def test_admin_sees_all_accounts():
 
 
 @pytest.mark.asyncio
-async def test_agent_only_sees_shared_accounts():
-    """Agent account listing should exclude private accounts."""
+async def test_agent_only_sees_agent_accessible_accounts():
+    """Agent account listing should exclude accounts where agent_access is disabled.
+
+    Gates on agent_access (whether agents can read this inbox), NOT visibility
+    (which is the human-side UI control). A private inbox with agent_access
+    enabled is still triageable.
+    """
     maker = await _make_session()
     async with maker() as session:
         await _seed(session)
         stmt = select(EmailAccount).where(
             EmailAccount.organization_id == ORG_ID,
             EmailAccount.sync_enabled == True,  # noqa: E712
-            EmailAccount.visibility == "shared",
+            EmailAccount.agent_access == "enabled",
         )
         result = await session.execute(stmt)
         accounts = list(result.scalars().all())
-        assert len(accounts) == 1
-        assert accounts[0].email_address == "henry@wastegurus.ca"
+        # Default seed: shared accounts have agent_access=enabled (model default),
+        # private accounts in fresh test data also have agent_access=enabled by default.
+        # Both should appear in the list. The migration's "private→disabled"
+        # backfill applies only to existing-prod-data on real deploy, not seed.
+        addresses = {a.email_address for a in accounts}
+        assert "henry@wastegurus.ca" in addresses
 
 
 @pytest.mark.asyncio
-async def test_agent_messages_exclude_private_accounts():
-    """Agent message listing should exclude messages from private accounts."""
+async def test_agent_messages_exclude_agent_disabled_accounts():
+    """Agent message listing should exclude messages from agent-disabled accounts."""
     maker = await _make_session()
     async with maker() as session:
         await _seed(session)
-        shared_account_ids = select(EmailAccount.id).where(
+        accessible_account_ids = select(EmailAccount.id).where(
             EmailAccount.organization_id == ORG_ID,
-            EmailAccount.visibility == "shared",
+            EmailAccount.agent_access == "enabled",
         )
         stmt = select(EmailMessage).where(
             EmailMessage.organization_id == ORG_ID,
-            EmailMessage.email_account_id.in_(shared_account_ids),
+            EmailMessage.email_account_id.in_(accessible_account_ids),
         )
         result = await session.execute(stmt)
         messages = list(result.scalars().all())
-        assert len(messages) == 1
-        assert messages[0].subject == "Shared email"
+        # Both shared and private accounts default to agent_access=enabled,
+        # so messages from both should be returned in fresh seed data.
+        subjects = {m.subject for m in messages}
+        assert "Shared email" in subjects
 
 
 # ---------------------------------------------------------------------------
@@ -405,3 +416,173 @@ async def test_unread_count_admin_sees_all_inbox_unread():
         )
         count = (await session.execute(stmt)).scalar_one()
         assert count == 6
+
+
+# ---------------------------------------------------------------------------
+# Agent access (orthogonal to visibility)
+# ---------------------------------------------------------------------------
+#
+# Locks in the 2026-05-03 fix that split the conflated visibility flag into
+# two orthogonal controls. visibility = who in the org can VIEW the inbox in
+# the UI. agent_access = whether agents (triage, reply, archive) can read it.
+#
+# The triggering case: henry@wastegurus.ca was triaged successfully when
+# visibility='shared'. Flipping it to 'private' to keep it out of Samir's
+# view silently disabled triage. The fix ensures private+enabled = "owner-
+# only UI access, agents still triage."
+
+
+@pytest.mark.asyncio
+async def test_agent_access_default_is_enabled():
+    """New email accounts default to agent_access='enabled'."""
+    maker = await _make_session()
+    async with maker() as session:
+        account = EmailAccount(
+            organization_id=ORG_ID,
+            user_id=uuid4(),
+            provider="microsoft",
+            email_address="newaccount@x.ca",
+        )
+        session.add(account)
+        await session.commit()
+        await session.refresh(account)
+        assert account.agent_access == "enabled"
+
+
+@pytest.mark.asyncio
+async def test_private_inbox_with_agent_enabled_is_triageable():
+    """The henry@wastegurus.ca regression case: private + agent_access=enabled.
+
+    Owner sees inbox in UI. Other org members do NOT see it. But the org's
+    triage cron still processes it — agent endpoints gate on agent_access,
+    not visibility.
+    """
+    maker = await _make_session()
+    async with maker() as session:
+        owner_id = uuid4()
+        account = EmailAccount(
+            organization_id=ORG_ID,
+            user_id=owner_id,
+            provider="microsoft",
+            email_address="henry@wastegurus.ca",
+            visibility="private",
+            agent_access="enabled",
+        )
+        session.add(account)
+        await session.commit()
+
+        # Agent-side query — gated on agent_access, not visibility.
+        agent_stmt = select(EmailAccount).where(
+            EmailAccount.organization_id == ORG_ID,
+            EmailAccount.agent_access == "enabled",
+        )
+        agent_visible = list(
+            (await session.execute(agent_stmt)).scalars().all()
+        )
+        assert any(a.email_address == "henry@wastegurus.ca" for a in agent_visible), (
+            "private+enabled inbox MUST be agent-accessible (the triggering bug)"
+        )
+
+
+@pytest.mark.asyncio
+async def test_shared_inbox_with_agent_disabled_is_invisible_to_agents():
+    """Shared in UI but agent_access=disabled — humans see it, agents don't."""
+    maker = await _make_session()
+    async with maker() as session:
+        account = EmailAccount(
+            organization_id=ORG_ID,
+            user_id=uuid4(),
+            provider="microsoft",
+            email_address="sensitive-shared@x.ca",
+            visibility="shared",
+            agent_access="disabled",
+        )
+        session.add(account)
+        await session.commit()
+
+        agent_stmt = select(EmailAccount).where(
+            EmailAccount.organization_id == ORG_ID,
+            EmailAccount.agent_access == "enabled",
+        )
+        agent_visible = list(
+            (await session.execute(agent_stmt)).scalars().all()
+        )
+        assert not any(
+            a.email_address == "sensitive-shared@x.ca" for a in agent_visible
+        ), "shared+disabled inbox must NOT appear to agents"
+
+
+@pytest.mark.asyncio
+async def test_private_inbox_with_agent_disabled_blocks_both():
+    """Private + agent_access=disabled — invisible to other members AND to agents."""
+    maker = await _make_session()
+    async with maker() as session:
+        owner_id = uuid4()
+        account = EmailAccount(
+            organization_id=ORG_ID,
+            user_id=owner_id,
+            provider="microsoft",
+            email_address="quiet-personal@x.ca",
+            visibility="private",
+            agent_access="disabled",
+        )
+        session.add(account)
+        await session.commit()
+
+        # Agent query excludes it.
+        agent_stmt = select(EmailAccount).where(
+            EmailAccount.organization_id == ORG_ID,
+            EmailAccount.agent_access == "enabled",
+        )
+        agent_visible = list(
+            (await session.execute(agent_stmt)).scalars().all()
+        )
+        assert not any(
+            a.email_address == "quiet-personal@x.ca" for a in agent_visible
+        )
+
+        # Non-owner member query (visibility=shared filter) also excludes it.
+        member_stmt = select(EmailAccount).where(
+            EmailAccount.organization_id == ORG_ID,
+            EmailAccount.visibility == "shared",
+        )
+        member_visible = list(
+            (await session.execute(member_stmt)).scalars().all()
+        )
+        assert not any(
+            a.email_address == "quiet-personal@x.ca" for a in member_visible
+        )
+
+
+@pytest.mark.asyncio
+async def test_toggle_agent_access_roundtrip():
+    """Owner can toggle agent_access enabled→disabled→enabled without losing visibility setting."""
+    maker = await _make_session()
+    async with maker() as session:
+        account = EmailAccount(
+            organization_id=ORG_ID,
+            user_id=uuid4(),
+            provider="microsoft",
+            email_address="toggle@x.ca",
+            visibility="private",
+            agent_access="enabled",
+        )
+        session.add(account)
+        await session.commit()
+        await session.refresh(account)
+        assert account.visibility == "private"
+        assert account.agent_access == "enabled"
+
+        account.agent_access = "disabled"
+        session.add(account)
+        await session.commit()
+        await session.refresh(account)
+        assert account.visibility == "private"  # unchanged
+        assert account.agent_access == "disabled"
+
+        account.agent_access = "enabled"
+        session.add(account)
+        await session.commit()
+        await session.refresh(account)
+        assert account.visibility == "private"  # still unchanged
+        assert account.agent_access == "enabled"

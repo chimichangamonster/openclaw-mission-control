@@ -26,6 +26,7 @@ class EmailAccountRead(SQLModel):
     display_name: str | None = None
     sync_enabled: bool
     visibility: str = "shared"
+    agent_access: str = "enabled"
     last_sync_at: datetime | None = None
     last_sync_error: str | None = None
     created_at: datetime
@@ -38,6 +39,7 @@ class EmailAccountUpdate(SQLModel):
     sync_enabled: bool | None = None
     display_name: str | None = None
     visibility: str | None = None
+    agent_access: str | None = None
 
 
 # --- Email Messages ---

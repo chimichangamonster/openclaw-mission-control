@@ -39,7 +39,17 @@ class EmailAccount(TenantScoped, table=True):
     scopes: str | None = None
     provider_account_id: str | None = None
     sync_enabled: bool = Field(default=True, index=True)
+    # visibility: who in the org can VIEW this inbox in the UI.
+    #   "shared"  = all org members + agents.
+    #   "private" = owner + org admins only.
     visibility: str = Field(default="shared", index=True)  # "shared" or "private"
+    # agent_access: whether the org's agents (triage cron, reply/archive flows,
+    # LLM-driven processing) can read messages from this inbox. Orthogonal to
+    # visibility — a private account can still have agent_access=enabled if the
+    # owner wants triage on their inbox without exposing it to other members.
+    #   "enabled"  = agents can read this inbox.
+    #   "disabled" = agents cannot read this inbox (UI access still governed by visibility).
+    agent_access: str = Field(default="enabled", index=True)  # "enabled" or "disabled"
     # Scope controls — restrict what agents can access
     allowed_folders_json: str = Field(default="[]")  # empty = all folders
     blocked_senders_json: str = Field(

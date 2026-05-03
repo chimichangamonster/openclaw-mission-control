@@ -66,10 +66,17 @@ def _redact_message(
     return msg
 
 
-async def _require_shared_account(session: AsyncSession, msg: EmailMessage) -> EmailAccount:
-    """Load the parent email account and reject if it's private."""
+async def _require_agent_accessible_account(
+    session: AsyncSession, msg: EmailMessage
+) -> EmailAccount:
+    """Load the parent email account and reject if agents are blocked from it.
+
+    Gates on `agent_access`, not `visibility`. A private inbox can still be
+    agent-accessible if the owner enables AI processing on it (e.g. triage on
+    a private mailbox the owner doesn't want other org members to see).
+    """
     account = await session.get(EmailAccount, msg.email_account_id)
-    if account is None or account.visibility == "private":
+    if account is None or account.agent_access == "disabled":
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
     return account
 
@@ -125,12 +132,16 @@ async def agent_list_email_accounts(
     if board is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
 
+    # Agent endpoint: gate on agent_access (whether agents can read this inbox),
+    # NOT visibility (which is the human-side UI access control). A private
+    # inbox with agent_access='enabled' is still triageable — owner just doesn't
+    # want other org members seeing it in the UI.
     stmt = (
         select(EmailAccount)
         .where(
             EmailAccount.organization_id == board.organization_id,  # type: ignore[arg-type]
             EmailAccount.sync_enabled.is_(True),  # type: ignore[attr-defined]
-            EmailAccount.visibility == "shared",  # type: ignore[arg-type]
+            EmailAccount.agent_access == "enabled",  # type: ignore[arg-type]
         )
         .order_by(EmailAccount.created_at.desc())  # type: ignore[attr-defined]
     )
@@ -160,16 +171,17 @@ async def agent_list_email_messages(
 
     await _enforce_email_to_llm_policy(session, board.organization_id)
 
-    # Only include messages from shared (non-private) accounts
-    shared_account_ids = select(EmailAccount.id).where(  # type: ignore[call-overload]
+    # Agent endpoint: include messages from any account where agent_access is
+    # enabled — not gated on visibility. A private+enabled inbox triages too.
+    accessible_account_ids = select(EmailAccount.id).where(  # type: ignore[call-overload]
         EmailAccount.organization_id == board.organization_id,
-        EmailAccount.visibility == "shared",
+        EmailAccount.agent_access == "enabled",
     )
     stmt = (
         select(EmailMessage)
         .where(
             EmailMessage.organization_id == board.organization_id,  # type: ignore[arg-type]
-            EmailMessage.email_account_id.in_(shared_account_ids),  # type: ignore[attr-defined]
+            EmailMessage.email_account_id.in_(accessible_account_ids),  # type: ignore[attr-defined]
         )
         .order_by(EmailMessage.received_at.desc())  # type: ignore[attr-defined]
         .offset(offset)
@@ -205,7 +217,7 @@ async def agent_get_email_message(
     msg = await session.get(EmailMessage, message_id)
     if msg is None or msg.organization_id != board.organization_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
-    await _require_shared_account(session, msg)
+    await _require_agent_accessible_account(session, msg)
     await _enforce_email_to_llm_policy(session, board.organization_id)
     return _redact_message(msg)
 
@@ -231,7 +243,7 @@ async def agent_update_email_message(
     msg = await session.get(EmailMessage, message_id)
     if msg is None or msg.organization_id != board.organization_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
-    await _require_shared_account(session, msg)
+    await _require_agent_accessible_account(session, msg)
 
     for field in (
         "is_read",
@@ -276,7 +288,7 @@ async def agent_reply_to_email(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
 
     account = await session.get(EmailAccount, msg.email_account_id)
-    if account is None or account.visibility == "private":
+    if account is None or account.agent_access == "disabled":
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
 
     await _enforce_email_to_llm_policy(session, board.organization_id)
@@ -409,7 +421,7 @@ async def agent_archive_email(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
 
     account = await session.get(EmailAccount, msg.email_account_id)
-    if account is None or account.visibility == "private":
+    if account is None or account.agent_access == "disabled":
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
 
     access_token = await get_valid_access_token(session, account)
@@ -459,7 +471,7 @@ async def agent_create_task_from_email(
     msg = await session.get(EmailMessage, message_id)
     if msg is None or msg.organization_id != board.organization_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
-    await _require_shared_account(session, msg)
+    await _require_agent_accessible_account(session, msg)
     await _enforce_email_to_llm_policy(session, board.organization_id)
 
     # Redact body before persisting it into the task description — task descriptions
