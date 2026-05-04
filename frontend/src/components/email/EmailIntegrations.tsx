@@ -18,6 +18,7 @@ import { useOrganizationMembership } from "@/lib/use-organization-membership";
 
 import { Button } from "@/components/ui/button";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
+import { EmailSignaturesPanel } from "@/components/email/EmailSignaturesPanel";
 import {
   type EmailAccount,
   deleteEmailAccount,
@@ -207,8 +208,9 @@ export function EmailIntegrations() {
           {accounts.map((account) => (
             <div
               key={account.id}
-              className="flex items-center justify-between rounded-lg border border-slate-200 p-4"
+              className="rounded-lg border border-slate-200 p-4"
             >
+              <div className="flex items-center justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium text-slate-900">
@@ -327,6 +329,12 @@ export function EmailIntegrations() {
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
               </div>
+              </div>
+              <EmailSignaturesPanel
+                accountId={account.id}
+                emailAddress={account.email_address}
+                canManage={canToggleVisibility(account)}
+              />
             </div>
           ))}
         </div>

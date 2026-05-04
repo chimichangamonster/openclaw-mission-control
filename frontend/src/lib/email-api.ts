@@ -78,6 +78,62 @@ export async function deleteEmailAccount(accountId: string): Promise<void> {
   });
 }
 
+// --- Email Signatures ---
+
+export interface EmailSignature {
+  id: string;
+  organization_id: string;
+  email_account_id: string;
+  name: string;
+  body_html: string;
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function fetchEmailSignatures(
+  accountId: string,
+): Promise<EmailSignature[]> {
+  const res = await customFetch<{ data: EmailSignature[] }>(
+    `${V1}/email/accounts/${accountId}/signatures`,
+    { method: "GET" },
+  );
+  return res.data;
+}
+
+export async function createEmailSignature(
+  accountId: string,
+  data: { name: string; body_html: string; is_default?: boolean },
+): Promise<EmailSignature> {
+  const res = await customFetch<{ data: EmailSignature }>(
+    `${V1}/email/accounts/${accountId}/signatures`,
+    { method: "POST", body: JSON.stringify(data) },
+  );
+  return res.data;
+}
+
+export async function updateEmailSignature(
+  accountId: string,
+  signatureId: string,
+  data: { name?: string; body_html?: string; is_default?: boolean },
+): Promise<EmailSignature> {
+  const res = await customFetch<{ data: EmailSignature }>(
+    `${V1}/email/accounts/${accountId}/signatures/${signatureId}`,
+    { method: "PATCH", body: JSON.stringify(data) },
+  );
+  return res.data;
+}
+
+export async function deleteEmailSignature(
+  accountId: string,
+  signatureId: string,
+): Promise<void> {
+  await customFetch(
+    `${V1}/email/accounts/${accountId}/signatures/${signatureId}`,
+    { method: "DELETE" },
+  );
+}
+
 export async function updateEmailAccount(
   accountId: string,
   data: {

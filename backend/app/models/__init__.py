@@ -30,6 +30,7 @@ from app.models.ecosystem_repos import EcosystemRepo, EcosystemSnapshot
 from app.models.email_accounts import EmailAccount
 from app.models.email_attachments import EmailAttachment
 from app.models.email_messages import EmailMessage
+from app.models.email_signatures import EmailSignature
 from app.models.exchange_accounts import ExchangeAccount
 from app.models.gateways import Gateway
 from app.models.generated_documents import GeneratedDocument
@@ -96,6 +97,7 @@ __all__ = [
     "ExchangeAccount",
     "EmailAttachment",
     "EmailMessage",
+    "EmailSignature",
     "GeneratedDocument",
     "Gateway",
     "PolymarketPosition",

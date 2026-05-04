@@ -17,6 +17,7 @@ from app.core.time import utcnow
 from app.models.email_accounts import EmailAccount
 from app.models.email_attachments import EmailAttachment
 from app.models.email_messages import EmailMessage
+from app.models.email_signatures import EmailSignature
 from app.schemas.email import (
     EmailAccountRead,
     EmailAccountUpdate,
@@ -27,6 +28,9 @@ from app.schemas.email import (
     EmailMessageUpdate,
     EmailReplyCreate,
     EmailSendCreate,
+    EmailSignatureCreate,
+    EmailSignatureRead,
+    EmailSignatureUpdate,
     EmailSyncTriggerResponse,
 )
 from app.services.email.queue import QueuedEmailSync, enqueue_email_sync
@@ -625,6 +629,7 @@ async def send_new_email(
         subject=payload.subject,
         body=payload.body,
         body_html=payload.body_html,
+        signature_id=payload.signature_id,
     )
     return {"ok": True}
 
@@ -667,6 +672,161 @@ async def archive_email(
     session.add(msg)
     await session.commit()
     return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# Signature endpoints
+# ---------------------------------------------------------------------------
+
+
+def _can_manage_signatures(account: EmailAccount, ctx: OrganizationContext) -> bool:
+    """Account owner or org admin can manage signatures (mirrors visibility/agent_access)."""
+    return account.user_id == ctx.member.user_id or is_org_admin(ctx.member)
+
+
+async def _clear_other_defaults(
+    session: AsyncSession,
+    *,
+    email_account_id: UUID,
+    keep_id: UUID | None,
+) -> None:
+    """Clear is_default on all signatures for this account except keep_id."""
+    stmt = select(EmailSignature).where(
+        EmailSignature.email_account_id == email_account_id,  # type: ignore[arg-type]
+        EmailSignature.is_default.is_(True),  # type: ignore[attr-defined]
+    )
+    result = await session.execute(stmt)
+    for sig in result.scalars().all():
+        if keep_id is None or sig.id != keep_id:
+            sig.is_default = False
+            session.add(sig)
+
+
+@router.get(
+    "/accounts/{account_id}/signatures",
+    response_model=list[EmailSignatureRead],
+)
+async def list_email_signatures(
+    account_id: UUID,
+    ctx: OrganizationContext = ORG_MEMBER_DEP,
+    session: AsyncSession = SESSION_DEP,
+) -> list[EmailSignature]:
+    """List signatures for an email account."""
+    account = await _get_account_or_404(account_id, ctx, session)
+    stmt = (
+        select(EmailSignature)
+        .where(EmailSignature.email_account_id == account.id)  # type: ignore[arg-type]
+        .order_by(EmailSignature.created_at)  # type: ignore[arg-type]
+    )
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
+@router.post(
+    "/accounts/{account_id}/signatures",
+    response_model=EmailSignatureRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_email_signature(
+    account_id: UUID,
+    payload: EmailSignatureCreate,
+    ctx: OrganizationContext = ORG_MEMBER_DEP,
+    session: AsyncSession = SESSION_DEP,
+) -> EmailSignature:
+    """Create a new signature for an email account."""
+    account = await _get_account_or_404(account_id, ctx, session)
+    if not _can_manage_signatures(account, ctx):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the account owner or an admin can manage signatures.",
+        )
+
+    sig = EmailSignature(
+        organization_id=ctx.organization.id,
+        email_account_id=account.id,
+        name=payload.name,
+        body_html=payload.body_html,
+        is_default=payload.is_default,
+    )
+    if payload.is_default:
+        await _clear_other_defaults(session, email_account_id=account.id, keep_id=None)
+    session.add(sig)
+    await session.commit()
+    await session.refresh(sig)
+    return sig
+
+
+@router.patch(
+    "/accounts/{account_id}/signatures/{signature_id}",
+    response_model=EmailSignatureRead,
+)
+async def update_email_signature(
+    account_id: UUID,
+    signature_id: UUID,
+    payload: EmailSignatureUpdate,
+    ctx: OrganizationContext = ORG_MEMBER_DEP,
+    session: AsyncSession = SESSION_DEP,
+) -> EmailSignature:
+    """Update a signature. Setting ``is_default=True`` clears other defaults atomically."""
+    account = await _get_account_or_404(account_id, ctx, session)
+    if not _can_manage_signatures(account, ctx):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the account owner or an admin can manage signatures.",
+        )
+    sig = await session.get(EmailSignature, signature_id)
+    if sig is None or sig.email_account_id != account.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+
+    if payload.name is not None:
+        if not payload.name.strip():
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="name must not be empty",
+            )
+        sig.name = payload.name
+    if payload.body_html is not None:
+        if not payload.body_html.strip():
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="body_html must not be empty",
+            )
+        sig.body_html = payload.body_html
+    if payload.is_default is True:
+        await _clear_other_defaults(session, email_account_id=account.id, keep_id=sig.id)
+        sig.is_default = True
+    elif payload.is_default is False:
+        sig.is_default = False
+    sig.updated_at = utcnow()
+    session.add(sig)
+    await session.commit()
+    await session.refresh(sig)
+    return sig
+
+
+@router.delete(
+    "/accounts/{account_id}/signatures/{signature_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_email_signature(
+    account_id: UUID,
+    signature_id: UUID,
+    ctx: OrganizationContext = ORG_MEMBER_DEP,
+    session: AsyncSession = SESSION_DEP,
+) -> Response:
+    """Delete a signature."""
+    account = await _get_account_or_404(account_id, ctx, session)
+    if not _can_manage_signatures(account, ctx):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the account owner or an admin can manage signatures.",
+        )
+    sig = await session.get(EmailSignature, signature_id)
+    if sig is None or sig.email_account_id != account.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    await session.delete(sig)
+    await session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get(

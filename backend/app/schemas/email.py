@@ -111,6 +111,39 @@ class EmailSendCreate(SQLModel):
     subject: NonEmptyStr
     body: NonEmptyStr
     body_html: str | None = None
+    signature_id: UUID | None = None  # explicit pick; None = use account default
+
+
+# --- Email Signatures ---
+
+
+class EmailSignatureRead(SQLModel):
+    """Serialized email signature."""
+
+    id: UUID
+    organization_id: UUID
+    email_account_id: UUID
+    name: str
+    body_html: str
+    is_default: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class EmailSignatureCreate(SQLModel):
+    """Payload for creating an email signature."""
+
+    name: NonEmptyStr
+    body_html: NonEmptyStr
+    is_default: bool = False
+
+
+class EmailSignatureUpdate(SQLModel):
+    """Payload for updating an email signature."""
+
+    name: str | None = None
+    body_html: str | None = None
+    is_default: bool | None = None
 
 
 class EmailSyncTriggerResponse(SQLModel):

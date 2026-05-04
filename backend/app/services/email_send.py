@@ -9,6 +9,7 @@ from sqlalchemy import select
 from app.core.logging import get_logger
 from app.models.email_accounts import EmailAccount
 from app.services.email.token_manager import get_valid_access_token
+from app.services.email_signatures import append_signature_html, resolve_signature
 
 if TYPE_CHECKING:
     from uuid import UUID
@@ -56,6 +57,7 @@ async def send_email(
     body: str,
     body_html: str | None = None,
     attachments: list[dict[str, Any]] | None = None,
+    signature_id: UUID | None = None,
 ) -> dict[str, Any]:
     """Send an email using the given account's provider.
 
@@ -67,11 +69,18 @@ async def send_email(
         body: Plain-text body.
         body_html: Optional HTML body (used when provider supports it).
         attachments: Optional list of ``{filename, content_bytes, content_type}`` dicts.
+        signature_id: Optional explicit signature to append. ``None`` resolves to
+            the account's default signature; if no default exists, no signature
+            is appended.
 
     Returns:
         Provider response dict.
     """
     access_token = await get_valid_access_token(session, account)
+
+    sig = await resolve_signature(session, account, signature_id)
+    if sig is not None:
+        body, body_html = append_signature_html(body_html, body, sig.body_html)
 
     if account.provider == "zoho":
         from app.services.email.providers.zoho import send_message as zoho_send_message
