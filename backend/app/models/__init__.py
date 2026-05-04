@@ -56,6 +56,16 @@ from app.models.personal_bookkeeping import (
 from app.models.polymarket_positions import PolymarketPosition
 from app.models.polymarket_risk_config import PolymarketRiskConfig
 from app.models.polymarket_wallets import PolymarketWallet
+from app.models.regulatory import (
+    RegulatoryCountry,
+    RegulatoryPhase,
+    RegulatoryPriorityNote,
+    RegulatoryStream,
+    RegulatoryTag,
+    RegulatoryTask,
+    RegulatoryTaskNote,
+    RegulatoryTaskTag,
+)
 from app.models.skills import GatewayInstalledSkill, MarketplaceSkill, SkillPack
 from app.models.tag_assignments import TagAssignment
 from app.models.tags import Tag
@@ -134,6 +144,14 @@ __all__ = [
     "PaperPortfolio",
     "PaperPosition",
     "PaperTrade",
+    "RegulatoryCountry",
+    "RegulatoryPhase",
+    "RegulatoryPriorityNote",
+    "RegulatoryStream",
+    "RegulatoryTag",
+    "RegulatoryTask",
+    "RegulatoryTaskNote",
+    "RegulatoryTaskTag",
     "WatchlistItem",
     "BkClient",
     "BkExpense",
