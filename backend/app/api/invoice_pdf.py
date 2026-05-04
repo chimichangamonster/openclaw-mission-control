@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import Response
 from sqlmodel import select
 
-from app.api.deps import ORG_ACTOR_DEP
+from app.api.deps import ORG_ACTOR_DEP, require_org_from_actor
 from app.core.config import settings
 from app.core.logging import get_logger
 from app.db.session import async_session_maker
@@ -70,17 +70,36 @@ async def list_invoices(
 )
 async def get_invoice_pdf(
     invoice_id: str,
-    token: str = Query(..., description="Auth token"),
+    request: Request,
+    token: str | None = Query(default=None, description="Legacy local-auth token (back-compat)"),
     company_name: str = Query(default=None),
     company_email: str = Query(default=None),
 ) -> Response:
-    """Generate a PDF for the given invoice. Auth via ?token= query param."""
-    if token != settings.local_auth_token:
+    """Generate a PDF for the given invoice.
+
+    Two auth paths:
+    1. `Authorization: Bearer <clerk-or-agent-token>` — resolves org context, scopes the
+       query to that org's invoices. Used by the web UI in Clerk mode and by gateway agents.
+    2. `?token=<MC_LOCAL_AUTH_TOKEN>` — legacy back-compat for cron skills that already
+       hardcode this URL shape. No org scoping (single-token == single trust boundary).
+    """
+    org_id: str | None = None
+    has_auth_header = request.headers.get("authorization") is not None
+    if has_auth_header:
+        async with async_session_maker() as auth_session:
+            ctx = await require_org_from_actor(request=request, session=auth_session)
+            org_id = str(ctx.organization.id)
+    elif token and token == settings.local_auth_token:
+        org_id = None  # legacy: no org scoping (single-token == single trust boundary)
+    else:
         raise HTTPException(status_code=401, detail="Invalid token")
 
     async with async_session_maker() as session:
-        # Fetch invoice
-        inv_result = await session.execute(select(BkInvoice).where(BkInvoice.id == invoice_id))
+        # Fetch invoice — scope by org when authenticated via header
+        inv_query = select(BkInvoice).where(BkInvoice.id == invoice_id)
+        if org_id is not None:
+            inv_query = inv_query.where(BkInvoice.organization_id == org_id)
+        inv_result = await session.execute(inv_query)
         invoice = inv_result.scalars().first()
         if not invoice:
             raise HTTPException(status_code=404, detail="Invoice not found")

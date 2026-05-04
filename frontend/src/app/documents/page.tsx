@@ -6,6 +6,8 @@ import { useCallback, useEffect, useState } from "react";
 import { Download, FileText, RefreshCw, Trash2 } from "lucide-react";
 
 import { useAuth } from "@/auth/clerk";
+import { getLocalAuthToken, isLocalAuthMode } from "@/auth/localAuth";
+import { getApiBaseUrl } from "@/lib/api-base";
 import { DashboardPageLayout } from "@/components/templates/DashboardPageLayout";
 import { Button } from "@/components/ui/button";
 import { customFetch } from "@/api/mutator";
@@ -41,11 +43,47 @@ interface GeneratedDoc {
   created_at: string;
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+type ClerkSession = { getToken: () => Promise<string> };
+type ClerkGlobal = { session?: ClerkSession | null };
 
-function getToken(): string {
-  if (typeof window === "undefined") return "";
-  return localStorage.getItem("mc_local_auth_token") || "";
+async function resolveAuthToken(): Promise<string | null> {
+  if (typeof window === "undefined") return null;
+  if (isLocalAuthMode()) {
+    return getLocalAuthToken();
+  }
+  const clerk = (window as unknown as { Clerk?: ClerkGlobal }).Clerk;
+  if (!clerk?.session) return null;
+  try {
+    return await clerk.session.getToken();
+  } catch {
+    return null;
+  }
+}
+
+async function downloadInvoicePdf(invoiceId: string, invoiceNumber: string | null): Promise<void> {
+  const token = await resolveAuthToken();
+  if (!token) {
+    alert("Not signed in — please sign in and try again.");
+    return;
+  }
+  const url = `${getApiBaseUrl()}/api/v1/invoices/${invoiceId}/pdf?company_name=Vantage+Solutions&company_email=info@vantagesolutions.ca`;
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    alert(`Failed to download PDF (HTTP ${response.status}): ${text || response.statusText}`);
+    return;
+  }
+  const blob = await response.blob();
+  const blobUrl = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = blobUrl;
+  a.download = `invoice-${invoiceNumber || invoiceId.slice(0, 8)}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(blobUrl);
 }
 
 async function fetchInvoices(): Promise<Invoice[]> {
@@ -58,11 +96,6 @@ async function fetchGeneratedDocs(): Promise<GeneratedDoc[]> {
   const res: any = await customFetch("/api/v1/documents/generated", { method: "GET" });
   const data = res?.data ?? res;
   return Array.isArray(data) ? data : [];
-}
-
-function getPdfUrl(invoiceId: string): string {
-  const token = getToken();
-  return `${API_URL}/api/v1/invoices/${invoiceId}/pdf?token=${token}&company_name=Vantage+Solutions&company_email=info@vantagesolutions.ca`;
 }
 
 function statusBadge(status: string) {
@@ -260,15 +293,14 @@ export default function DocumentsPage() {
                           {inv.due_date ? new Date(inv.due_date).toLocaleDateString("en-CA") : "—"}
                         </td>
                         <td className="px-4 py-3 text-right">
-                          <a
-                            href={getPdfUrl(inv.id)}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                          <button
+                            type="button"
+                            onClick={() => downloadInvoicePdf(inv.id, inv.invoice_number)}
                             className="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100 transition"
                           >
                             <Download className="h-3.5 w-3.5" />
                             PDF
-                          </a>
+                          </button>
                         </td>
                       </tr>
                     ))}
