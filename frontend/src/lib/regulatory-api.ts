@@ -204,6 +204,340 @@ export async function listPriorityNotes(phaseId: string): Promise<RegulatoryPrio
 }
 
 // ---------------------------------------------------------------------------
+// Phase 2b — task-note helpers
+// ---------------------------------------------------------------------------
+
+export interface RegulatoryTaskNote {
+  id: string;
+  task_id: string;
+  body: string;
+  author_user_id: string;
+  created_at: string;
+}
+
+export async function listTaskNotes(taskId: string): Promise<RegulatoryTaskNote[]> {
+  const res = await customFetch(`${V1}/regulatory/tasks/${taskId}/notes`, {
+    method: "GET",
+  });
+  return unwrap<RegulatoryTaskNote[]>(res);
+}
+
+export async function createTaskNote(
+  taskId: string,
+  body: string,
+): Promise<RegulatoryTaskNote> {
+  const res = await customFetch(`${V1}/regulatory/tasks/${taskId}/notes`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ body }),
+  });
+  return unwrap<RegulatoryTaskNote>(res);
+}
+
+export async function deleteTaskNote(
+  taskId: string,
+  noteId: string,
+): Promise<void> {
+  await customFetch(`${V1}/regulatory/tasks/${taskId}/notes/${noteId}`, {
+    method: "DELETE",
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2b — task mutations
+// ---------------------------------------------------------------------------
+
+export async function toggleTask(taskId: string): Promise<RegulatoryTask> {
+  const res = await customFetch(`${V1}/regulatory/tasks/${taskId}/toggle`, {
+    method: "POST",
+  });
+  return unwrap<RegulatoryTask>(res);
+}
+
+export interface RegulatoryTaskUpdate {
+  body?: string;
+  note?: string | null;
+  assignee_user_id?: string | null;
+  due_date?: string | null;
+  sort_order?: number;
+}
+
+export async function updateTask(
+  taskId: string,
+  payload: RegulatoryTaskUpdate,
+): Promise<RegulatoryTask> {
+  const res = await customFetch(`${V1}/regulatory/tasks/${taskId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return unwrap<RegulatoryTask>(res);
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2b — task-tag mutations
+// ---------------------------------------------------------------------------
+
+export interface RegulatoryTaskTagLink {
+  task_id: string;
+  tag_id: string;
+  created_at: string;
+}
+
+export async function addTaskTag(
+  taskId: string,
+  tagId: string,
+): Promise<RegulatoryTaskTagLink> {
+  const res = await customFetch(`${V1}/regulatory/task-tags`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ task_id: taskId, tag_id: tagId }),
+  });
+  return unwrap<RegulatoryTaskTagLink>(res);
+}
+
+export async function removeTaskTag(
+  taskId: string,
+  tagId: string,
+): Promise<void> {
+  await customFetch(`${V1}/regulatory/task-tags/${taskId}/${tagId}`, {
+    method: "DELETE",
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2b — phase / task creation
+// ---------------------------------------------------------------------------
+
+export interface RegulatoryPhaseCreate {
+  stream_id: string;
+  country_id: string;
+  name: string;
+  badge_kind: string;
+  timing_label?: string | null;
+  sort_order?: number;
+  default_open?: boolean;
+}
+
+export async function createPhase(
+  payload: RegulatoryPhaseCreate,
+): Promise<RegulatoryPhase> {
+  const res = await customFetch(`${V1}/regulatory/phases`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return unwrap<RegulatoryPhase>(res);
+}
+
+export interface RegulatoryTaskCreate {
+  phase_id: string;
+  body: string;
+  note?: string | null;
+  assignee_user_id?: string | null;
+  due_date?: string | null;
+  sort_order?: number;
+}
+
+export async function createTask(
+  payload: RegulatoryTaskCreate,
+): Promise<RegulatoryTask> {
+  const res = await customFetch(`${V1}/regulatory/tasks`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return unwrap<RegulatoryTask>(res);
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2b — Import HTML (admin)
+// ---------------------------------------------------------------------------
+
+export interface ImportHtmlSummary {
+  countries_created: number;
+  streams_created: number;
+  streams_skipped_existing: number;
+  phases_created: number;
+  phases_skipped_existing: number;
+  tasks_created: number;
+  tasks_skipped_duplicate: number;
+  tags_created: number;
+  priority_notes_created: number;
+}
+
+export async function importTrackerHtml(
+  file: File,
+): Promise<ImportHtmlSummary> {
+  const form = new FormData();
+  form.append("file", file);
+  // NOTE: do NOT set Content-Type — the browser sets it with the multipart
+  // boundary parameter automatically when the body is a FormData instance.
+  const res = await customFetch(`${V1}/regulatory/import-html`, {
+    method: "POST",
+    body: form,
+  });
+  return unwrap<ImportHtmlSummary>(res);
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2b — Authored snapshot (Path A: keeps IDs threaded through every
+// level so mutation handlers in the page have something to point at). The
+// public-snapshot contract (`loadCountrySnapshot` / `regulatory_public.py`)
+// is deliberately untouched — Phase 3 marketing-site SSR keeps using it.
+// ---------------------------------------------------------------------------
+
+export interface AuthoredSnapshotTaskTag {
+  id: string;
+  slug: string;
+  label: string;
+  color_token: string;
+}
+
+export interface AuthoredSnapshotTask {
+  id: string;
+  body: string;
+  note: string | null;
+  completed: boolean;
+  assignee_user_id: string | null;
+  due_date: string | null;
+  tags: AuthoredSnapshotTaskTag[];
+}
+
+export interface AuthoredSnapshotPriorityNote {
+  id: string;
+  body: string;
+  severity: string;
+}
+
+export interface AuthoredSnapshotPhase {
+  id: string;
+  name: string;
+  badge_kind: string;
+  timing_label: string | null;
+  default_open: boolean;
+  priority_notes: AuthoredSnapshotPriorityNote[];
+  tasks: AuthoredSnapshotTask[];
+}
+
+export interface AuthoredSnapshotStream {
+  id: string;
+  slug: string;
+  name: string;
+  color_token: string;
+  description: string | null;
+  timeline_label: string | null;
+  totals: SnapshotTotals;
+  phases: AuthoredSnapshotPhase[];
+}
+
+export interface AuthoredSnapshot {
+  country: { id: string; code: string; display_label: string };
+  totals: SnapshotTotals;
+  streams: AuthoredSnapshotStream[];
+}
+
+export async function loadAuthoredSnapshot(
+  countryCode: string,
+): Promise<AuthoredSnapshot | null> {
+  const countries = await listCountries();
+  const country = countries.find((c) => c.code === countryCode);
+  if (!country) return null;
+
+  const streams = await listStreams(false);
+
+  const snapshotStreams: AuthoredSnapshotStream[] = [];
+  let grandTotal = 0;
+  let grandDone = 0;
+
+  for (const stream of streams) {
+    const phases = await listPhases({
+      streamId: stream.id,
+      countryId: country.id,
+    });
+
+    const snapshotPhases: AuthoredSnapshotPhase[] = [];
+    let streamTotal = 0;
+    let streamDone = 0;
+
+    for (const phase of phases) {
+      const [tasks, priorityNotes] = await Promise.all([
+        listTasks(phase.id),
+        listPriorityNotes(phase.id),
+      ]);
+
+      const snapshotTasks: AuthoredSnapshotTask[] = [];
+      for (const task of tasks) {
+        const tags = await listTaskTags(task.id);
+        snapshotTasks.push({
+          id: task.id,
+          body: task.body,
+          note: task.note,
+          completed: task.completed,
+          assignee_user_id: task.assignee_user_id,
+          due_date: task.due_date,
+          tags: tags.map((t) => ({
+            id: t.id,
+            slug: t.slug,
+            label: t.label,
+            color_token: t.color_token,
+          })),
+        });
+      }
+
+      streamTotal += tasks.length;
+      streamDone += tasks.filter((t) => t.completed).length;
+
+      snapshotPhases.push({
+        id: phase.id,
+        name: phase.name,
+        badge_kind: phase.badge_kind,
+        timing_label: phase.timing_label,
+        default_open: phase.default_open,
+        priority_notes: priorityNotes.map((n) => ({
+          id: n.id,
+          body: n.body,
+          severity: n.severity,
+        })),
+        tasks: snapshotTasks,
+      });
+    }
+
+    grandTotal += streamTotal;
+    grandDone += streamDone;
+
+    snapshotStreams.push({
+      id: stream.id,
+      slug: stream.slug,
+      name: stream.name,
+      color_token: stream.color_token,
+      description: stream.description,
+      timeline_label: stream.timeline_label,
+      totals: {
+        tasks: streamTotal,
+        completed: streamDone,
+        percent: percent(streamDone, streamTotal),
+      },
+      phases: snapshotPhases,
+    });
+  }
+
+  return {
+    country: {
+      id: country.id,
+      code: country.code,
+      display_label: country.display_label,
+    },
+    totals: {
+      tasks: grandTotal,
+      completed: grandDone,
+      percent: percent(grandDone, grandTotal),
+    },
+    streams: snapshotStreams,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Aggregator — produces the public-snapshot shape from authenticated reads
 // ---------------------------------------------------------------------------
 

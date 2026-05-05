@@ -2,21 +2,36 @@
 
 export const dynamic = "force-dynamic";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 
 import { useAuth } from "@/auth/clerk";
 import { DashboardPageLayout } from "@/components/templates/DashboardPageLayout";
 import { FeatureGate } from "@/components/molecules/FeatureGate";
 import { useOrganizationMembership } from "@/lib/use-organization-membership";
+import { useOrgMembers } from "@/lib/use-org-members";
 import {
-  loadCountrySnapshot,
-  type CountrySnapshot,
-  type SnapshotPhase,
-  type SnapshotPriorityNote,
-  type SnapshotStream,
-  type SnapshotTask,
-  type SnapshotTaskTag,
+  listTags,
+  loadAuthoredSnapshot,
+  toggleTask,
+  type AuthoredSnapshot,
+  type AuthoredSnapshotPhase,
+  type AuthoredSnapshotPriorityNote,
+  type AuthoredSnapshotStream,
+  type AuthoredSnapshotTask,
+  type AuthoredSnapshotTaskTag,
+  type RegulatoryTag,
 } from "@/lib/regulatory-api";
+import { RegulatoryDetailPanel } from "./regulatory-detail-panel";
+import {
+  AddPhaseModal,
+  AddTaskModal,
+  ImportHtmlModal,
+} from "./regulatory-modals";
 
 import styles from "./regulatory.module.css";
 
@@ -28,8 +43,6 @@ const COUNTRY_TABS: { code: string; label: string; enabled: boolean }[] = [
 
 // ---------------------------------------------------------------------------
 // Pure helpers — visual mapping from data fields to CSS-module class names.
-// Kept as functions (not maps) so the lint hook doesn't yell about unused
-// keys when a new badge_kind / severity / color_token surfaces upstream.
 // ---------------------------------------------------------------------------
 
 function badgeClass(badgeKind: string): string {
@@ -99,12 +112,12 @@ function tagPillClass(colorToken: string): string {
 // Render pieces
 // ---------------------------------------------------------------------------
 
-function TagPills({ tags }: { tags: SnapshotTaskTag[] }) {
+function TagPills({ tags }: { tags: AuthoredSnapshotTaskTag[] }) {
   if (tags.length === 0) return null;
   return (
     <span className={styles.tagPills}>
       {tags.map((t) => (
-        <span key={t.slug} className={tagPillClass(t.color_token)}>
+        <span key={t.id} className={tagPillClass(t.color_token)}>
           {t.label}
         </span>
       ))}
@@ -112,39 +125,69 @@ function TagPills({ tags }: { tags: SnapshotTaskTag[] }) {
   );
 }
 
-function TaskRow({ task }: { task: SnapshotTask }) {
+function TaskRow({
+  task,
+  onToggle,
+  onSelect,
+}: {
+  task: AuthoredSnapshotTask;
+  onToggle: (taskId: string) => void;
+  onSelect: (task: AuthoredSnapshotTask) => void;
+}) {
   return (
     <li
       className={`${styles.taskItem} ${task.completed ? styles.taskItemDone : ""}`}
     >
-      <input type="checkbox" checked={task.completed} disabled readOnly />
-      <span className={styles.taskBody}>
+      <input
+        type="checkbox"
+        checked={task.completed}
+        aria-label={task.body}
+        onChange={() => onToggle(task.id)}
+      />
+      <button
+        type="button"
+        className={`${styles.taskBody} ${styles.taskBodyButton}`}
+        onClick={() => onSelect(task)}
+      >
         {task.body}
-        {/* Snapshot shape doesn't carry note (sanitized in public payload). */}
-      </span>
+      </button>
       <TagPills tags={task.tags} />
     </li>
   );
 }
 
-function PriorityNoteBanner({ note }: { note: SnapshotPriorityNote }) {
+function PriorityNoteBanner({ note }: { note: AuthoredSnapshotPriorityNote }) {
   return <div className={priorityNoteClass(note.severity)}>{note.body}</div>;
 }
 
-function PhaseBlock({ phase }: { phase: SnapshotPhase }) {
-  const [open, setOpen] = useState(phase.default_open);
+function PhaseBlock({
+  phase,
+  forceOpen,
+  onToggleTask,
+  onSelectTask,
+  onAddTaskClick,
+}: {
+  phase: AuthoredSnapshotPhase;
+  forceOpen: boolean | null;
+  onToggleTask: (taskId: string) => void;
+  onSelectTask: (task: AuthoredSnapshotTask) => void;
+  onAddTaskClick: (phaseId: string) => void;
+}) {
+  const [localOpen, setLocalOpen] = useState(phase.default_open);
+  const open = forceOpen === null ? localOpen : forceOpen;
+
   return (
     <div className={styles.phaseBlock}>
       <div
         className={styles.phaseHeader}
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => setLocalOpen((v) => !v)}
         role="button"
         aria-expanded={open}
         tabIndex={0}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
-            setOpen((v) => !v);
+            setLocalOpen((v) => !v);
           }
         }}
       >
@@ -158,21 +201,50 @@ function PhaseBlock({ phase }: { phase: SnapshotPhase }) {
       </div>
       {open && (
         <>
-          {phase.priority_notes.map((n, idx) => (
-            <PriorityNoteBanner key={idx} note={n} />
+          {phase.priority_notes.map((n) => (
+            <PriorityNoteBanner key={n.id} note={n} />
           ))}
           <ul className={styles.taskList}>
-            {phase.tasks.map((t, idx) => (
-              <TaskRow key={idx} task={t} />
+            {phase.tasks.map((t) => (
+              <TaskRow
+                key={t.id}
+                task={t}
+                onToggle={onToggleTask}
+                onSelect={onSelectTask}
+              />
             ))}
           </ul>
+          <button
+            type="button"
+            className={styles.toolbarBtn}
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddTaskClick(phase.id);
+            }}
+          >
+            + Add task
+          </button>
         </>
       )}
     </div>
   );
 }
 
-function StreamBlock({ stream }: { stream: SnapshotStream }) {
+function StreamBlock({
+  stream,
+  forceOpen,
+  onToggleTask,
+  onSelectTask,
+  onAddTaskClick,
+  onAddPhaseClick,
+}: {
+  stream: AuthoredSnapshotStream;
+  forceOpen: boolean | null;
+  onToggleTask: (taskId: string) => void;
+  onSelectTask: (task: AuthoredSnapshotTask) => void;
+  onAddTaskClick: (phaseId: string) => void;
+  onAddPhaseClick: (streamId: string) => void;
+}) {
   return (
     <section className={styles.streamCard}>
       <div className={styles.streamHeader}>
@@ -194,19 +266,29 @@ function StreamBlock({ stream }: { stream: SnapshotStream }) {
         />
       </div>
       <div style={{ marginTop: "0.75rem" }}>
-        {stream.phases.map((p, idx) => (
-          <PhaseBlock key={idx} phase={p} />
+        {stream.phases.map((p) => (
+          <PhaseBlock
+            key={p.id}
+            phase={p}
+            forceOpen={forceOpen}
+            onToggleTask={onToggleTask}
+            onSelectTask={onSelectTask}
+            onAddTaskClick={onAddTaskClick}
+          />
         ))}
+        <button
+          type="button"
+          className={styles.toolbarBtn}
+          onClick={() => onAddPhaseClick(stream.id)}
+        >
+          + Add phase
+        </button>
       </div>
     </section>
   );
 }
 
-function StatBar({
-  snapshot,
-}: {
-  snapshot: CountrySnapshot;
-}) {
+function StatBar({ snapshot }: { snapshot: AuthoredSnapshot }) {
   const phaseCount = snapshot.streams.reduce(
     (acc, s) => acc + s.phases.length,
     0,
@@ -236,37 +318,117 @@ function StatBar({
 function RegulatoryPageInner() {
   const { isSignedIn } = useAuth();
   const { isAdmin } = useOrganizationMembership(isSignedIn);
+  const { members: orgMembers } = useOrgMembers();
+  const queryClient = useQueryClient();
 
   const [countryCode, setCountryCode] = useState("CA");
-  const [snapshot, setSnapshot] = useState<CountrySnapshot | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [loaded, setLoaded] = useState(false);
+  // Toolbar Expand/Collapse override, scoped per country so switching country
+  // implicitly clears it without a setState-in-effect cascade.
+  const [forceOpenState, setForceOpenState] = useState<{
+    country: string;
+    value: boolean;
+  } | null>(null);
+  const forceOpen =
+    forceOpenState && forceOpenState.country === countryCode
+      ? forceOpenState.value
+      : null;
+  const [selectedTask, setSelectedTask] =
+    useState<AuthoredSnapshotTask | null>(null);
+  const [showImport, setShowImport] = useState(false);
+  const [addPhaseStreamId, setAddPhaseStreamId] = useState<string | null>(
+    null,
+  );
+  const [addTaskPhaseId, setAddTaskPhaseId] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!isAdmin) return;
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      setLoaded(false);
-      try {
-        const result = await loadCountrySnapshot(countryCode);
-        if (!cancelled) {
-          setSnapshot(result);
-          setLoaded(true);
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
+  const snapshotQuery = useQuery({
+    queryKey: ["regulatory", "snapshot", countryCode],
+    queryFn: () => loadAuthoredSnapshot(countryCode),
+    enabled: isAdmin,
+  });
+
+  const tagsQuery = useQuery({
+    queryKey: ["regulatory", "tags"],
+    queryFn: () => listTags(),
+    enabled: isAdmin,
+  });
+
+  const snapshot = snapshotQuery.data ?? null;
+  const loading = snapshotQuery.isLoading;
+  const loaded = snapshotQuery.isFetched && !snapshotQuery.isLoading;
+
+  // Toggle mutation with optimistic checkbox flip on the cached snapshot.
+  const toggleMutation = useMutation({
+    mutationFn: (taskId: string) => toggleTask(taskId),
+    onMutate: async (taskId) => {
+      await queryClient.cancelQueries({
+        queryKey: ["regulatory", "snapshot", countryCode],
+      });
+      const previous = queryClient.getQueryData<AuthoredSnapshot | null>([
+        "regulatory",
+        "snapshot",
+        countryCode,
+      ]);
+      if (previous) {
+        queryClient.setQueryData<AuthoredSnapshot | null>(
+          ["regulatory", "snapshot", countryCode],
+          {
+            ...previous,
+            streams: previous.streams.map((s) => ({
+              ...s,
+              phases: s.phases.map((ph) => ({
+                ...ph,
+                tasks: ph.tasks.map((t) =>
+                  t.id === taskId ? { ...t, completed: !t.completed } : t,
+                ),
+              })),
+            })),
+          },
+        );
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [countryCode, isAdmin]);
+      return { previous };
+    },
+    onError: (_err, _taskId, context) => {
+      if (context?.previous !== undefined) {
+        queryClient.setQueryData(
+          ["regulatory", "snapshot", countryCode],
+          context.previous,
+        );
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["regulatory", "snapshot", countryCode],
+      });
+    },
+  });
 
   const headerSubtitle = useMemo(() => {
     if (!snapshot) return undefined;
     return `${snapshot.country.display_label} — ${snapshot.totals.completed}/${snapshot.totals.tasks} tasks complete (${snapshot.totals.percent}%)`;
   }, [snapshot]);
+
+  // When the snapshot refetches, find the latest version of the selected task
+  // so the detail panel sees authoritative values (notes saved, tags added).
+  const selectedTaskFresh = useMemo(() => {
+    if (!selectedTask || !snapshot) return selectedTask;
+    for (const s of snapshot.streams) {
+      for (const ph of s.phases) {
+        const t = ph.tasks.find((tk) => tk.id === selectedTask.id);
+        if (t) return t;
+      }
+    }
+    return selectedTask;
+  }, [selectedTask, snapshot]);
+
+  const allTags: AuthoredSnapshotTaskTag[] = useMemo(() => {
+    const raw: RegulatoryTag[] = tagsQuery.data ?? [];
+    return raw.map((t) => ({
+      id: t.id,
+      slug: t.slug,
+      label: t.label,
+      color_token: t.color_token,
+    }));
+  }, [tagsQuery.data]);
 
   if (!isAdmin) {
     return (
@@ -337,6 +499,42 @@ function RegulatoryPageInner() {
           })}
         </nav>
 
+        <div className={styles.toolbar}>
+          <button
+            type="button"
+            className={styles.toolbarBtn}
+            onClick={() =>
+              setForceOpenState({ country: countryCode, value: true })
+            }
+          >
+            Expand all
+          </button>
+          <button
+            type="button"
+            className={styles.toolbarBtn}
+            onClick={() =>
+              setForceOpenState({ country: countryCode, value: false })
+            }
+          >
+            Collapse all
+          </button>
+          <button
+            type="button"
+            className={styles.toolbarBtn}
+            onClick={() => window.print()}
+          >
+            Print
+          </button>
+          <div className={styles.toolbarSpacer} />
+          <button
+            type="button"
+            className={styles.toolbarBtn}
+            onClick={() => setShowImport(true)}
+          >
+            Import HTML
+          </button>
+        </div>
+
         {loading && !loaded && (
           <div className={styles.emptyState}>
             <p>Loading regulatory tracker…</p>
@@ -350,9 +548,8 @@ function RegulatoryPageInner() {
             </p>
             <p style={{ marginTop: "0.5rem" }}>
               Use <code>POST /api/v1/regulatory/import-html</code> with your
-              equipment-tracker.html to populate this country, or add streams
-              and phases manually via the API. Edit affordances ship in Phase
-              2b.
+              equipment-tracker.html to populate this country, or click{" "}
+              <strong>Import HTML</strong> above.
             </p>
           </div>
         )}
@@ -367,13 +564,47 @@ function RegulatoryPageInner() {
               </div>
             ) : (
               snapshot.streams.map((s) => (
-                <StreamBlock key={s.slug} stream={s} />
+                <StreamBlock
+                  key={s.id}
+                  stream={s}
+                  forceOpen={forceOpen}
+                  onToggleTask={(id) => toggleMutation.mutate(id)}
+                  onSelectTask={(t) => setSelectedTask(t)}
+                  onAddTaskClick={(phaseId) => setAddTaskPhaseId(phaseId)}
+                  onAddPhaseClick={(streamId) => setAddPhaseStreamId(streamId)}
+                />
               ))
             )}
             <StatBar snapshot={snapshot} />
           </>
         )}
       </div>
+
+      {selectedTaskFresh && (
+        <RegulatoryDetailPanel
+          task={selectedTaskFresh}
+          allTags={allTags}
+          orgMembers={orgMembers}
+          onClose={() => setSelectedTask(null)}
+        />
+      )}
+
+      {showImport && <ImportHtmlModal onClose={() => setShowImport(false)} />}
+
+      {addPhaseStreamId && snapshot && (
+        <AddPhaseModal
+          streamId={addPhaseStreamId}
+          countryId={snapshot.country.id}
+          onClose={() => setAddPhaseStreamId(null)}
+        />
+      )}
+
+      {addTaskPhaseId && (
+        <AddTaskModal
+          phaseId={addTaskPhaseId}
+          onClose={() => setAddTaskPhaseId(null)}
+        />
+      )}
     </DashboardPageLayout>
   );
 }
