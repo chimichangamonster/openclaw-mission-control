@@ -63,6 +63,7 @@ from app.api.paper_trading import router as paper_trading_router
 from app.api.pentest import router as pentest_router
 from app.api.platform_admin import router as platform_admin_router
 from app.api.polymarket import router as polymarket_router
+from app.api.regulatory import router as regulatory_router
 from app.api.skill_config import router as skill_config_router
 from app.api.skills_marketplace import router as skills_marketplace_router
 from app.api.souls_directory import router as souls_directory_router
@@ -1055,6 +1056,7 @@ api_v1.include_router(org_settings_router)
 api_v1.include_router(cron_jobs_router)
 api_v1.include_router(chat_projects_router)
 api_v1.include_router(ecosystem_intel_router)
+api_v1.include_router(regulatory_router)
 api_v1.include_router(model_registry_router)
 api_v1.include_router(board_memory_router)
 api_v1.include_router(board_webhooks_router)
