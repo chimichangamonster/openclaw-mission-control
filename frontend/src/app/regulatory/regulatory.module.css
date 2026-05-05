@@ -1,0 +1,243 @@
+/*
+ * Regulatory tracker color tokens — copied from
+ * magnetik-solutions/public/internal/equipment-tracker.html (item 101 v2).
+ *
+ * Henry recognizes the layout from the standalone HTML; visual parity is
+ * load-bearing for adoption. Phase 3 marketing-site refactor will share
+ * these tokens (or a subset) so the platform view and the public-snapshot
+ * view stay visually consistent.
+ *
+ * Naming preserved from source HTML to make diffing trivial:
+ *   gd/gm/gl/gp = green dark/mid/light/pale
+ *   od/om/op    = orange dark/mid/pale
+ *   nd/nm/np    = navy   dark/mid/pale
+ *   sl/sll      = slate  / slate-lighter (text + dim)
+ *   bone, bdr   = warm-grey background and border
+ */
+
+.root {
+  --gd: #1B5E20;
+  --gm: #2E7D32;
+  --gl: #4CAF50;
+  --gp: #E8F5E9;
+  --od: #E65100;
+  --om: #FF8F00;
+  --op: #FFF3E0;
+  --nd: #0D47A1;
+  --nm: #1565C0;
+  --np: #E3F2FD;
+  --sl: #37474F;
+  --sll: #607D8B;
+  --bone: #FAF8F5;
+  --bdr: #DDD8D0;
+  --wh: #FFFFFF;
+}
+
+/* Phase badges — backgrounds + text colors copied verbatim from HTML. */
+.badgeNow      { background: #C8E6C9; color: #1B5E20; }
+.badgePre      { background: #BBDEFB; color: #0D47A1; }
+.badgeArrive   { background: #FFE0B2; color: #E65100; }
+.badgePost     { background: #E1BEE7; color: #4A148C; }
+.badgeConcurrent { background: #F3E5F5; color: #6A1B9A; }
+.badgeCorp     { background: #FCE4EC; color: #880E4F; }
+.badgeInsurance { background: #E8EAF6; color: #283593; }
+
+.badge {
+  display: inline-block;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* Priority-note banners — severity → palette. */
+.priorityNote {
+  margin: 0.5rem 0;
+  padding: 0.6rem 0.85rem;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  border-left: 3px solid;
+}
+.priorityNoteCritical { background: #FFEBEE; border-color: #EF5350; color: #B71C1C; }
+.priorityNoteInfo     { background: var(--gp); border-color: var(--gl); color: var(--gd); }
+.priorityNoteWarn     { background: #FFF8E1; border-color: #FFC107; color: #795548; }
+.priorityNoteNavy     { background: var(--np); border-color: var(--nm); color: var(--nd); }
+
+/* Stream cards — accent color per stream's color_token. */
+.streamCard {
+  border: 1px solid var(--bdr);
+  border-radius: 10px;
+  background: var(--wh);
+  padding: 1rem 1.1rem;
+  margin-bottom: 1rem;
+}
+.streamHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+.streamTitle {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--sl);
+}
+.streamMeta {
+  font-size: 0.72rem;
+  color: var(--sll);
+}
+
+/* Per-stream progress bar. */
+.progressBarTrack {
+  width: 100%;
+  height: 6px;
+  background: var(--bdr);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-top: 0.4rem;
+}
+.progressBarFill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 200ms ease;
+}
+.progressBarFillNavy   { background: var(--nm); }
+.progressBarFillGreen  { background: var(--gm); }
+.progressBarFillOrange { background: var(--om); }
+.progressBarFillPurple { background: #8E24AA; }
+
+/* Phase block + task rows. */
+.phaseBlock {
+  border-top: 1px solid var(--bdr);
+  padding-top: 0.6rem;
+  margin-top: 0.6rem;
+}
+.phaseBlock:first-of-type {
+  border-top: none;
+  padding-top: 0;
+  margin-top: 0;
+}
+.phaseHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--sl);
+  cursor: pointer;
+  user-select: none;
+}
+.phaseTiming {
+  margin-left: auto;
+  font-size: 0.7rem;
+  color: var(--sll);
+}
+.taskList {
+  list-style: none;
+  padding: 0.4rem 0 0 0;
+  margin: 0;
+}
+.taskItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  padding: 0.35rem 0;
+  border-bottom: 1px dashed var(--bdr);
+  font-size: 0.83rem;
+  color: var(--sl);
+}
+.taskItem:last-child {
+  border-bottom: none;
+}
+.taskItemDone .taskBody {
+  text-decoration: line-through;
+  color: var(--sll);
+}
+.taskBody {
+  flex: 1;
+}
+.taskNote {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--sll);
+  font-style: italic;
+  margin-top: 0.15rem;
+}
+.tagPills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-left: 0.5rem;
+}
+.tagPill {
+  display: inline-block;
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.65rem;
+  font-weight: 500;
+  border: 1px solid var(--bdr);
+  background: var(--bone);
+  color: var(--sl);
+}
+.tagPillNavy   { background: var(--np); border-color: var(--nm); color: var(--nd); }
+.tagPillGreen  { background: var(--gp); border-color: var(--gl); color: var(--gd); }
+.tagPillOrange { background: var(--op); border-color: var(--om); color: var(--od); }
+
+/* Country tabs at top. */
+.countryTabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+  border-bottom: 1px solid var(--bdr);
+}
+.countryTab {
+  padding: 0.5rem 0.95rem;
+  font-size: 0.85rem;
+  color: var(--sll);
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  background: none;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+}
+.countryTabActive {
+  color: var(--nd);
+  border-bottom-color: var(--nm);
+  font-weight: 600;
+}
+.countryTabDisabled {
+  color: var(--bdr);
+  cursor: not-allowed;
+}
+
+/* Stat bar at bottom. */
+.statBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  padding: 0.75rem 1rem;
+  background: var(--bone);
+  border: 1px solid var(--bdr);
+  border-radius: 8px;
+  margin-top: 1.5rem;
+  font-size: 0.8rem;
+  color: var(--sl);
+}
+.statBar strong {
+  color: var(--nd);
+  font-weight: 600;
+}
+
+/* Empty state. */
+.emptyState {
+  padding: 3rem 1.5rem;
+  text-align: center;
+  color: var(--sll);
+  background: var(--bone);
+  border: 1px dashed var(--bdr);
+  border-radius: 10px;
+}
