@@ -15,7 +15,15 @@
  *   bone, bdr   = warm-grey background and border
  */
 
-.root {
+/*
+ * Color tokens shared between the page subtree (`.root`) and the modal
+ * portals (`.modalBackdrop`). Modals use `position: fixed` and escape
+ * `.root`'s cascade, so the same tokens are duplicated onto
+ * `.modalBackdrop` rather than promoted to `:global(:root)` (which would
+ * leak Magnetik regulatory colours onto every other page). Item 110.
+ */
+.root,
+.modalBackdrop {
   --gd: #1B5E20;
   --gm: #2E7D32;
   --gl: #4CAF50;
