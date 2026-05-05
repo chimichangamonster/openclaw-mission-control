@@ -23,10 +23,11 @@ Phase 1b.2 (next session) adds:
 
 from __future__ import annotations
 
+import secrets
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy import select
 
 from app.api.deps import (
@@ -38,6 +39,7 @@ from app.api.deps import (
 )
 from app.core.logging import get_logger
 from app.core.time import utcnow
+from app.models.organization_settings import OrganizationSettings
 from app.models.regulatory import (
     RegulatoryCountry,
     RegulatoryPhase,
@@ -916,3 +918,301 @@ async def delete_task_tag(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
     await session.delete(link)
     await session.commit()
+
+
+# ---------------------------------------------------------------------------
+# Phase 1b.2 — HTML import (admin+) + public snapshot token rotation (admin+)
+# ---------------------------------------------------------------------------
+
+
+_IMPORT_HTML_MAX_BYTES = 5 * 1024 * 1024  # 5 MB — equipment-tracker.html is ~80KB
+
+
+@router.post(
+    "/import-html",
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[ORG_ADMIN_DEP],
+)
+async def import_tracker_html(
+    file: UploadFile = File(...),  # noqa: B008
+    ctx: OrganizationContext = ORG_MEMBER_DEP,
+    session: AsyncSession = SESSION_DEP,
+) -> dict[str, int]:
+    """One-shot seed of the regulatory tracker from equipment-tracker.html.
+
+    Idempotent on ``(organization_id, country_code, stream_slug, phase_name,
+    task_body_hash)`` — re-running on the same HTML never duplicates rows.
+
+    Streams + countries + tags are upserted on first sight; phases are
+    upserted by ``(stream, country, name)``; tasks are deduplicated by
+    body_hash within their phase. Priority notes dedupe on
+    ``(phase, normalized body)`` to prevent re-import duplicates.
+
+    Returns a counts summary so the operator can verify what changed.
+    """
+    from app.services.regulatory_html_parser import (
+        kind_for_tag_slug,
+        parse_tracker_html,
+    )
+
+    raw = await file.read()
+    if len(raw) > _IMPORT_HTML_MAX_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"HTML file exceeds {_IMPORT_HTML_MAX_BYTES} bytes.",
+        )
+    try:
+        html = raw.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="HTML file must be UTF-8 encoded.",
+        ) from exc
+
+    tracker = parse_tracker_html(html)
+    if not tracker.countries:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="No published-country panels found in HTML.",
+        )
+
+    org_id = ctx.organization.id
+    now = utcnow()
+
+    summary = {
+        "countries_created": 0,
+        "streams_created": 0,
+        "streams_skipped_existing": 0,
+        "phases_created": 0,
+        "phases_skipped_existing": 0,
+        "tasks_created": 0,
+        "tasks_skipped_duplicate": 0,
+        "tags_created": 0,
+        "priority_notes_created": 0,
+    }
+
+    # Tag cache keyed by slug — populated lazily as we encounter tags.
+    tag_cache: dict[str, RegulatoryTag] = {}
+
+    async def _get_or_create_tag(slug: str, label: str) -> RegulatoryTag:
+        if slug in tag_cache:
+            return tag_cache[slug]
+        existing = (
+            await session.execute(
+                select(RegulatoryTag).where(
+                    RegulatoryTag.organization_id == org_id,
+                    RegulatoryTag.slug == slug,
+                )
+            )
+        ).scalar_one_or_none()
+        if existing:
+            tag_cache[slug] = existing
+            return existing
+        tag = RegulatoryTag(
+            id=uuid4(),
+            organization_id=org_id,
+            slug=slug,
+            label=label,
+            color_token=slug,
+            kind=kind_for_tag_slug(slug),
+            created_at=now,
+        )
+        session.add(tag)
+        await session.flush()
+        tag_cache[slug] = tag
+        summary["tags_created"] += 1
+        return tag
+
+    for parsed_country in tracker.countries:
+        country = (
+            await session.execute(
+                select(RegulatoryCountry).where(
+                    RegulatoryCountry.organization_id == org_id,
+                    RegulatoryCountry.code == parsed_country.code,
+                )
+            )
+        ).scalar_one_or_none()
+        if country is None:
+            country = RegulatoryCountry(
+                id=uuid4(),
+                organization_id=org_id,
+                code=parsed_country.code,
+                name=parsed_country.display_label.split(" (")[0],
+                status="active",
+                display_label=parsed_country.display_label,
+                created_at=now,
+                updated_at=now,
+            )
+            session.add(country)
+            await session.flush()
+            summary["countries_created"] += 1
+
+        for parsed_stream in parsed_country.streams:
+            stream = (
+                await session.execute(
+                    select(RegulatoryStream).where(
+                        RegulatoryStream.organization_id == org_id,
+                        RegulatoryStream.slug == parsed_stream.slug,
+                    )
+                )
+            ).scalar_one_or_none()
+            if stream is None:
+                stream = RegulatoryStream(
+                    id=uuid4(),
+                    organization_id=org_id,
+                    slug=parsed_stream.slug,
+                    name=parsed_stream.name,
+                    description=parsed_stream.subtitle,
+                    color_token=parsed_stream.color_token,
+                    timeline_label=parsed_stream.budget_blob,
+                    sort_order=0,
+                    archived=False,
+                    created_at=now,
+                    updated_at=now,
+                )
+                session.add(stream)
+                await session.flush()
+                summary["streams_created"] += 1
+            else:
+                summary["streams_skipped_existing"] += 1
+
+            for parsed_phase in parsed_stream.phases:
+                phase = (
+                    await session.execute(
+                        select(RegulatoryPhase).where(
+                            RegulatoryPhase.stream_id == stream.id,
+                            RegulatoryPhase.country_id == country.id,
+                            RegulatoryPhase.name == parsed_phase.name,
+                        )
+                    )
+                ).scalar_one_or_none()
+                if phase is None:
+                    phase = RegulatoryPhase(
+                        id=uuid4(),
+                        stream_id=stream.id,
+                        country_id=country.id,
+                        name=parsed_phase.name,
+                        badge_kind=parsed_phase.badge_kind,
+                        timing_label=parsed_phase.timing_label,
+                        sort_order=0,
+                        default_open=parsed_phase.default_open,
+                        created_at=now,
+                        updated_at=now,
+                    )
+                    session.add(phase)
+                    await session.flush()
+                    summary["phases_created"] += 1
+                else:
+                    summary["phases_skipped_existing"] += 1
+
+                # Priority notes — dedupe on (phase, body).
+                existing_notes = (
+                    await session.execute(
+                        select(RegulatoryPriorityNote).where(
+                            RegulatoryPriorityNote.phase_id == phase.id,
+                        )
+                    )
+                ).scalars().all()
+                existing_note_bodies = {n.body for n in existing_notes}
+                for parsed_note in parsed_phase.priority_notes:
+                    if parsed_note.body in existing_note_bodies:
+                        continue
+                    note = RegulatoryPriorityNote(
+                        id=uuid4(),
+                        phase_id=phase.id,
+                        body=parsed_note.body,
+                        severity=parsed_note.severity,
+                        sort_order=0,
+                        created_at=now,
+                    )
+                    session.add(note)
+                    summary["priority_notes_created"] += 1
+
+                # Tasks — dedupe on body_hash within phase.
+                existing_tasks = (
+                    await session.execute(
+                        select(RegulatoryTask).where(
+                            RegulatoryTask.phase_id == phase.id,
+                        )
+                    )
+                ).scalars().all()
+                existing_task_hashes = {
+                    _hash_for_dedup(t.body) for t in existing_tasks
+                }
+                for parsed_task in parsed_phase.tasks:
+                    if parsed_task.body_hash in existing_task_hashes:
+                        summary["tasks_skipped_duplicate"] += 1
+                        continue
+                    task = RegulatoryTask(
+                        id=uuid4(),
+                        phase_id=phase.id,
+                        body=parsed_task.text,
+                        note=parsed_task.note,
+                        completed=False,
+                        sort_order=0,
+                        created_at=now,
+                        updated_at=now,
+                    )
+                    session.add(task)
+                    await session.flush()
+                    summary["tasks_created"] += 1
+                    existing_task_hashes.add(parsed_task.body_hash)
+
+                    # Tags + task_tag links
+                    for parsed_tag in parsed_task.tags:
+                        tag = await _get_or_create_tag(
+                            parsed_tag.slug, parsed_tag.label
+                        )
+                        # Link is unique on (task_id, tag_id) by composite PK,
+                        # so no extra dedup query needed for new tasks.
+                        link = RegulatoryTaskTag(
+                            task_id=task.id, tag_id=tag.id, created_at=now
+                        )
+                        session.add(link)
+
+    await session.commit()
+    return summary
+
+
+def _hash_for_dedup(stored_body: str) -> str:
+    """Compute the body_hash for an already-stored task body so we can
+    compare against parsed task hashes. Mirrors the parser's normalization."""
+    from app.services.regulatory_html_parser import _hash_task_text
+
+    return _hash_task_text(stored_body)
+
+
+@router.post(
+    "/snapshot/public/rotate-token",
+    dependencies=[ORG_ADMIN_DEP],
+)
+async def rotate_public_snapshot_token(
+    ctx: OrganizationContext = ORG_MEMBER_DEP,
+    session: AsyncSession = SESSION_DEP,
+) -> dict[str, str]:
+    """Generate a new public snapshot token, invalidating any previous one.
+
+    The token is the only credential — anyone with it can read this org's
+    published Canada snapshot via GET /regulatory/snapshot/public/{token}.
+    Rotation is the cleanup mechanism if a token leaks.
+    """
+    settings = (
+        await session.execute(
+            select(OrganizationSettings).where(
+                OrganizationSettings.organization_id == ctx.organization.id,
+            )
+        )
+    ).scalar_one_or_none()
+    if settings is None:
+        settings = OrganizationSettings(
+            id=uuid4(),
+            organization_id=ctx.organization.id,
+        )
+        session.add(settings)
+
+    new_token = secrets.token_urlsafe(32)
+    settings.regulatory_public_snapshot_token = new_token
+    settings.updated_at = utcnow()
+    session.add(settings)
+    await session.commit()
+    return {"token": new_token}

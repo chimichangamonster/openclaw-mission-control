@@ -88,6 +88,11 @@ class OrganizationSettings(QueryModel, table=True):
     # Branding / org context
     branding_json: str = Field(default="{}")
 
+    # Regulatory tracker — public snapshot token (item 101 v2 Phase 1b.2).
+    # Nullable so an org without a published snapshot has a clean "no token,
+    # no public surface" state. Rotated by POST /regulatory/snapshot/public/rotate-token.
+    regulatory_public_snapshot_token: str | None = Field(default=None, index=True)
+
     created_at: datetime = Field(default_factory=utcnow)
     updated_at: datetime = Field(default_factory=utcnow)
 
