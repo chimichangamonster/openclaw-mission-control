@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   ClipboardCheck,
   Clock,
+  Coins,
   Eye,
   EyeOff,
   FileText,
@@ -291,6 +292,20 @@ export function DashboardSidebar() {
               >
                 <ClipboardCheck className="h-4 w-4" />
                 Regulatory
+              </Link>
+              ) : null}
+              {isAdmin && isFeatureEnabled("grants_tracker") ? (
+              <Link
+                href="/grants"
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-[color:var(--text)] transition",
+                  pathname.startsWith("/grants")
+                    ? "bg-[color:var(--accent-soft)] text-[color:var(--accent-strong)] font-medium"
+                    : "hover:bg-[color:var(--surface-muted)]",
+                )}
+              >
+                <Coins className="h-4 w-4" />
+                Grants
               </Link>
               ) : null}
             </div>
