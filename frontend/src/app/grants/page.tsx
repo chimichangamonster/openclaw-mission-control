@@ -47,6 +47,43 @@ const fmtMoney = (n: number, currency = "CAD"): string =>
     maximumFractionDigits: 0,
   }).format(n);
 
+// Item 118 sub-A — `Grant.awarded_amount` column holds different semantics
+// across the application lifecycle. Pre-award the value is a target /
+// requested amount; post-award it is the confirmed disbursement total.
+// Display label flips with `application_status` so stakeholders don't
+// mistake a $850K request for a $850K commitment.
+export type AmountSemantics = "requested" | "awarded" | "declined";
+
+export function amountSemantics(applicationStatus: string): AmountSemantics {
+  switch (applicationStatus) {
+    case "awarded":
+    case "completed":
+      return "awarded";
+    case "declined":
+    case "withdrawn":
+      return "declined";
+    default:
+      return "requested";
+  }
+}
+
+export function amountLabel(applicationStatus: string): string {
+  const sem = amountSemantics(applicationStatus);
+  if (sem === "awarded") return "Awarded";
+  if (sem === "declined") return "Was requested";
+  return "Requested";
+}
+
+// Stat-strip card label: "Total awarded" if any grant is post-award,
+// "Total requested" otherwise. Mixed populations bias toward "awarded"
+// because presence-of-confirmed-funding is the more material signal.
+export function statStripCommittedLabel(grants: { application_status: string }[]): string {
+  const hasAwarded = grants.some(
+    (g) => amountSemantics(g.application_status) === "awarded",
+  );
+  return hasAwarded ? "Total awarded" : "Total requested";
+}
+
 const daysUntil = (isoDate: string): number => {
   const today = new Date();
   today.setUTCHours(12, 0, 0, 0);
@@ -241,9 +278,13 @@ function GrantsPageInner() {
         {/* Stat strip */}
         <div className={styles.statStrip}>
           <StatCard
-            label="Total committed"
+            label={statStripCommittedLabel(grants)}
             value={fmtMoney(stats.committed)}
-            sub="Sum of awarded across all grants"
+            sub={
+              statStripCommittedLabel(grants) === "Total awarded"
+                ? "Sum of confirmed amounts across post-award grants"
+                : "Sum of target amounts across all grants (pre-award)"
+            }
           />
           <StatCard
             label="Drawn-to-date"
@@ -287,7 +328,13 @@ function GrantsPageInner() {
                 <tr>
                   <th>Program</th>
                   <th>Status</th>
-                  <th>Awarded</th>
+                  <th>
+                    {grants.some(
+                      (g) => amountSemantics(g.application_status) === "awarded",
+                    )
+                      ? "Awarded"
+                      : "Requested"}
+                  </th>
                   <th>Next deadline</th>
                 </tr>
               </thead>

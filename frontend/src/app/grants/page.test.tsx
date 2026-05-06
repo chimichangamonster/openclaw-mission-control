@@ -426,4 +426,102 @@ describe("GrantsPage", () => {
       links.some((a) => a.getAttribute("href")?.startsWith("/regulatory")),
     ).toBe(true);
   });
+
+  // -------------------------------------------------------------------------
+  // Item 118 sub-A — amount label semantics by application_status.
+  //
+  // The Grant model column is `awarded_amount` but the field holds different
+  // semantics across the lifecycle:
+  //   planned | drafting | submitted | under_review  →  "Requested"  (target)
+  //   awarded | completed                            →  "Awarded"    (confirmed)
+  //   declined | withdrawn                           →  "Was requested"
+  //
+  // Stat-strip "committed" sum is honest only when grants are post-award.
+  // Pre-award, the page shows "Requested" both in the stat-strip card label
+  // and in the table column header + drawer metadata cell.
+  // -------------------------------------------------------------------------
+
+  it("labels amount as 'Requested' (not 'Awarded') for grants in pre-award status", async () => {
+    flagsState.grants_tracker = true;
+    membershipState.isAdmin = true;
+    mockedList.mockResolvedValue([
+      { ...baseGrantEra, application_status: "drafting" },
+    ]);
+    mockedDetail.mockResolvedValue({
+      ...baseGrantEra,
+      application_status: "drafting",
+      draws: [],
+      deadlines: [],
+      prerequisites: [],
+    });
+
+    renderPage();
+
+    // Stat-strip card label flips to "Total requested" when no grants are
+    // post-award yet.
+    expect(
+      await screen.findByText(/total requested/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/total committed/i)).toBeNull();
+
+    // Table column header shows "Requested" (await render).
+    expect(
+      await screen.findByRole("columnheader", { name: /^requested$/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("labels amount as 'Awarded' for grants in post-award status (awarded | completed)", async () => {
+    flagsState.grants_tracker = true;
+    membershipState.isAdmin = true;
+    mockedList.mockResolvedValue([
+      { ...baseGrantEra, application_status: "awarded" },
+    ]);
+    mockedDetail.mockResolvedValue({
+      ...baseGrantEra,
+      application_status: "awarded",
+      draws: [],
+      deadlines: [],
+      prerequisites: [],
+    });
+
+    renderPage();
+
+    // Stat-strip card label is "Total awarded" when at least one grant is
+    // post-award.
+    expect(await screen.findByText(/total awarded/i)).toBeInTheDocument();
+    expect(screen.queryByText(/total requested/i)).toBeNull();
+
+    // Table column header shows "Awarded".
+    expect(
+      await screen.findByRole("columnheader", { name: /^awarded$/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("uses 'Total awarded' on stat strip when mixed pre-award + post-award grants exist", async () => {
+    // Mix: ERA drafting ($750K requested) + ABI awarded ($250K confirmed).
+    // Stat strip should label as "Total awarded" because at least one grant
+    // is post-award. Sum stays $1M; the label shift is the visible change.
+    flagsState.grants_tracker = true;
+    membershipState.isAdmin = true;
+    mockedList.mockResolvedValue([
+      { ...baseGrantEra, application_status: "drafting" },
+      { ...baseGrantAbi, application_status: "awarded" },
+    ]);
+    mockedDetail.mockImplementation(async (id: string) => {
+      const base = id === "grant-era" ? baseGrantEra : baseGrantAbi;
+      const status = id === "grant-era" ? "drafting" : "awarded";
+      return {
+        ...base,
+        application_status: status,
+        draws: [],
+        deadlines: [],
+        prerequisites: [],
+      };
+    });
+
+    renderPage();
+
+    expect(await screen.findByText(/total awarded/i)).toBeInTheDocument();
+    expect(screen.queryByText(/total requested/i)).toBeNull();
+  });
 });

@@ -22,6 +22,7 @@ import type {
   GrantPrerequisite,
 } from "@/lib/grants-api";
 
+import { amountLabel } from "./page";
 import styles from "./grants.module.css";
 
 const fmtMoney = (raw: string | null | undefined, currency = "CAD"): string => {
@@ -99,7 +100,7 @@ export function GrantsDetailDrawer({ grant, onClose }: Props) {
             <div className={styles.metaGrid}>
               <MetaCell label="Status" value={grant.application_status} />
               <MetaCell
-                label="Awarded"
+                label={amountLabel(grant.application_status)}
                 value={fmtMoney(grant.awarded_amount, grant.currency)}
               />
               <MetaCell
