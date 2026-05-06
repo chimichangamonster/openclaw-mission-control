@@ -37,6 +37,7 @@ DEFAULT_FEATURE_FLAGS = {
     "chat_token_streaming": False,
     "ecosystem_intel": False,
     "regulatory": False,
+    "grants_tracker": False,
 }
 
 

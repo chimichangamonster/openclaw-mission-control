@@ -56,6 +56,12 @@ from app.models.personal_bookkeeping import (
 from app.models.polymarket_positions import PolymarketPosition
 from app.models.polymarket_risk_config import PolymarketRiskConfig
 from app.models.polymarket_wallets import PolymarketWallet
+from app.models.grants import (
+    Grant,
+    GrantDrawSchedule,
+    GrantPrerequisiteTask,
+    GrantReportingDeadline,
+)
 from app.models.regulatory import (
     RegulatoryCountry,
     RegulatoryPhase,
@@ -110,6 +116,10 @@ __all__ = [
     "EmailSignature",
     "GeneratedDocument",
     "Gateway",
+    "Grant",
+    "GrantDrawSchedule",
+    "GrantPrerequisiteTask",
+    "GrantReportingDeadline",
     "PolymarketPosition",
     "PolymarketRiskConfig",
     "PolymarketWallet",

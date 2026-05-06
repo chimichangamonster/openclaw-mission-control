@@ -63,7 +63,9 @@ from app.api.paper_trading import router as paper_trading_router
 from app.api.pentest import router as pentest_router
 from app.api.platform_admin import router as platform_admin_router
 from app.api.polymarket import router as polymarket_router
+from app.api.agent_grants import router as agent_grants_router
 from app.api.agent_regulatory import router as agent_regulatory_router
+from app.api.grants import router as grants_router
 from app.api.regulatory import router as regulatory_router
 from app.api.regulatory_public import router as regulatory_public_router
 from app.api.skill_config import router as skill_config_router
@@ -1061,6 +1063,8 @@ api_v1.include_router(ecosystem_intel_router)
 api_v1.include_router(regulatory_router)
 api_v1.include_router(regulatory_public_router)
 api_v1.include_router(agent_regulatory_router)
+api_v1.include_router(grants_router)
+api_v1.include_router(agent_grants_router)
 api_v1.include_router(model_registry_router)
 api_v1.include_router(board_memory_router)
 api_v1.include_router(board_webhooks_router)
