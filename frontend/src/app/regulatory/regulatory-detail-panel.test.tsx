@@ -137,14 +137,14 @@ describe("RegulatoryDetailPanel", () => {
     });
     renderPanel();
 
-    const textarea = await screen.findByPlaceholderText(/add a note/i);
-    fireEvent.change(textarea, { target: { value: "New note body" } });
-    fireEvent.click(screen.getByRole("button", { name: /save note/i }));
+    const input = await screen.findByPlaceholderText(/add a note/i);
+    fireEvent.change(input, { target: { value: "New note body" } });
+    fireEvent.click(screen.getByRole("button", { name: /^add note$/i }));
 
     await waitFor(() =>
       expect(mockedCreateNote).toHaveBeenCalledWith("task-1", "New note body"),
     );
-    expect((textarea as HTMLTextAreaElement).value).toBe("");
+    expect((input as HTMLInputElement).value).toBe("");
   });
 
   it("deletes a note via deleteTaskNote", async () => {
@@ -294,5 +294,167 @@ describe("RegulatoryDetailPanel", () => {
 
     expect(bodyInput.value).toBe("Open business bank account");
     expect(mockedUpdateTask).not.toHaveBeenCalled();
+  });
+
+  // -------------------------------------------------------------------------
+  // Item 116 — visible edit affordances on detail panel
+  //
+  // Bug A: description input must surface explicit Save/Cancel affordance
+  //        when the draft diverges from the saved body. Blur-save still
+  //        works (covered above), but operators who don't realize the input
+  //        is editable need a visible button as a redundant cue.
+  //
+  // Bug B: Notes section's Add button was rendered at the bottom of a
+  //        scrollable section, below an existing notes list and a textarea
+  //        with min-height: 60px — so on a typical task it ended up below
+  //        the fold. Restructure docks the Add affordance at the TOP of
+  //        the section, above the notes list, as a single-line input row.
+  //        The DOM-order invariant locks the structural fix in jsdom even
+  //        though jsdom can't compute viewport scroll.
+  // -------------------------------------------------------------------------
+
+  it("renders an explicit Save button on description when the draft diverges, persisting on click", async () => {
+    mockedListNotes.mockResolvedValue([]);
+    mockedUpdateTask.mockResolvedValue({
+      ...baseTask,
+      body: "Open RBC operating account",
+    });
+    renderPanel();
+
+    const bodyInput = (await screen.findByLabelText(
+      /task body/i,
+    )) as HTMLInputElement;
+
+    // No Save button at rest — common case stays clean.
+    expect(
+      screen.queryByRole("button", { name: /save body/i }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.change(bodyInput, {
+      target: { value: "Open RBC operating account" },
+    });
+
+    // Save button surfaces when draft differs from saved body.
+    const saveBtn = await screen.findByRole("button", { name: /save body/i });
+    expect(saveBtn).toBeVisible();
+
+    fireEvent.click(saveBtn);
+
+    await waitFor(() =>
+      expect(mockedUpdateTask).toHaveBeenCalledWith("task-1", {
+        body: "Open RBC operating account",
+      }),
+    );
+  });
+
+  it("reverts the body draft when the Cancel button is clicked", async () => {
+    mockedListNotes.mockResolvedValue([]);
+    renderPanel();
+
+    const bodyInput = (await screen.findByLabelText(
+      /task body/i,
+    )) as HTMLInputElement;
+    fireEvent.change(bodyInput, { target: { value: "throwaway typo" } });
+
+    const cancelBtn = await screen.findByRole("button", {
+      name: /cancel body edit/i,
+    });
+    fireEvent.click(cancelBtn);
+
+    expect(bodyInput.value).toBe("Open business bank account");
+    expect(mockedUpdateTask).not.toHaveBeenCalled();
+    // Cancel button collapses back out once draft equals saved body.
+    expect(
+      screen.queryByRole("button", { name: /cancel body edit/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("renders the Add note input + button at the top of the Notes section, above the notes list", async () => {
+    mockedListNotes.mockResolvedValue([
+      {
+        id: "n1",
+        task_id: "task-1",
+        body: "first existing note",
+        author_user_id: "user-1",
+        created_at: "2026-05-04T10:00:00Z",
+      },
+    ]);
+    renderPanel();
+
+    const addInput = (await screen.findByPlaceholderText(
+      /add a note/i,
+    )) as HTMLInputElement;
+    const addBtn = screen.getByRole("button", { name: /^add note$/i });
+    expect(addBtn).toBeVisible();
+    expect(addInput).toBeVisible();
+
+    // Structural invariant: input must be a single-line <input>, not a
+    // multi-line <textarea> (the latter was the off-screen offender).
+    expect(addInput.tagName).toBe("INPUT");
+
+    // Wait for the existing-note text to render, then assert DOM order:
+    // the Add button must come BEFORE the existing-note text so the
+    // affordance sits at the section top, not below the notes list.
+    const existingNote = await screen.findByText(/first existing note/);
+    expect(
+      addBtn.compareDocumentPosition(existingNote) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("disables the Add note button when the input is empty, enables on text, persists + clears on click", async () => {
+    mockedListNotes.mockResolvedValue([]);
+    mockedCreateNote.mockResolvedValue({
+      id: "note-new",
+      task_id: "task-1",
+      body: "Phone call with Alberta Innovates",
+      author_user_id: "user-1",
+      created_at: "2026-05-06T00:00:00Z",
+    });
+    renderPanel();
+
+    const addInput = (await screen.findByPlaceholderText(
+      /add a note/i,
+    )) as HTMLInputElement;
+    const addBtn = screen.getByRole("button", { name: /^add note$/i });
+
+    expect(addBtn).toBeDisabled();
+    fireEvent.change(addInput, {
+      target: { value: "Phone call with Alberta Innovates" },
+    });
+    expect(addBtn).toBeEnabled();
+
+    fireEvent.click(addBtn);
+    await waitFor(() =>
+      expect(mockedCreateNote).toHaveBeenCalledWith(
+        "task-1",
+        "Phone call with Alberta Innovates",
+      ),
+    );
+    expect(addInput.value).toBe("");
+  });
+
+  it("keeps the Add note row visible (and structurally first in the section) even with 5+ existing notes", async () => {
+    mockedListNotes.mockResolvedValue(
+      Array.from({ length: 6 }, (_, i) => ({
+        id: `n${i}`,
+        task_id: "task-1",
+        body: `existing note ${i}`,
+        author_user_id: "user-1",
+        created_at: "2026-05-04T10:00:00Z",
+      })),
+    );
+    renderPanel();
+
+    const addBtn = await screen.findByRole("button", { name: /^add note$/i });
+    expect(addBtn).toBeVisible();
+
+    // Wait for notes to render, then assert Add button is still ahead of
+    // every note in DOM order — this locks the top-of-section docking.
+    const lastNote = await screen.findByText(/existing note 5/);
+    expect(
+      addBtn.compareDocumentPosition(lastNote) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 });

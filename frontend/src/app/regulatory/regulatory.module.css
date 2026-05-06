@@ -362,19 +362,47 @@
   font-weight: 600;
   margin: 0 0.75rem 0 0;
   color: var(--nd);
-  background: transparent;
-  border: 1px solid transparent;
+  background: var(--bone);
+  border: 1px solid var(--bdr);
   border-radius: 4px;
   padding: 0.25rem 0.5rem;
   font-family: inherit;
 }
 .detailPanelTitleInput:hover {
-  border-color: var(--bdr);
+  border-color: var(--sl);
 }
 .detailPanelTitleInput:focus {
   outline: none;
   border-color: var(--nd);
   background: var(--surface);
+}
+.detailPanelTitleActions {
+  display: flex;
+  gap: 0.4rem;
+  padding: 0.4rem 1.25rem 0.6rem;
+  border-bottom: 1px solid var(--bdr);
+  background: var(--bone);
+}
+.detailPanelTitleSave,
+.detailPanelTitleCancel {
+  padding: 0.3rem 0.7rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  border: 1px solid var(--bdr);
+}
+.detailPanelTitleSave {
+  background: var(--nd);
+  color: white;
+  border-color: var(--nd);
+}
+.detailPanelTitleSave:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.detailPanelTitleCancel {
+  background: white;
+  color: var(--nd);
 }
 .detailPanelClose {
   background: none;
@@ -443,10 +471,37 @@
   color: var(--sl);
 }
 
+.detailNoteAddRow {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 0.75rem;
+}
+.detailNoteInput {
+  flex: 1;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--bdr);
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 0.85rem;
+}
+.detailNoteSave {
+  padding: 0.4rem 0.85rem;
+  border: 1px solid var(--bdr);
+  border-radius: 6px;
+  background: var(--nd);
+  color: white;
+  font-size: 0.8rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.detailNoteSave:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 .detailNoteList {
   list-style: none;
   padding: 0;
-  margin: 0 0 0.75rem 0;
+  margin: 0;
 }
 .detailNoteItem {
   padding: 0.5rem 0.75rem;
@@ -469,30 +524,6 @@
   cursor: pointer;
   color: var(--sll);
   font-size: 0.75rem;
-}
-.detailNoteInput {
-  width: 100%;
-  min-height: 60px;
-  padding: 0.5rem;
-  border: 1px solid var(--bdr);
-  border-radius: 6px;
-  font-family: inherit;
-  font-size: 0.85rem;
-  resize: vertical;
-}
-.detailNoteSave {
-  margin-top: 0.5rem;
-  padding: 0.4rem 0.85rem;
-  border: 1px solid var(--bdr);
-  border-radius: 6px;
-  background: var(--nd);
-  color: white;
-  font-size: 0.8rem;
-  cursor: pointer;
-}
-.detailNoteSave:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 /* Modal (Import HTML, Add Phase, Add Task) */

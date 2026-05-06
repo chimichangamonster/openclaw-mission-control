@@ -163,13 +163,14 @@ export function RegulatoryDetailPanel({
     },
   });
 
-  // ---- inline body edit (item 114)
-  // The panel is mounted with key={task.id} from the page, so a different
-  // task always remounts and re-initialises the draft. The remaining concern
-  // is server-side mutation of the same task — `task.body` updates in props
-  // after a save, but the user's draft is already what was saved, so no sync
-  // is needed in practice.
+  // ---- inline body edit (item 114 + 116)
+  // Panel is mounted with key={task.id} so a different task always remounts.
+  // Item 116: blur-save stays as the in-flow path; explicit Save / Cancel
+  // buttons surface only when the draft diverges from saved body, as a
+  // redundant affordance for operators who don't realize the input is
+  // editable. Both paths converge on the same saveTask.mutate call.
   const [bodyDraft, setBodyDraft] = useState(task.body);
+  const bodyDirty = bodyDraft.trim() !== task.body && bodyDraft.trim() !== "";
   const handleBodyBlur = () => {
     const next = bodyDraft.trim();
     if (!next || next === task.body) return;
@@ -185,6 +186,14 @@ export function RegulatoryDetailPanel({
       e.preventDefault();
       e.currentTarget.blur();
     }
+  };
+  const handleBodySaveClick = () => {
+    const next = bodyDraft.trim();
+    if (!next || next === task.body) return;
+    saveTask.mutate({ body: next });
+  };
+  const handleBodyCancelClick = () => {
+    setBodyDraft(task.body);
   };
 
   // ---- tags
@@ -259,6 +268,27 @@ export function RegulatoryDetailPanel({
             ×
           </button>
         </div>
+        {bodyDirty && (
+          <div className={styles.detailPanelTitleActions}>
+            <button
+              type="button"
+              aria-label="save body"
+              className={styles.detailPanelTitleSave}
+              onClick={handleBodySaveClick}
+              disabled={saveTask.isPending}
+            >
+              Save
+            </button>
+            <button
+              type="button"
+              aria-label="cancel body edit"
+              className={styles.detailPanelTitleCancel}
+              onClick={handleBodyCancelClick}
+            >
+              Cancel
+            </button>
+          </div>
+        )}
 
         <div className={styles.detailPanelBody}>
           {/* ---- tag pills + add ---- */}
@@ -338,9 +368,36 @@ export function RegulatoryDetailPanel({
             </label>
           </section>
 
-          {/* ---- notes ---- */}
+          {/* ---- notes (item 116: input+button docked at top, list below) ---- */}
           <section className={styles.detailSection}>
             <div className={styles.detailLabel}>Notes</div>
+            <div className={styles.detailNoteAddRow}>
+              <input
+                type="text"
+                placeholder="Add a note…"
+                aria-label="add note"
+                value={noteDraft}
+                onChange={(e) => setNoteDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && noteDraft.trim()) {
+                    e.preventDefault();
+                    createNote.mutate(noteDraft.trim());
+                  }
+                }}
+                className={styles.detailNoteInput}
+              />
+              <button
+                type="button"
+                aria-label="add note"
+                onClick={() => {
+                  if (noteDraft.trim()) createNote.mutate(noteDraft.trim());
+                }}
+                disabled={!noteDraft.trim() || createNote.isPending}
+                className={styles.detailNoteSave}
+              >
+                Add note
+              </button>
+            </div>
             <ul className={styles.detailNoteList}>
               {(notesQuery.data ?? []).map((n) => (
                 <li key={n.id} className={styles.detailNoteItem}>
@@ -356,22 +413,6 @@ export function RegulatoryDetailPanel({
                 </li>
               ))}
             </ul>
-            <textarea
-              placeholder="Add a note…"
-              value={noteDraft}
-              onChange={(e) => setNoteDraft(e.target.value)}
-              className={styles.detailNoteInput}
-            />
-            <button
-              type="button"
-              onClick={() => {
-                if (noteDraft.trim()) createNote.mutate(noteDraft.trim());
-              }}
-              disabled={!noteDraft.trim() || createNote.isPending}
-              className={styles.detailNoteSave}
-            >
-              Save note
-            </button>
           </section>
         </div>
       </div>
