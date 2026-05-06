@@ -1216,3 +1216,253 @@ async def rotate_public_snapshot_token(
     session.add(settings)
     await session.commit()
     return {"token": new_token}
+
+
+# ---------------------------------------------------------------------------
+# Item 115 — authored snapshot aggregator (admin /regulatory page)
+# ---------------------------------------------------------------------------
+#
+# The `/regulatory` admin page needs the entire authored tree (streams →
+# phases → tasks → tags + priority notes) to render edit affordances.
+# Pre-item-115, the frontend walked the CRUD endpoints client-side: ~112
+# round-trips on Magnetik (3 streams / 17 phases / 90 tasks), 10+ second
+# load times.
+#
+# This endpoint returns the full tree in a single response with batched
+# IN-queries internally (4 queries total: streams, phases, tasks-with-notes,
+# task-tag links). Shape is a superset of regulatory_public.py — adds IDs
+# at every level so PATCH/DELETE/toggle from the page can target rows
+# directly, plus per-task `note`, `assignee_user_id`, `due_date` for
+# detail-panel edits.
+# ---------------------------------------------------------------------------
+
+
+def _percent(done: int, total: int) -> int:
+    if total == 0:
+        return 0
+    return round(done * 100 / total)
+
+
+@router.get("/snapshot/authored/{country_code}")
+async def get_authored_snapshot(
+    country_code: str,
+    ctx: OrganizationContext = ORG_MEMBER_DEP,
+    session: AsyncSession = SESSION_DEP,
+) -> dict[str, object]:
+    """Return the full authored snapshot for the caller's org + country.
+
+    Single-round-trip aggregator backing the admin /regulatory page.
+    Returns 404 if the org has no country with that code seeded.
+    """
+    org_id = ctx.organization.id
+
+    country = (
+        await session.execute(
+            select(RegulatoryCountry).where(
+                RegulatoryCountry.organization_id == org_id,
+                RegulatoryCountry.code == country_code,
+            )
+        )
+    ).scalar_one_or_none()
+    if country is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+
+    streams = list(
+        (
+            await session.execute(
+                select(RegulatoryStream)
+                .where(
+                    RegulatoryStream.organization_id == org_id,
+                    RegulatoryStream.archived.is_(False),  # type: ignore[union-attr]
+                )
+                .order_by(RegulatoryStream.sort_order, RegulatoryStream.name)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    if not streams:
+        return {
+            "country": {
+                "id": str(country.id),
+                "code": country.code,
+                "display_label": country.display_label,
+            },
+            "totals": {"tasks": 0, "completed": 0, "percent": 0},
+            "streams": [],
+        }
+
+    stream_ids = [s.id for s in streams]
+    phases = list(
+        (
+            await session.execute(
+                select(RegulatoryPhase)
+                .where(
+                    RegulatoryPhase.stream_id.in_(stream_ids),  # type: ignore[attr-defined]
+                    RegulatoryPhase.country_id == country.id,
+                )
+                .order_by(RegulatoryPhase.sort_order, RegulatoryPhase.name)
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+    phase_ids = [p.id for p in phases]
+    tasks: list[RegulatoryTask] = []
+    priority_notes: list[RegulatoryPriorityNote] = []
+    if phase_ids:
+        tasks = list(
+            (
+                await session.execute(
+                    select(RegulatoryTask)
+                    .where(RegulatoryTask.phase_id.in_(phase_ids))  # type: ignore[attr-defined]
+                    .order_by(RegulatoryTask.sort_order, RegulatoryTask.created_at)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        priority_notes = list(
+            (
+                await session.execute(
+                    select(RegulatoryPriorityNote)
+                    .where(RegulatoryPriorityNote.phase_id.in_(phase_ids))  # type: ignore[attr-defined]
+                    .order_by(
+                        RegulatoryPriorityNote.sort_order,
+                        RegulatoryPriorityNote.created_at,
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+
+    # One join query for the whole task-tag link table for these tasks.
+    task_ids = [t.id for t in tasks]
+    tags_by_task: dict[UUID, list[RegulatoryTag]] = {}
+    if task_ids:
+        rows = (
+            await session.execute(
+                select(RegulatoryTaskTag.task_id, RegulatoryTag)
+                .join(RegulatoryTag, RegulatoryTag.id == RegulatoryTaskTag.tag_id)
+                .where(
+                    RegulatoryTaskTag.task_id.in_(task_ids),  # type: ignore[attr-defined]
+                    # Defense-in-depth: only this org's tags.
+                    RegulatoryTag.organization_id == org_id,
+                )
+            )
+        ).all()
+        for task_id, tag in rows:
+            tags_by_task.setdefault(task_id, []).append(tag)
+
+    # Build O(1) lookups for the assembly pass.
+    tasks_by_phase: dict[UUID, list[RegulatoryTask]] = {}
+    for t in tasks:
+        tasks_by_phase.setdefault(t.phase_id, []).append(t)
+
+    notes_by_phase: dict[UUID, list[RegulatoryPriorityNote]] = {}
+    for n in priority_notes:
+        notes_by_phase.setdefault(n.phase_id, []).append(n)
+
+    phases_by_stream: dict[UUID, list[RegulatoryPhase]] = {}
+    for p in phases:
+        phases_by_stream.setdefault(p.stream_id, []).append(p)
+
+    payload_streams: list[dict[str, object]] = []
+    grand_total = 0
+    grand_done = 0
+
+    for stream in streams:
+        stream_phases = phases_by_stream.get(stream.id, [])
+        payload_phases: list[dict[str, object]] = []
+        stream_total = 0
+        stream_done = 0
+
+        for phase in stream_phases:
+            phase_tasks = tasks_by_phase.get(phase.id, [])
+            phase_notes = notes_by_phase.get(phase.id, [])
+
+            payload_tasks: list[dict[str, object]] = []
+            for task in phase_tasks:
+                tag_rows = tags_by_task.get(task.id, [])
+                payload_tasks.append(
+                    {
+                        "id": str(task.id),
+                        "body": task.body,
+                        "note": task.note,
+                        "completed": task.completed,
+                        "assignee_user_id": (
+                            str(task.assignee_user_id)
+                            if task.assignee_user_id
+                            else None
+                        ),
+                        "due_date": (
+                            task.due_date.isoformat() if task.due_date else None
+                        ),
+                        "tags": [
+                            {
+                                "id": str(t.id),
+                                "slug": t.slug,
+                                "label": t.label,
+                                "color_token": t.color_token,
+                            }
+                            for t in tag_rows
+                        ],
+                    }
+                )
+
+            stream_total += len(phase_tasks)
+            stream_done += sum(1 for t in phase_tasks if t.completed)
+
+            payload_phases.append(
+                {
+                    "id": str(phase.id),
+                    "name": phase.name,
+                    "badge_kind": phase.badge_kind,
+                    "timing_label": phase.timing_label,
+                    "default_open": phase.default_open,
+                    "priority_notes": [
+                        {
+                            "id": str(n.id),
+                            "body": n.body,
+                            "severity": n.severity,
+                        }
+                        for n in phase_notes
+                    ],
+                    "tasks": payload_tasks,
+                }
+            )
+
+        grand_total += stream_total
+        grand_done += stream_done
+        payload_streams.append(
+            {
+                "id": str(stream.id),
+                "slug": stream.slug,
+                "name": stream.name,
+                "color_token": stream.color_token,
+                "description": stream.description,
+                "timeline_label": stream.timeline_label,
+                "totals": {
+                    "tasks": stream_total,
+                    "completed": stream_done,
+                    "percent": _percent(stream_done, stream_total),
+                },
+                "phases": payload_phases,
+            }
+        )
+
+    return {
+        "country": {
+            "id": str(country.id),
+            "code": country.code,
+            "display_label": country.display_label,
+        },
+        "totals": {
+            "tasks": grand_total,
+            "completed": grand_done,
+            "percent": _percent(grand_done, grand_total),
+        },
+        "streams": payload_streams,
+    }

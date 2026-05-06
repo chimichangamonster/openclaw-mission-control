@@ -267,91 +267,72 @@ describe("loadCountrySnapshot", () => {
 // Phase 2b — authored (with-IDs) snapshot
 // ---------------------------------------------------------------------------
 
-describe("loadAuthoredSnapshot", () => {
-  it("threads IDs through every level (task/phase/stream/tag/priority-note)", async () => {
-    const country = {
-      id: "country-1",
-      organization_id: "org-1",
-      code: "CA",
-      name: "Canada",
-      status: "active",
-      display_label: "Canada",
-      sort_order: 0,
-      created_at: "2026-05-01T00:00:00Z",
-      updated_at: "2026-05-01T00:00:00Z",
-    };
-    const stream = {
-      id: "stream-1",
-      organization_id: "org-1",
-      slug: "navy",
-      name: "Corporate",
-      description: null,
-      color_token: "navy",
-      budget_estimate: null,
-      regulator_label: null,
-      timeline_label: null,
-      sort_order: 0,
-      archived: false,
-      created_at: "2026-05-01T00:00:00Z",
-      updated_at: "2026-05-01T00:00:00Z",
-    };
-    const phase = {
-      id: "phase-1",
-      stream_id: "stream-1",
-      country_id: "country-1",
-      name: "Incorporation",
-      badge_kind: "corp",
-      timing_label: null,
-      sort_order: 0,
-      default_open: true,
-      created_at: "2026-05-01T00:00:00Z",
-      updated_at: "2026-05-01T00:00:00Z",
-    };
-    const task = {
-      id: "task-1",
-      phase_id: "phase-1",
-      body: "File articles",
-      note: null,
-      completed: false,
-      completed_at: null,
-      completed_by_user_id: null,
-      assignee_user_id: null,
-      due_date: null,
-      sort_order: 0,
-      created_at: "2026-05-01T00:00:00Z",
-      updated_at: "2026-05-01T00:00:00Z",
-    };
-    const tag = {
-      id: "tag-1",
-      organization_id: "org-1",
-      slug: "abca",
-      label: "ABCA",
-      color_token: "navy",
-      kind: "corporate",
-      created_at: "2026-05-01T00:00:00Z",
-    };
-    const priorityNote = {
-      id: "pn-1",
-      phase_id: "phase-1",
-      body: "BLOCKING",
-      severity: "critical",
-      sort_order: 0,
-      created_at: "2026-05-01T00:00:00Z",
+describe("loadAuthoredSnapshot (item 115 — single-endpoint aggregator)", () => {
+  it("calls /regulatory/snapshot/authored/{code} once and returns the response", async () => {
+    // Item 115 contract: ONE round-trip, not the prior 100+ walker.
+    // Backend stitches the tree; frontend trusts the shape.
+    const aggregatedSnapshot = {
+      country: { id: "country-1", code: "CA", display_label: "Canada" },
+      totals: { tasks: 1, completed: 0, percent: 0 },
+      streams: [
+        {
+          id: "stream-1",
+          slug: "navy",
+          name: "Corporate",
+          color_token: "navy",
+          description: null,
+          timeline_label: null,
+          totals: { tasks: 1, completed: 0, percent: 0 },
+          phases: [
+            {
+              id: "phase-1",
+              name: "Incorporation",
+              badge_kind: "corp",
+              timing_label: null,
+              default_open: true,
+              priority_notes: [
+                { id: "pn-1", body: "BLOCKING", severity: "critical" },
+              ],
+              tasks: [
+                {
+                  id: "task-1",
+                  body: "File articles",
+                  note: null,
+                  completed: false,
+                  assignee_user_id: null,
+                  due_date: null,
+                  tags: [
+                    {
+                      id: "tag-1",
+                      slug: "abca",
+                      label: "ABCA",
+                      color_token: "navy",
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
     };
 
+    const seenUrls: string[] = [];
     mockedFetch.mockImplementation(async (url: string) => {
-      if (url.endsWith("/regulatory/countries")) return { data: [country] };
-      if (url.endsWith("/regulatory/streams")) return { data: [stream] };
-      if (url.includes("/regulatory/phases?")) return { data: [phase] };
-      if (url.includes("/regulatory/tasks?")) return { data: [task] };
-      if (url.endsWith(`/regulatory/tasks/${task.id}/tags`)) return { data: [tag] };
-      if (url.endsWith(`/regulatory/phases/${phase.id}/priority-notes`)) {
-        return { data: [priorityNote] };
+      seenUrls.push(url);
+      if (url.includes("/regulatory/snapshot/authored/CA")) {
+        return { data: aggregatedSnapshot, status: 200 };
       }
       throw new Error(`unexpected fetch: ${url}`);
     });
 
     const snapshot = await loadAuthoredSnapshot("CA");
+
+    // Single round-trip — locks the contract that broke the prior 10s load.
+    expect(seenUrls).toHaveLength(1);
+    expect(seenUrls[0]).toContain("/regulatory/snapshot/authored/CA");
+
+    // Shape preserves IDs at every level (admin edit affordances depend on them).
     expect(snapshot).not.toBeNull();
     expect(snapshot!.country.id).toBe("country-1");
     expect(snapshot!.streams[0].id).toBe("stream-1");
@@ -366,9 +347,11 @@ describe("loadAuthoredSnapshot", () => {
     expect(pn.id).toBe("pn-1");
   });
 
-  it("returns null when the requested country is not seeded", async () => {
+  it("returns null on 404 (country not seeded for the org)", async () => {
     mockedFetch.mockImplementation(async (url: string) => {
-      if (url.endsWith("/regulatory/countries")) return { data: [] };
+      if (url.includes("/regulatory/snapshot/authored/")) {
+        return { data: null, status: 404 };
+      }
       throw new Error(`unexpected fetch: ${url}`);
     });
     const snapshot = await loadAuthoredSnapshot("CA");

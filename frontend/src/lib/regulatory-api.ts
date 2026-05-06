@@ -460,105 +460,26 @@ export interface AuthoredSnapshot {
 export async function loadAuthoredSnapshot(
   countryCode: string,
 ): Promise<AuthoredSnapshot | null> {
-  const countries = await listCountries();
-  const country = countries.find((c) => c.code === countryCode);
-  if (!country) return null;
-
-  const streams = await listStreams(false);
-
-  const snapshotStreams: AuthoredSnapshotStream[] = [];
-  let grandTotal = 0;
-  let grandDone = 0;
-
-  for (const stream of streams) {
-    const phases = await listPhases({
-      streamId: stream.id,
-      countryId: country.id,
-    });
-
-    const snapshotPhases: AuthoredSnapshotPhase[] = [];
-    let streamTotal = 0;
-    let streamDone = 0;
-
-    for (const phase of phases) {
-      const [tasks, priorityNotes] = await Promise.all([
-        listTasks(phase.id),
-        listPriorityNotes(phase.id),
-      ]);
-
-      const snapshotTasks: AuthoredSnapshotTask[] = [];
-      for (const task of tasks) {
-        const tags = await listTaskTags(task.id);
-        snapshotTasks.push({
-          id: task.id,
-          body: task.body,
-          note: task.note,
-          completed: task.completed,
-          assignee_user_id: task.assignee_user_id,
-          due_date: task.due_date,
-          tags: tags.map((t) => ({
-            id: t.id,
-            slug: t.slug,
-            label: t.label,
-            color_token: t.color_token,
-          })),
-        });
-      }
-
-      streamTotal += tasks.length;
-      streamDone += tasks.filter((t) => t.completed).length;
-
-      snapshotPhases.push({
-        id: phase.id,
-        name: phase.name,
-        badge_kind: phase.badge_kind,
-        timing_label: phase.timing_label,
-        default_open: phase.default_open,
-        priority_notes: priorityNotes.map((n) => ({
-          id: n.id,
-          body: n.body,
-          severity: n.severity,
-        })),
-        tasks: snapshotTasks,
-      });
-    }
-
-    grandTotal += streamTotal;
-    grandDone += streamDone;
-
-    snapshotStreams.push({
-      id: stream.id,
-      slug: stream.slug,
-      name: stream.name,
-      color_token: stream.color_token,
-      description: stream.description,
-      timeline_label: stream.timeline_label,
-      totals: {
-        tasks: streamTotal,
-        completed: streamDone,
-        percent: percent(streamDone, streamTotal),
-      },
-      phases: snapshotPhases,
-    });
+  // Item 115 — single round-trip aggregator. Backend handles the join.
+  // Replaces the prior client-side walker (~112 round-trips per page load
+  // on Magnetik's 90-task tracker → 10+ second loads).
+  const res = await customFetch(
+    `${V1}/regulatory/snapshot/authored/${countryCode}`,
+    { method: "GET" },
+  );
+  // 404 = country not seeded for this org. customFetch wraps responses, so
+  // the envelope's status is what we check.
+  const envelope = res as { status?: number; data?: unknown };
+  if (envelope.status === 404) {
+    return null;
   }
-
-  return {
-    country: {
-      id: country.id,
-      code: country.code,
-      display_label: country.display_label,
-    },
-    totals: {
-      tasks: grandTotal,
-      completed: grandDone,
-      percent: percent(grandDone, grandTotal),
-    },
-    streams: snapshotStreams,
-  };
+  return unwrap<AuthoredSnapshot>(res);
 }
 
 // ---------------------------------------------------------------------------
-// Aggregator — produces the public-snapshot shape from authenticated reads
+// Public-snapshot aggregator — produces the public-snapshot shape from
+// authenticated reads. Used by Phase 3 marketing-site SSR; the platform
+// admin page uses loadAuthoredSnapshot() above instead.
 // ---------------------------------------------------------------------------
 
 const percent = (done: number, total: number): number =>

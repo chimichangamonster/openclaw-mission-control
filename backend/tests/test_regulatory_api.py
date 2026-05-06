@@ -589,3 +589,132 @@ async def test_routes_blocked_when_regulatory_flag_disabled(env: dict[str, Any])
         ]:
             resp = await c.get(path)
             assert resp.status_code == 403, f"{path} should be blocked when flag off"
+
+
+# ---------------------------------------------------------------------------
+# Item 115 — authored snapshot aggregator endpoint
+#
+# /regulatory/snapshot/authored/{country_code} returns the entire authored
+# snapshot in one round-trip: streams + phases + tasks + tags + priority
+# notes, all keyed by ID so the admin /regulatory page can render edit
+# affordances against authoritative state.
+#
+# Replaces the client-side N+1 walker that took 10+ seconds on Magnetik's
+# 90-task tracker. The shape is a superset of the public snapshot
+# (regulatory_public.py) — adds task IDs + note + assignee_user_id +
+# due_date + phase IDs + stream IDs + country ID + tag IDs.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_GET_authored_snapshot_returns_full_tree_for_caller_org(
+    env: dict[str, Any],
+) -> None:
+    """One request returns the entire org's authored snapshot for the country."""
+    d = env["data"]
+    app = _make_app(env["maker"], _ctx(d["org_a"], d["admin_a"]))
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+        resp = await c.get("/api/v1/regulatory/snapshot/authored/CA")
+    assert resp.status_code == 200, resp.text
+    snap = resp.json()
+
+    # Country shape — id present (admin endpoint, not the public token-gated one)
+    assert UUID(snap["country"]["id"]) == d["country_a_id"]
+    assert snap["country"]["code"] == "CA"
+    assert "display_label" in snap["country"]
+
+    # Totals — 1 task seeded, not completed
+    assert snap["totals"]["tasks"] == 1
+    assert snap["totals"]["completed"] == 0
+    assert snap["totals"]["percent"] == 0
+
+    # Streams — exactly the org's stream
+    assert len(snap["streams"]) == 1
+    stream = snap["streams"][0]
+    assert UUID(stream["id"]) == d["stream_a_id"]
+
+    # Phases — id + name present, scoped to the country
+    assert len(stream["phases"]) == 1
+    phase = stream["phases"][0]
+    assert UUID(phase["id"]) == d["phase_a_id"]
+    assert "default_open" in phase
+    assert "priority_notes" in phase
+
+    # Tasks — id + edit-affordance fields (note, assignee_user_id, due_date)
+    assert len(phase["tasks"]) == 1
+    task = phase["tasks"][0]
+    assert UUID(task["id"]) == d["task_a_id"]
+    assert task["body"] == "NUANS search (A)"
+    assert task["completed"] is False
+    assert "note" in task
+    assert "assignee_user_id" in task
+    assert "due_date" in task
+    assert task["tags"] == []  # No tags linked in the seed
+
+
+@pytest.mark.asyncio
+async def test_GET_authored_snapshot_excludes_other_org_data(
+    env: dict[str, Any],
+) -> None:
+    """Org A's snapshot must not contain Org B's streams/phases/tasks."""
+    d = env["data"]
+    app = _make_app(env["maker"], _ctx(d["org_a"], d["admin_a"]))
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+        resp = await c.get("/api/v1/regulatory/snapshot/authored/CA")
+    assert resp.status_code == 200
+    snap = resp.json()
+
+    stream_ids = {UUID(s["id"]) for s in snap["streams"]}
+    assert d["stream_a_id"] in stream_ids
+    assert d["stream_b_id"] not in stream_ids
+
+    phase_ids = {
+        UUID(p["id"])
+        for s in snap["streams"]
+        for p in s["phases"]
+    }
+    assert d["phase_a_id"] in phase_ids
+    assert d["phase_b_id"] not in phase_ids
+
+    task_ids = {
+        UUID(t["id"])
+        for s in snap["streams"]
+        for p in s["phases"]
+        for t in p["tasks"]
+    }
+    assert d["task_a_id"] in task_ids
+    assert d["task_b_id"] not in task_ids
+
+
+@pytest.mark.asyncio
+async def test_GET_authored_snapshot_unknown_country_returns_404(
+    env: dict[str, Any],
+) -> None:
+    """A country code the org hasn't seeded returns 404, not an empty snapshot."""
+    d = env["data"]
+    app = _make_app(env["maker"], _ctx(d["org_a"], d["admin_a"]))
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+        resp = await c.get("/api/v1/regulatory/snapshot/authored/IN")  # India not seeded
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_GET_authored_snapshot_blocked_when_regulatory_flag_disabled(
+    env: dict[str, Any],
+) -> None:
+    """The new endpoint is feature-flag-gated like the rest of the regulatory router."""
+    from fastapi import HTTPException, status
+
+    d = env["data"]
+    app = _make_app(env["maker"], _ctx(d["org_a"], d["admin_a"]))
+
+    def _flag_off() -> None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="regulatory disabled"
+        )
+
+    app.dependency_overrides[REGULATORY_FEATURE_GATE] = _flag_off
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+        resp = await c.get("/api/v1/regulatory/snapshot/authored/CA")
+    assert resp.status_code == 403
