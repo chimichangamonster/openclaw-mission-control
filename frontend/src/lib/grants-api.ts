@@ -48,6 +48,7 @@ export interface Grant {
   contact_person: string | null;
   contact_email: string | null;
   owner_user_id: string | null;
+  program_url: string | null;
   notes_md: string | null;
   created_at: string;
   updated_at: string;
@@ -125,6 +126,7 @@ export interface GrantCreate {
   contact_person?: string | null;
   contact_email?: string | null;
   owner_user_id?: string | null;
+  program_url?: string | null;
   notes_md?: string | null;
 }
 
@@ -147,6 +149,7 @@ export interface GrantUpdate {
   contact_person?: string | null;
   contact_email?: string | null;
   owner_user_id?: string | null;
+  program_url?: string | null;
   notes_md?: string | null;
 }
 

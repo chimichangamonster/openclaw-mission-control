@@ -46,6 +46,7 @@ class GrantRead(SQLModel):
     contact_person: str | None = None
     contact_email: str | None = None
     owner_user_id: UUID | None = None
+    program_url: str | None = None
     notes_md: str | None = None
     created_at: datetime
     updated_at: datetime
@@ -70,6 +71,7 @@ class GrantCreate(SQLModel):
     contact_person: str | None = None
     contact_email: str | None = None
     owner_user_id: UUID | None = None
+    program_url: str | None = None
     notes_md: str | None = None
 
 
@@ -92,6 +94,7 @@ class GrantUpdate(SQLModel):
     contact_person: str | None = None
     contact_email: str | None = None
     owner_user_id: UUID | None = None
+    program_url: str | None = None
     notes_md: str | None = None
 
 

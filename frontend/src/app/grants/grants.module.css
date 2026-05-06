@@ -109,11 +109,27 @@
 .programName {
   font-weight: 600;
   color: var(--sl);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
 }
 .bodyName {
   font-size: 0.75rem;
   color: var(--sll);
   margin-top: 0.1rem;
+}
+/* Item 118 sub-C — external-link icon next to program name and drawer title.
+   Subtle muted color at rest, accent on hover. Click stops propagation in
+   the table row context (would otherwise also open the drawer). */
+.programLink {
+  color: var(--sll);
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  transition: color 120ms ease;
+}
+.programLink:hover {
+  color: var(--accent, #0d6efd);
 }
 
 /* Status badges (application_status). */

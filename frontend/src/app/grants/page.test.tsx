@@ -524,4 +524,106 @@ describe("GrantsPage", () => {
     expect(await screen.findByText(/total awarded/i)).toBeInTheDocument();
     expect(screen.queryByText(/total requested/i)).toBeNull();
   });
+
+  // -------------------------------------------------------------------------
+  // Item 118 sub-C — program_url field renders as external-link affordance.
+  //
+  // Each grant program has a public landing page operators paste into emails,
+  // RFPs, partner pitches. The Grant model has a `program_url` column; UI
+  // surfaces it as a small external-link icon next to the program name in
+  // the table row + drawer header. Null program_url renders no icon.
+  // -------------------------------------------------------------------------
+
+  it("renders external-link icon next to program name when program_url is set", async () => {
+    flagsState.grants_tracker = true;
+    membershipState.isAdmin = true;
+    mockedList.mockResolvedValue([
+      {
+        ...baseGrantEra,
+        program_url: "https://eralberta.ca/funding/industrial-transformation-challenge/",
+      },
+    ]);
+    mockedDetail.mockResolvedValue({
+      ...baseGrantEra,
+      program_url: "https://eralberta.ca/funding/industrial-transformation-challenge/",
+      draws: [],
+      deadlines: [],
+      prerequisites: [],
+    });
+
+    renderPage();
+
+    // Table cell wraps the program name with an anchor pointing at program_url.
+    const links = await screen.findAllByRole("link");
+    const programLink = links.find(
+      (a) =>
+        a.getAttribute("href") ===
+        "https://eralberta.ca/funding/industrial-transformation-challenge/",
+    );
+    expect(programLink).toBeDefined();
+    expect(programLink?.getAttribute("target")).toBe("_blank");
+    expect(programLink?.getAttribute("rel")).toMatch(/noopener/i);
+  });
+
+  it("renders no external-link icon when program_url is null", async () => {
+    flagsState.grants_tracker = true;
+    membershipState.isAdmin = true;
+    mockedList.mockResolvedValue([{ ...baseGrantEra, program_url: null }]);
+    mockedDetail.mockResolvedValue({
+      ...baseGrantEra,
+      program_url: null,
+      draws: [],
+      deadlines: [],
+      prerequisites: [],
+    });
+
+    renderPage();
+
+    await screen.findByText(/Industrial Transformation/i);
+
+    // No external link should exist (only internal /regulatory anchor in
+    // prereq map renders, and that's empty here).
+    const links = screen.queryAllByRole("link");
+    const externalLinks = links.filter((a) =>
+      a.getAttribute("href")?.startsWith("http"),
+    );
+    expect(externalLinks.length).toBe(0);
+  });
+
+  it("renders external-link icon in drawer header when program_url is set", async () => {
+    flagsState.grants_tracker = true;
+    membershipState.isAdmin = true;
+    mockedList.mockResolvedValue([
+      {
+        ...baseGrantEra,
+        program_url: "https://eralberta.ca/funding/industrial-transformation-challenge/",
+      },
+    ]);
+    mockedDetail.mockResolvedValue({
+      ...baseGrantEra,
+      program_url: "https://eralberta.ca/funding/industrial-transformation-challenge/",
+      draws: [],
+      deadlines: [],
+      prerequisites: [],
+    });
+
+    renderPage();
+    fireEvent.click(
+      await screen.findByText(/Industrial Transformation Challenge/i),
+    );
+
+    // Drawer renders, header link present. May appear in both table + drawer.
+    await waitFor(() =>
+      expect(mockedDetail).toHaveBeenCalledWith("grant-era"),
+    );
+
+    const links = screen.getAllByRole("link");
+    const programLinks = links.filter(
+      (a) =>
+        a.getAttribute("href") ===
+        "https://eralberta.ca/funding/industrial-transformation-challenge/",
+    );
+    // At minimum 2 occurrences: one in table cell, one in drawer header.
+    expect(programLinks.length).toBeGreaterThanOrEqual(2);
+  });
 });

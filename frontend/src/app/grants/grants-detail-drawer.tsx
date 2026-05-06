@@ -14,6 +14,7 @@
  */
 
 import Link from "next/link";
+import { ExternalLink } from "lucide-react";
 
 import type {
   GrantDeadline,
@@ -80,7 +81,20 @@ export function GrantsDetailDrawer({ grant, onClose }: Props) {
       <aside className={styles.drawer} role="dialog" aria-label={grant.program_name}>
         <header className={styles.drawerHeader}>
           <div>
-            <div className={styles.drawerTitle}>{grant.program_name}</div>
+            <div className={styles.drawerTitle}>
+              {grant.program_name}
+              {grant.program_url && (
+                <a
+                  href={grant.program_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={styles.programLink}
+                  aria-label={`Open ${grant.program_name} program page in new tab`}
+                >
+                  <ExternalLink size={16} aria-hidden="true" />
+                </a>
+              )}
+            </div>
             <div className={styles.drawerSubtitle}>{grant.granting_body}</div>
           </div>
           <button

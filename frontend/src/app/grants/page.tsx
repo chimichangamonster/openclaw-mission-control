@@ -20,6 +20,7 @@ export const dynamic = "force-dynamic";
 
 import { useMemo, useState } from "react";
 import { useQueries, useQuery } from "@tanstack/react-query";
+import { ExternalLink } from "lucide-react";
 
 import { useAuth } from "@/auth/clerk";
 import { DashboardPageLayout } from "@/components/templates/DashboardPageLayout";
@@ -346,7 +347,21 @@ function GrantsPageInner() {
                     onClick={() => setSelectedGrantId(g.id)}
                   >
                     <td>
-                      <div className={styles.programName}>{g.program_name}</div>
+                      <div className={styles.programName}>
+                        {g.program_name}
+                        {g.program_url && (
+                          <a
+                            href={g.program_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={styles.programLink}
+                            onClick={(e) => e.stopPropagation()}
+                            aria-label={`Open ${g.program_name} program page in new tab`}
+                          >
+                            <ExternalLink size={14} aria-hidden="true" />
+                          </a>
+                        )}
+                      </div>
                       <div className={styles.bodyName}>{g.granting_body}</div>
                     </td>
                     <td>

@@ -103,6 +103,10 @@ class Grant(TenantScoped, table=True):
     contact_email: str | None = None
     owner_user_id: UUID | None = Field(default=None, foreign_key="users.id")
 
+    program_url: str | None = None
+    # Public landing page for the granting program — operator paste-target
+    # for emails, RFPs, partner pitches. Item 118 sub-C, 2026-05-06.
+
     notes_md: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
 
     created_at: datetime = Field(default_factory=utcnow)
