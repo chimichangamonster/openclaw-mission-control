@@ -143,6 +143,39 @@
   font-size: 0.7rem;
   color: var(--sll);
 }
+.phaseNameInput {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--nd);
+  background: var(--surface);
+  border: 1px solid var(--nd);
+  border-radius: 4px;
+  padding: 0.15rem 0.4rem;
+  font-family: inherit;
+  flex: 0 1 auto;
+  min-width: 8rem;
+}
+.phaseNameInput:focus {
+  outline: none;
+}
+.phaseNameEditBtn {
+  background: none;
+  border: none;
+  color: var(--sll);
+  cursor: pointer;
+  font-size: 0.8rem;
+  padding: 0 0.25rem;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+.phaseHeader:hover .phaseNameEditBtn {
+  opacity: 1;
+}
+.phaseNameEditBtn:focus {
+  opacity: 1;
+  outline: 1px dashed var(--sll);
+}
 .taskList {
   list-style: none;
   padding: 0.4rem 0 0 0;
@@ -322,6 +355,26 @@
   font-weight: 600;
   margin: 0;
   color: var(--nd);
+}
+.detailPanelTitleInput {
+  flex: 1;
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0 0.75rem 0 0;
+  color: var(--nd);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 0.25rem 0.5rem;
+  font-family: inherit;
+}
+.detailPanelTitleInput:hover {
+  border-color: var(--bdr);
+}
+.detailPanelTitleInput:focus {
+  outline: none;
+  border-color: var(--nd);
+  background: var(--surface);
 }
 .detailPanelClose {
   background: none;

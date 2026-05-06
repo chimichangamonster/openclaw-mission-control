@@ -330,6 +330,26 @@ export async function createPhase(
   return unwrap<RegulatoryPhase>(res);
 }
 
+export interface RegulatoryPhaseUpdate {
+  name?: string;
+  badge_kind?: string;
+  timing_label?: string | null;
+  sort_order?: number;
+  default_open?: boolean;
+}
+
+export async function updatePhase(
+  phaseId: string,
+  payload: RegulatoryPhaseUpdate,
+): Promise<RegulatoryPhase> {
+  const res = await customFetch(`${V1}/regulatory/phases/${phaseId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return unwrap<RegulatoryPhase>(res);
+}
+
 export interface RegulatoryTaskCreate {
   phase_id: string;
   body: string;

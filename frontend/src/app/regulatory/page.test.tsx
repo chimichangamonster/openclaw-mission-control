@@ -65,6 +65,7 @@ vi.mock("@/lib/regulatory-api", async () => {
     toggleTask: vi.fn(),
     importTrackerHtml: vi.fn(),
     createPhase: vi.fn(),
+    updatePhase: vi.fn(),
     createTask: vi.fn(),
     listTaskNotes: vi.fn(),
   };
@@ -89,6 +90,7 @@ import {
   listTaskNotes,
   loadAuthoredSnapshot,
   toggleTask,
+  updatePhase,
 } from "@/lib/regulatory-api";
 import RegulatoryPage from "./page";
 
@@ -99,6 +101,7 @@ const mockedListCountries = vi.mocked(listCountries);
 const mockedToggle = vi.mocked(toggleTask);
 const mockedImport = vi.mocked(importTrackerHtml);
 const mockedCreatePhase = vi.mocked(createPhase);
+const mockedUpdatePhase = vi.mocked(updatePhase);
 const mockedCreateTask = vi.mocked(createTask);
 const mockedListNotes = vi.mocked(listTaskNotes);
 
@@ -504,6 +507,56 @@ describe("RegulatoryPage — Phase 2b edit affordances", () => {
           body: "Send AOI to bank",
         }),
       ),
+    );
+  });
+
+  // -------------------------------------------------------------------------
+  // Item 114 — inline edit of phase name
+  // -------------------------------------------------------------------------
+
+  it("clicking the phase-name edit button reveals an input pre-filled with the current name", async () => {
+    renderPhase2b();
+    await screen.findByText(/Incorporation/);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /^rename incorporation$/i }),
+    );
+
+    const nameInput = (await screen.findByLabelText(
+      /rename phase/i,
+    )) as HTMLInputElement;
+    expect(nameInput.value).toBe("Incorporation");
+  });
+
+  it("blurring the phase-name input persists the new name via updatePhase", async () => {
+    mockedUpdatePhase.mockResolvedValue({
+      id: "phase-1",
+      stream_id: "stream-1",
+      country_id: "country-1",
+      name: "Incorporation Filing",
+      badge_kind: "corp",
+      timing_label: "Days 1-3",
+      sort_order: 0,
+      default_open: true,
+      created_at: "",
+      updated_at: "",
+    });
+    renderPhase2b();
+    await screen.findByText(/Incorporation/);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /^rename incorporation$/i }),
+    );
+    const nameInput = (await screen.findByLabelText(
+      /rename phase/i,
+    )) as HTMLInputElement;
+    fireEvent.change(nameInput, { target: { value: "Incorporation Filing" } });
+    fireEvent.blur(nameInput);
+
+    await waitFor(() =>
+      expect(mockedUpdatePhase).toHaveBeenCalledWith("phase-1", {
+        name: "Incorporation Filing",
+      }),
     );
   });
 });

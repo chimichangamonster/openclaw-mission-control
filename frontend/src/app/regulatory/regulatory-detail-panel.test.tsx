@@ -103,7 +103,9 @@ describe("RegulatoryDetailPanel", () => {
   it("renders the task body and existing tag pills", () => {
     mockedListNotes.mockResolvedValue([]);
     renderPanel();
-    expect(screen.getByText(/Open business bank account/)).toBeInTheDocument();
+    expect(
+      screen.getByDisplayValue(/Open business bank account/),
+    ).toBeInTheDocument();
     expect(screen.getByText("TD")).toBeInTheDocument();
   });
 
@@ -241,5 +243,56 @@ describe("RegulatoryDetailPanel", () => {
     const { onClose } = renderPanel();
     fireEvent.keyDown(window, { key: "Escape" });
     expect(onClose).toHaveBeenCalled();
+  });
+
+  // -------------------------------------------------------------------------
+  // Item 114 — inline edit of task body
+  // -------------------------------------------------------------------------
+
+  it("renders an editable input for the task body, saving via updateTask on blur", async () => {
+    mockedListNotes.mockResolvedValue([]);
+    mockedUpdateTask.mockResolvedValue({ ...baseTask, body: "Open RBC operating account" });
+    renderPanel();
+
+    const bodyInput = (await screen.findByLabelText(
+      /task body/i,
+    )) as HTMLInputElement;
+    expect(bodyInput.value).toBe("Open business bank account");
+
+    fireEvent.change(bodyInput, { target: { value: "Open RBC operating account" } });
+    fireEvent.blur(bodyInput);
+
+    await waitFor(() =>
+      expect(mockedUpdateTask).toHaveBeenCalledWith("task-1", {
+        body: "Open RBC operating account",
+      }),
+    );
+  });
+
+  it("does not call updateTask on blur when the body is unchanged", async () => {
+    mockedListNotes.mockResolvedValue([]);
+    renderPanel();
+
+    const bodyInput = (await screen.findByLabelText(
+      /task body/i,
+    )) as HTMLInputElement;
+    fireEvent.focus(bodyInput);
+    fireEvent.blur(bodyInput);
+
+    expect(mockedUpdateTask).not.toHaveBeenCalled();
+  });
+
+  it("reverts the body to the original value when Escape is pressed in the input", async () => {
+    mockedListNotes.mockResolvedValue([]);
+    renderPanel();
+
+    const bodyInput = (await screen.findByLabelText(
+      /task body/i,
+    )) as HTMLInputElement;
+    fireEvent.change(bodyInput, { target: { value: "throwaway typo" } });
+    fireEvent.keyDown(bodyInput, { key: "Escape" });
+
+    expect(bodyInput.value).toBe("Open business bank account");
+    expect(mockedUpdateTask).not.toHaveBeenCalled();
   });
 });

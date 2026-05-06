@@ -153,12 +153,39 @@ export function RegulatoryDetailPanel({
 
   // ---- task fields
   const saveTask = useMutation({
-    mutationFn: (patch: { assignee_user_id?: string | null; due_date?: string | null }) =>
-      updateTask(task.id, patch),
+    mutationFn: (patch: {
+      body?: string;
+      assignee_user_id?: string | null;
+      due_date?: string | null;
+    }) => updateTask(task.id, patch),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["regulatory", "snapshot"] });
     },
   });
+
+  // ---- inline body edit (item 114)
+  // The panel is mounted with key={task.id} from the page, so a different
+  // task always remounts and re-initialises the draft. The remaining concern
+  // is server-side mutation of the same task — `task.body` updates in props
+  // after a save, but the user's draft is already what was saved, so no sync
+  // is needed in practice.
+  const [bodyDraft, setBodyDraft] = useState(task.body);
+  const handleBodyBlur = () => {
+    const next = bodyDraft.trim();
+    if (!next || next === task.body) return;
+    saveTask.mutate({ body: next });
+  };
+  const handleBodyKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopPropagation();
+      setBodyDraft(task.body);
+      e.currentTarget.blur();
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      e.currentTarget.blur();
+    }
+  };
 
   // ---- tags
   const addTag = useMutation({
@@ -214,7 +241,15 @@ export function RegulatoryDetailPanel({
         aria-modal="true"
       >
         <div className={styles.detailPanelHeader}>
-          <h2 className={styles.detailPanelTitle}>{task.body}</h2>
+          <input
+            type="text"
+            aria-label="Task body"
+            className={styles.detailPanelTitleInput}
+            value={bodyDraft}
+            onChange={(e) => setBodyDraft(e.target.value)}
+            onBlur={handleBodyBlur}
+            onKeyDown={handleBodyKeyDown}
+          />
           <button
             type="button"
             aria-label="close panel"

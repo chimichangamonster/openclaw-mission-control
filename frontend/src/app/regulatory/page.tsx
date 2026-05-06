@@ -18,6 +18,7 @@ import {
   listTags,
   loadAuthoredSnapshot,
   toggleTask,
+  updatePhase,
   type AuthoredSnapshot,
   type AuthoredSnapshotPhase,
   type AuthoredSnapshotPriorityNote,
@@ -166,25 +167,51 @@ function PhaseBlock({
   onToggleTask,
   onSelectTask,
   onAddTaskClick,
+  onRenamePhase,
 }: {
   phase: AuthoredSnapshotPhase;
   forceOpen: boolean | null;
   onToggleTask: (taskId: string) => void;
   onSelectTask: (task: AuthoredSnapshotTask) => void;
   onAddTaskClick: (phaseId: string) => void;
+  onRenamePhase: (phaseId: string, name: string) => void;
 }) {
   const [localOpen, setLocalOpen] = useState(phase.default_open);
   const open = forceOpen === null ? localOpen : forceOpen;
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState(phase.name);
+
+  const startEdit = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setNameDraft(phase.name);
+    setEditingName(true);
+  };
+  const commitName = () => {
+    const next = nameDraft.trim();
+    setEditingName(false);
+    if (next && next !== phase.name) {
+      onRenamePhase(phase.id, next);
+    } else {
+      setNameDraft(phase.name);
+    }
+  };
+  const cancelName = () => {
+    setNameDraft(phase.name);
+    setEditingName(false);
+  };
 
   return (
     <div className={styles.phaseBlock}>
       <div
         className={styles.phaseHeader}
-        onClick={() => setLocalOpen((v) => !v)}
+        onClick={() => {
+          if (!editingName) setLocalOpen((v) => !v);
+        }}
         role="button"
         aria-expanded={open}
         tabIndex={0}
         onKeyDown={(e) => {
+          if (editingName) return;
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
             setLocalOpen((v) => !v);
@@ -194,8 +221,42 @@ function PhaseBlock({
         <span className={`${styles.badge} ${badgeClass(phase.badge_kind)}`}>
           {phase.badge_kind}
         </span>
-        <span>{phase.name}</span>
-        {phase.timing_label && (
+        {editingName ? (
+          <input
+            type="text"
+            aria-label="Rename phase"
+            className={styles.phaseNameInput}
+            autoFocus
+            value={nameDraft}
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => setNameDraft(e.target.value)}
+            onBlur={commitName}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                e.preventDefault();
+                e.stopPropagation();
+                cancelName();
+              } else if (e.key === "Enter") {
+                e.preventDefault();
+                e.stopPropagation();
+                e.currentTarget.blur();
+              }
+            }}
+          />
+        ) : (
+          <>
+            <span>{phase.name}</span>
+            <button
+              type="button"
+              aria-label={`Rename ${phase.name}`}
+              className={styles.phaseNameEditBtn}
+              onClick={startEdit}
+            >
+              ✎
+            </button>
+          </>
+        )}
+        {phase.timing_label && !editingName && (
           <span className={styles.phaseTiming}>{phase.timing_label}</span>
         )}
       </div>
@@ -237,6 +298,7 @@ function StreamBlock({
   onSelectTask,
   onAddTaskClick,
   onAddPhaseClick,
+  onRenamePhase,
 }: {
   stream: AuthoredSnapshotStream;
   forceOpen: boolean | null;
@@ -244,6 +306,7 @@ function StreamBlock({
   onSelectTask: (task: AuthoredSnapshotTask) => void;
   onAddTaskClick: (phaseId: string) => void;
   onAddPhaseClick: (streamId: string) => void;
+  onRenamePhase: (phaseId: string, name: string) => void;
 }) {
   return (
     <section className={styles.streamCard}>
@@ -274,6 +337,7 @@ function StreamBlock({
             onToggleTask={onToggleTask}
             onSelectTask={onSelectTask}
             onAddTaskClick={onAddTaskClick}
+            onRenamePhase={onRenamePhase}
           />
         ))}
         <button
@@ -388,6 +452,51 @@ function RegulatoryPageInner() {
       return { previous };
     },
     onError: (_err, _taskId, context) => {
+      if (context?.previous !== undefined) {
+        queryClient.setQueryData(
+          ["regulatory", "snapshot", countryCode],
+          context.previous,
+        );
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["regulatory", "snapshot", countryCode],
+      });
+    },
+  });
+
+  // Phase-name rename (item 114). Optimistic update on the cached snapshot
+  // so the new name is visible immediately; authoritative refetch on settle.
+  const renamePhaseMutation = useMutation({
+    mutationFn: ({ phaseId, name }: { phaseId: string; name: string }) =>
+      updatePhase(phaseId, { name }),
+    onMutate: async ({ phaseId, name }) => {
+      await queryClient.cancelQueries({
+        queryKey: ["regulatory", "snapshot", countryCode],
+      });
+      const previous = queryClient.getQueryData<AuthoredSnapshot | null>([
+        "regulatory",
+        "snapshot",
+        countryCode,
+      ]);
+      if (previous) {
+        queryClient.setQueryData<AuthoredSnapshot | null>(
+          ["regulatory", "snapshot", countryCode],
+          {
+            ...previous,
+            streams: previous.streams.map((s) => ({
+              ...s,
+              phases: s.phases.map((ph) =>
+                ph.id === phaseId ? { ...ph, name } : ph,
+              ),
+            })),
+          },
+        );
+      }
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
       if (context?.previous !== undefined) {
         queryClient.setQueryData(
           ["regulatory", "snapshot", countryCode],
@@ -572,6 +681,9 @@ function RegulatoryPageInner() {
                   onSelectTask={(t) => setSelectedTask(t)}
                   onAddTaskClick={(phaseId) => setAddTaskPhaseId(phaseId)}
                   onAddPhaseClick={(streamId) => setAddPhaseStreamId(streamId)}
+                  onRenamePhase={(phaseId, name) =>
+                    renamePhaseMutation.mutate({ phaseId, name })
+                  }
                 />
               ))
             )}
@@ -582,6 +694,7 @@ function RegulatoryPageInner() {
 
       {selectedTaskFresh && (
         <RegulatoryDetailPanel
+          key={selectedTaskFresh.id}
           task={selectedTaskFresh}
           allTags={allTags}
           orgMembers={orgMembers}

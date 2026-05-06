@@ -40,6 +40,7 @@ import { useTheme } from "next-themes";
 import { useAuth } from "@/auth/clerk";
 import { customFetch } from "@/api/mutator";
 import { useFeatureFlags } from "@/lib/use-feature-flags";
+import { useOrganizationMembership } from "@/lib/use-organization-membership";
 import { usePlatformRole } from "@/lib/use-platform-role";
 import { useSidebarFullView } from "@/lib/use-sidebar-full-view";
 import { useNotifications } from "@/components/providers/NotificationProvider";
@@ -52,6 +53,7 @@ export function DashboardSidebar() {
   const { theme, setTheme } = useTheme();
   const { isSignedIn } = useAuth();
   const { isFeatureEnabled } = useFeatureFlags(Boolean(isSignedIn));
+  const { isAdmin } = useOrganizationMembership(isSignedIn);
   const { isPlatformOwner } = usePlatformRole(isSignedIn);
   const { fullView, toggle: toggleFullView } = useSidebarFullView();
   const showAdminItems = isPlatformOwner && fullView;
@@ -277,7 +279,7 @@ export function DashboardSidebar() {
                 Bookkeeping
               </Link>
               ) : null}
-              {showAdminItems && isFeatureEnabled("regulatory") ? (
+              {isAdmin && isFeatureEnabled("regulatory") ? (
               <Link
                 href="/regulatory"
                 className={cn(
