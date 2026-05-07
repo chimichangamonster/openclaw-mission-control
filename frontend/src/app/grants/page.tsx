@@ -35,6 +35,7 @@ import {
 } from "@/lib/grants-api";
 
 import { GrantsDetailDrawer } from "./grants-detail-drawer";
+import { CreateGrantModal, EditGrantModal } from "./grants-modals";
 import styles from "./grants.module.css";
 
 // ---------------------------------------------------------------------------
@@ -170,6 +171,8 @@ function GrantsPageInner() {
   const { isSignedIn } = useAuth();
   const { isAdmin } = useOrganizationMembership(isSignedIn);
   const [selectedGrantId, setSelectedGrantId] = useState<string | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
 
   const grantsQuery = useQuery({
     queryKey: ["grants", "list"],
@@ -276,6 +279,18 @@ function GrantsPageInner() {
       }}
     >
       <div className={styles.root}>
+        {/* Toolbar */}
+        <div className={styles.toolbar}>
+          <div className={styles.toolbarSpacer} />
+          <button
+            type="button"
+            className={styles.toolbarBtn}
+            onClick={() => setShowCreate(true)}
+          >
+            + New grant
+          </button>
+        </div>
+
         {/* Stat strip */}
         <div className={styles.statStrip}>
           <StatCard
@@ -392,6 +407,15 @@ function GrantsPageInner() {
         <GrantsDetailDrawer
           grant={selectedDetail}
           onClose={() => setSelectedGrantId(null)}
+          onEdit={() => setShowEdit(true)}
+        />
+      )}
+
+      {showCreate && <CreateGrantModal onClose={() => setShowCreate(false)} />}
+      {showEdit && selectedDetail && (
+        <EditGrantModal
+          grant={selectedDetail}
+          onClose={() => setShowEdit(false)}
         />
       )}
     </DashboardPageLayout>

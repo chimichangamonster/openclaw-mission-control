@@ -64,9 +64,10 @@ const daysUntil = (isoDate: string): number => {
 interface Props {
   grant: GrantDetail;
   onClose: () => void;
+  onEdit?: () => void;
 }
 
-export function GrantsDetailDrawer({ grant, onClose }: Props) {
+export function GrantsDetailDrawer({ grant, onClose, onEdit }: Props) {
   const totalTarget = sumTarget(grant.draws);
   const totalDrawn = sumAmount(grant.draws);
   const burnPercent = totalTarget > 0 ? Math.round((totalDrawn / totalTarget) * 100) : 0;
@@ -97,14 +98,25 @@ export function GrantsDetailDrawer({ grant, onClose }: Props) {
             </div>
             <div className={styles.drawerSubtitle}>{grant.granting_body}</div>
           </div>
-          <button
-            type="button"
-            className={styles.drawerCloseBtn}
-            onClick={onClose}
-            aria-label="Close"
-          >
-            Close
-          </button>
+          <div className={styles.drawerHeaderActions}>
+            {onEdit && (
+              <button
+                type="button"
+                className={styles.drawerCloseBtn}
+                onClick={onEdit}
+              >
+                Edit
+              </button>
+            )}
+            <button
+              type="button"
+              className={styles.drawerCloseBtn}
+              onClick={onClose}
+              aria-label="Close"
+            >
+              Close
+            </button>
+          </div>
         </header>
 
         <div className={styles.drawerBody}>

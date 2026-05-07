@@ -74,14 +74,23 @@ vi.mock("@/lib/grants-api", async () => {
     ...actual,
     listGrants: vi.fn(),
     getGrantDetail: vi.fn(),
+    createGrant: vi.fn(),
+    updateGrant: vi.fn(),
   };
 });
 
-import { getGrantDetail, listGrants } from "@/lib/grants-api";
+import {
+  createGrant,
+  getGrantDetail,
+  listGrants,
+  updateGrant,
+} from "@/lib/grants-api";
 import GrantsPage from "./page";
 
 const mockedList = vi.mocked(listGrants);
 const mockedDetail = vi.mocked(getGrantDetail);
+const mockedCreate = vi.mocked(createGrant);
+const mockedUpdate = vi.mocked(updateGrant);
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -110,6 +119,7 @@ const baseGrantEra = {
   contact_person: null,
   contact_email: null,
   owner_user_id: null,
+  program_url: null,
   notes_md: null,
   created_at: "2026-05-04T00:00:00Z",
   updated_at: "2026-05-04T00:00:00Z",
@@ -136,6 +146,7 @@ const baseGrantAbi = {
   contact_person: null,
   contact_email: null,
   owner_user_id: null,
+  program_url: null,
   notes_md: null,
   created_at: "2026-05-04T00:00:00Z",
   updated_at: "2026-05-04T00:00:00Z",
@@ -625,5 +636,164 @@ describe("GrantsPage", () => {
     );
     // At minimum 2 occurrences: one in table cell, one in drawer header.
     expect(programLinks.length).toBeGreaterThanOrEqual(2);
+  });
+
+  // -------------------------------------------------------------------------
+  // Item 118 sub-B Phase 2b.1 — create + edit grant modal.
+  //
+  // Phase 2 was viewable-but-unactionable. Operators couldn't add or modify
+  // grants without SQL. The "New grant" toolbar button opens CreateGrantModal;
+  // the drawer "Edit" button opens EditGrantModal pre-filled from the grant.
+  // Both wire to grants-api mutations and invalidate the relevant queries.
+  //
+  // Determinism posture per `feedback_determinism_first_for_high_liability.md`:
+  // zero LLM in modal path. No template-prefill helper, no URL-scrape, no
+  // status auto-advance. Operator-typed only.
+  // -------------------------------------------------------------------------
+
+  it("opens CreateGrantModal when 'New grant' toolbar button is clicked", async () => {
+    flagsState.grants_tracker = true;
+    membershipState.isAdmin = true;
+    mockedList.mockResolvedValue([]);
+
+    renderPage();
+
+    const button = await screen.findByRole("button", { name: /new grant/i });
+    fireEvent.click(button);
+
+    expect(
+      await screen.findByRole("heading", { name: /create grant/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("submits CreateGrantModal payload to createGrant() with required + optional fields", async () => {
+    flagsState.grants_tracker = true;
+    membershipState.isAdmin = true;
+    mockedList.mockResolvedValue([]);
+    mockedCreate.mockResolvedValue({
+      ...baseGrantEra,
+      id: "new-grant-id",
+      program_url: "https://example.org/program",
+    });
+
+    renderPage();
+
+    fireEvent.click(await screen.findByRole("button", { name: /new grant/i }));
+    await screen.findByRole("heading", { name: /create grant/i });
+
+    fireEvent.change(screen.getByLabelText(/granting body/i), {
+      target: { value: "Emissions Reduction Alberta" },
+    });
+    fireEvent.change(screen.getByLabelText(/program name/i), {
+      target: { value: "Industrial Transformation Challenge" },
+    });
+    fireEvent.change(screen.getByLabelText(/^application status/i), {
+      target: { value: "drafting" },
+    });
+    fireEvent.change(screen.getByLabelText(/program url/i), {
+      target: { value: "https://example.org/program" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /^create$/i }));
+
+    await waitFor(() => expect(mockedCreate).toHaveBeenCalledTimes(1));
+    const payload = mockedCreate.mock.calls[0][0];
+    expect(payload.granting_body).toBe("Emissions Reduction Alberta");
+    expect(payload.program_name).toBe("Industrial Transformation Challenge");
+    expect(payload.application_status).toBe("drafting");
+    expect(payload.program_url).toBe("https://example.org/program");
+  });
+
+  it("disables Create button when granting_body or program_name is blank", async () => {
+    flagsState.grants_tracker = true;
+    membershipState.isAdmin = true;
+    mockedList.mockResolvedValue([]);
+
+    renderPage();
+
+    fireEvent.click(await screen.findByRole("button", { name: /new grant/i }));
+    const createBtn = await screen.findByRole("button", { name: /^create$/i });
+    expect(createBtn).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText(/granting body/i), {
+      target: { value: "Some Body" },
+    });
+    expect(createBtn).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText(/program name/i), {
+      target: { value: "Some Program" },
+    });
+    expect(createBtn).not.toBeDisabled();
+  });
+
+  it("opens EditGrantModal pre-filled from drawer Edit button", async () => {
+    flagsState.grants_tracker = true;
+    membershipState.isAdmin = true;
+    mockedList.mockResolvedValue([baseGrantEra]);
+    mockedDetail.mockResolvedValue({
+      ...baseGrantEra,
+      draws: [],
+      deadlines: [],
+      prerequisites: [],
+    });
+
+    renderPage();
+
+    fireEvent.click(
+      await screen.findByText(/Industrial Transformation Challenge/i),
+    );
+    await waitFor(() =>
+      expect(mockedDetail).toHaveBeenCalledWith("grant-era"),
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: /^edit$/i }));
+
+    expect(
+      await screen.findByRole("heading", { name: /edit grant/i }),
+    ).toBeInTheDocument();
+
+    const programInput = screen.getByLabelText(/program name/i) as HTMLInputElement;
+    expect(programInput.value).toBe("Industrial Transformation Challenge");
+    const bodyInput = screen.getByLabelText(/granting body/i) as HTMLInputElement;
+    expect(bodyInput.value).toBe("Emissions Reduction Alberta");
+  });
+
+  it("submits EditGrantModal patch via updateGrant() with the changed fields", async () => {
+    flagsState.grants_tracker = true;
+    membershipState.isAdmin = true;
+    mockedList.mockResolvedValue([baseGrantEra]);
+    mockedDetail.mockResolvedValue({
+      ...baseGrantEra,
+      draws: [],
+      deadlines: [],
+      prerequisites: [],
+    });
+    mockedUpdate.mockResolvedValue({
+      ...baseGrantEra,
+      awarded_amount: "999000.00",
+    });
+
+    renderPage();
+
+    fireEvent.click(
+      await screen.findByText(/Industrial Transformation Challenge/i),
+    );
+    await waitFor(() =>
+      expect(mockedDetail).toHaveBeenCalledWith("grant-era"),
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: /^edit$/i }));
+    await screen.findByRole("heading", { name: /edit grant/i });
+
+    fireEvent.change(screen.getByLabelText(/awarded.*amount|requested.*amount/i), {
+      target: { value: "999000" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+
+    await waitFor(() => expect(mockedUpdate).toHaveBeenCalledTimes(1));
+    const [grantId, patch] = mockedUpdate.mock.calls[0];
+    expect(grantId).toBe("grant-era");
+    expect(patch.awarded_amount).toBe("999000");
   });
 });

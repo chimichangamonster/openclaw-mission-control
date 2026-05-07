@@ -251,6 +251,11 @@
   color: var(--sll);
   margin-top: 0.15rem;
 }
+.drawerHeaderActions {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
 .drawerCloseBtn {
   background: none;
   border: 1px solid var(--bdr);
@@ -421,4 +426,73 @@
   font-size: 0.78rem;
   color: var(--sll);
   font-style: italic;
+}
+
+/* ---------------------------------------------------------------------------
+   Modals (CreateGrantModal, EditGrantModal — item 118 sub-B Phase 2b.1)
+   --------------------------------------------------------------------------- */
+
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.modal {
+  background: white;
+  border-radius: 10px;
+  padding: 1.5rem;
+  width: 100%;
+  max-width: 480px;
+  max-height: 92vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+.modalWide {
+  max-width: 640px;
+}
+.modalTitle {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0 0 1rem 0;
+  color: var(--nd);
+}
+.modalField {
+  display: block;
+  margin-bottom: 0.85rem;
+  font-size: 0.78rem;
+  color: var(--sl);
+}
+.modalField input,
+.modalField select,
+.modalField textarea {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid var(--bdr);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  margin-top: 0.25rem;
+  color: var(--nd);
+}
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+.detailNoteSave {
+  padding: 0.5rem 0.85rem;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: var(--nd);
+  color: white;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.detailNoteSave:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
