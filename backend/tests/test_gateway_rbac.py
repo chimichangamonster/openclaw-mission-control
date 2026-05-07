@@ -32,7 +32,6 @@ from app.models.organization_members import OrganizationMember
 from app.models.organizations import Organization
 from app.models.users import User
 
-
 OPERATOR_USER_ID = uuid4()
 ADMIN_USER_ID = uuid4()
 MEMBER_USER_ID = uuid4()
@@ -217,12 +216,12 @@ async def test_member_can_read_status_but_not_send_message(app_with_seed) -> Non
             "/api/v1/gateways/sessions/abc/message",
             json={"message": "hello"},
         )
-    assert status_resp.status_code != 403, (
-        f"member must read /gateways/status; got {status_resp.status_code}"
-    )
-    assert message_resp.status_code == 403, (
-        f"member must NOT send messages (operator+ only); got {message_resp.status_code}"
-    )
+    assert (
+        status_resp.status_code != 403
+    ), f"member must read /gateways/status; got {status_resp.status_code}"
+    assert (
+        message_resp.status_code == 403
+    ), f"member must NOT send messages (operator+ only); got {message_resp.status_code}"
 
 
 @pytest.mark.asyncio
@@ -249,9 +248,9 @@ async def test_viewer_can_read_status(app_with_seed) -> None:
     _set_actor(app, VIEWER_USER_ID)
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.get("/api/v1/gateways/status")
-    assert response.status_code != 403, (
-        f"viewer must read /gateways/status (dashboard); got {response.status_code}"
-    )
+    assert (
+        response.status_code != 403
+    ), f"viewer must read /gateways/status (dashboard); got {response.status_code}"
 
 
 @pytest.mark.asyncio
@@ -274,9 +273,7 @@ async def test_viewer_cannot_send_message(app_with_seed) -> None:
             "/api/v1/gateways/sessions/abc/message",
             json={"message": "hello"},
         )
-    assert response.status_code == 403, (
-        f"viewer must NOT send messages; got {response.status_code}"
-    )
+    assert response.status_code == 403, f"viewer must NOT send messages; got {response.status_code}"
 
 
 @pytest.mark.asyncio
@@ -289,9 +286,9 @@ async def test_viewer_cannot_create_session(app_with_seed) -> None:
             "/api/v1/gateways/sessions",
             json={"label": "test"},
         )
-    assert response.status_code == 403, (
-        f"viewer must NOT create sessions; got {response.status_code}"
-    )
+    assert (
+        response.status_code == 403
+    ), f"viewer must NOT create sessions; got {response.status_code}"
 
 
 @pytest.mark.asyncio
@@ -302,9 +299,9 @@ async def test_viewer_cannot_compact_or_reset(app_with_seed) -> None:
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         compact_resp = await client.post("/api/v1/gateways/sessions/abc/compact")
         reset_resp = await client.post("/api/v1/gateways/sessions/abc/reset")
-    assert compact_resp.status_code == 403, (
-        f"viewer must NOT compact sessions; got {compact_resp.status_code}"
-    )
-    assert reset_resp.status_code == 403, (
-        f"viewer must NOT reset sessions; got {reset_resp.status_code}"
-    )
+    assert (
+        compact_resp.status_code == 403
+    ), f"viewer must NOT compact sessions; got {compact_resp.status_code}"
+    assert (
+        reset_resp.status_code == 403
+    ), f"viewer must NOT reset sessions; got {reset_resp.status_code}"

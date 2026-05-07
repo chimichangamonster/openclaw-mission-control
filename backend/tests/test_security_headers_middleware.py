@@ -39,7 +39,9 @@ async def test_security_headers_middleware_appends_lowercase_raw_header_names() 
 
     middleware = SecurityHeadersMiddleware(app, x_frame_options="SAMEORIGIN")
     await middleware(
-        {"type": "http", "method": "GET", "path": "/", "headers": []}, lambda: None, capture
+        {"type": "http", "method": "GET", "path": "/", "headers": []},
+        lambda: None,
+        capture,
     )
 
     response_start = next(

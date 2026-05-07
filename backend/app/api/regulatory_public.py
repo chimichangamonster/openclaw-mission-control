@@ -109,15 +109,19 @@ async def get_public_snapshot(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
 
     streams_q = (
-        await session.execute(
-            select(RegulatoryStream)
-            .where(
-                RegulatoryStream.organization_id == org_id,
-                RegulatoryStream.archived.is_(False),  # type: ignore[union-attr]
+        (
+            await session.execute(
+                select(RegulatoryStream)
+                .where(
+                    RegulatoryStream.organization_id == org_id,
+                    RegulatoryStream.archived.is_(False),  # type: ignore[union-attr]
+                )
+                .order_by(RegulatoryStream.sort_order, RegulatoryStream.name)
             )
-            .order_by(RegulatoryStream.sort_order, RegulatoryStream.name)
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     payload_streams: list[dict[str, Any]] = []
     grand_total = 0
@@ -125,15 +129,19 @@ async def get_public_snapshot(
 
     for stream in streams_q:
         phases_q = (
-            await session.execute(
-                select(RegulatoryPhase)
-                .where(
-                    RegulatoryPhase.stream_id == stream.id,
-                    RegulatoryPhase.country_id == country.id,
+            (
+                await session.execute(
+                    select(RegulatoryPhase)
+                    .where(
+                        RegulatoryPhase.stream_id == stream.id,
+                        RegulatoryPhase.country_id == country.id,
+                    )
+                    .order_by(RegulatoryPhase.sort_order, RegulatoryPhase.name)
                 )
-                .order_by(RegulatoryPhase.sort_order, RegulatoryPhase.name)
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
 
         payload_phases: list[dict[str, Any]] = []
         stream_total = 0
@@ -141,39 +149,51 @@ async def get_public_snapshot(
 
         for phase in phases_q:
             notes_q = (
-                await session.execute(
-                    select(RegulatoryPriorityNote)
-                    .where(RegulatoryPriorityNote.phase_id == phase.id)
-                    .order_by(
-                        RegulatoryPriorityNote.sort_order,
-                        RegulatoryPriorityNote.created_at,
+                (
+                    await session.execute(
+                        select(RegulatoryPriorityNote)
+                        .where(RegulatoryPriorityNote.phase_id == phase.id)
+                        .order_by(
+                            RegulatoryPriorityNote.sort_order,
+                            RegulatoryPriorityNote.created_at,
+                        )
                     )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             tasks_q = (
-                await session.execute(
-                    select(RegulatoryTask)
-                    .where(RegulatoryTask.phase_id == phase.id)
-                    .order_by(RegulatoryTask.sort_order, RegulatoryTask.created_at)
+                (
+                    await session.execute(
+                        select(RegulatoryTask)
+                        .where(RegulatoryTask.phase_id == phase.id)
+                        .order_by(RegulatoryTask.sort_order, RegulatoryTask.created_at)
+                    )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
 
             payload_tasks: list[dict[str, Any]] = []
             for task in tasks_q:
                 tag_rows = (
-                    await session.execute(
-                        select(RegulatoryTag)
-                        .join(
-                            RegulatoryTaskTag,
-                            RegulatoryTaskTag.tag_id == RegulatoryTag.id,
-                        )
-                        .where(
-                            RegulatoryTaskTag.task_id == task.id,
-                            # Defense-in-depth: only this org's tags.
-                            RegulatoryTag.organization_id == org_id,
+                    (
+                        await session.execute(
+                            select(RegulatoryTag)
+                            .join(
+                                RegulatoryTaskTag,
+                                RegulatoryTaskTag.tag_id == RegulatoryTag.id,
+                            )
+                            .where(
+                                RegulatoryTaskTag.task_id == task.id,
+                                # Defense-in-depth: only this org's tags.
+                                RegulatoryTag.organization_id == org_id,
+                            )
                         )
                     )
-                ).scalars().all()
+                    .scalars()
+                    .all()
+                )
                 payload_tasks.append(
                     {
                         "body": task.body,
@@ -194,9 +214,7 @@ async def get_public_snapshot(
                     "badge_kind": phase.badge_kind,
                     "timing_label": phase.timing_label,
                     "default_open": phase.default_open,
-                    "priority_notes": [
-                        {"body": n.body, "severity": n.severity} for n in notes_q
-                    ],
+                    "priority_notes": [{"body": n.body, "severity": n.severity} for n in notes_q],
                     "tasks": payload_tasks,
                 }
             )

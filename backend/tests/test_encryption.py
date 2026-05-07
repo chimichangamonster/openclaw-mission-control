@@ -38,7 +38,6 @@ def _reset():
 
 
 class TestAES256GCM:
-
     def test_round_trip(self):
         with patch("app.core.encryption.settings", _make_settings()):
             ct = enc.encrypt_token("hello world")
@@ -116,7 +115,6 @@ class TestAES256GCM:
 
 
 class TestFernetCompat:
-
     def test_decrypt_legacy_fernet(self):
         """Ciphertexts without v1: prefix are decrypted via Fernet."""
         fernet_key = Fernet.generate_key().decode()
@@ -143,7 +141,6 @@ class TestFernetCompat:
 
 
 class TestReEncrypt:
-
     def test_re_encrypt_fernet_to_aes256(self):
         """re_encrypt() converts Fernet → AES-256-GCM."""
         fernet_key = Fernet.generate_key().decode()
@@ -178,7 +175,6 @@ class TestReEncrypt:
 
 
 class TestKeyVersioning:
-
     def test_ciphertext_contains_version_byte(self):
         with patch("app.core.encryption.settings", _make_settings()):
             ct = enc.encrypt_token("versioned")
@@ -202,7 +198,6 @@ class TestKeyVersioning:
 
 
 class TestMissingKey:
-
     def test_encrypt_without_key_raises(self):
         with patch("app.core.encryption.settings", _make_settings("")):
             with pytest.raises(ValueError, match="ENCRYPTION_KEY must be set"):
@@ -221,7 +216,6 @@ class TestMissingKey:
 
 
 class TestKeyIsolation:
-
     def test_different_keys_cannot_cross_decrypt(self):
         with patch("app.core.encryption.settings", _make_settings("key-alpha")):
             ct = enc.encrypt_token("isolated")

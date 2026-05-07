@@ -46,7 +46,9 @@ class _BoardStub:
 
 
 @pytest.mark.asyncio
-async def test_gateway_coordination_nudge_success(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_gateway_coordination_nudge_success(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     session = _FakeSession()
     service = coordination_lifecycle.GatewayCoordinationService(session)  # type: ignore[arg-type]
     board = _BoardStub(id=uuid4(), gateway_id=uuid4(), name="Roadmap")

@@ -42,8 +42,11 @@ ORG_ID: UUID = uuid4()
 @pytest.mark.asyncio
 async def test_amex_cards_is_transfer(empty_session: AsyncMock) -> None:
     c = await classify(
-        "AMEX CARDS   X9K7W7", incoming=False, source="TD",
-        organization_id=ORG_ID, session=empty_session,
+        "AMEX CARDS   X9K7W7",
+        incoming=False,
+        source="TD",
+        organization_id=ORG_ID,
+        session=empty_session,
     )
     assert c.bucket == "transfer"
 
@@ -51,8 +54,11 @@ async def test_amex_cards_is_transfer(empty_session: AsyncMock) -> None:
 @pytest.mark.asyncio
 async def test_rbc_mc_is_transfer(empty_session: AsyncMock) -> None:
     c = await classify(
-        "RBC MC       X9K7X2", incoming=False, source="TD",
-        organization_id=ORG_ID, session=empty_session,
+        "RBC MC       X9K7X2",
+        incoming=False,
+        source="TD",
+        organization_id=ORG_ID,
+        session=empty_session,
     )
     assert c.bucket == "transfer"
 
@@ -60,8 +66,11 @@ async def test_rbc_mc_is_transfer(empty_session: AsyncMock) -> None:
 @pytest.mark.asyncio
 async def test_amex_payment_received_is_transfer(empty_session: AsyncMock) -> None:
     c = await classify(
-        "PAYMENT RECEIVED - THANK YOU", incoming=True, source="AMEX",
-        organization_id=ORG_ID, session=empty_session,
+        "PAYMENT RECEIVED - THANK YOU",
+        incoming=True,
+        source="AMEX",
+        organization_id=ORG_ID,
+        session=empty_session,
     )
     assert c.bucket == "transfer"
 
@@ -72,8 +81,11 @@ async def test_amex_payment_received_is_transfer(empty_session: AsyncMock) -> No
 @pytest.mark.asyncio
 async def test_td_atm_dep_is_income_pending(empty_session: AsyncMock) -> None:
     c = await classify(
-        "TD ATM DEP    007702", incoming=True, source="TD",
-        organization_id=ORG_ID, session=empty_session,
+        "TD ATM DEP    007702",
+        incoming=True,
+        source="TD",
+        organization_id=ORG_ID,
+        session=empty_session,
     )
     assert c.bucket == "income_pending"
     assert c.needs_receipt is True
@@ -82,8 +94,11 @@ async def test_td_atm_dep_is_income_pending(empty_session: AsyncMock) -> None:
 @pytest.mark.asyncio
 async def test_e_transfer_received_is_income_pending(empty_session: AsyncMock) -> None:
     c = await classify(
-        "E-TRANSFER ***ehp", incoming=True, source="TD",
-        organization_id=ORG_ID, session=empty_session,
+        "E-TRANSFER ***ehp",
+        incoming=True,
+        source="TD",
+        organization_id=ORG_ID,
+        session=empty_session,
     )
     assert c.bucket == "income_pending"
 
@@ -94,8 +109,11 @@ async def test_e_transfer_received_is_income_pending(empty_session: AsyncMock) -
 @pytest.mark.asyncio
 async def test_openrouter_is_business_mgmt_admin(empty_session: AsyncMock) -> None:
     c = await classify(
-        "OPENROUTER, INC         NEW YORK", incoming=False, source="AMEX",
-        organization_id=ORG_ID, session=empty_session,
+        "OPENROUTER, INC         NEW YORK",
+        incoming=False,
+        source="AMEX",
+        organization_id=ORG_ID,
+        session=empty_session,
     )
     assert c.bucket == "business"
     assert c.t2125_line == "8871"
@@ -105,8 +123,11 @@ async def test_openrouter_is_business_mgmt_admin(empty_session: AsyncMock) -> No
 @pytest.mark.asyncio
 async def test_gallo_llp_is_legal_acct(empty_session: AsyncMock) -> None:
     c = await classify(
-        "GALLO LLP               SHERWOOD PARK W", incoming=False, source="AMEX",
-        organization_id=ORG_ID, session=empty_session,
+        "GALLO LLP               SHERWOOD PARK W",
+        incoming=False,
+        source="AMEX",
+        organization_id=ORG_ID,
+        session=empty_session,
     )
     assert c.bucket == "business"
     assert c.t2125_line == "8860"
@@ -115,8 +136,11 @@ async def test_gallo_llp_is_legal_acct(empty_session: AsyncMock) -> None:
 @pytest.mark.asyncio
 async def test_squarespace_is_business(empty_session: AsyncMock) -> None:
     c = await classify(
-        "SQSP* WEBSIT#225615382  NEW YORK", incoming=False, source="AMEX",
-        organization_id=ORG_ID, session=empty_session,
+        "SQSP* WEBSIT#225615382  NEW YORK",
+        incoming=False,
+        source="AMEX",
+        organization_id=ORG_ID,
+        session=empty_session,
     )
     assert c.bucket == "business"
     assert c.t2125_line == "8871"
@@ -125,8 +149,11 @@ async def test_squarespace_is_business(empty_session: AsyncMock) -> None:
 @pytest.mark.asyncio
 async def test_dropbox_is_office(empty_session: AsyncMock) -> None:
     c = await classify(
-        "DROPBOX*B14XRKYBVQYB    SAN FRANCISCO", incoming=False, source="AMEX",
-        organization_id=ORG_ID, session=empty_session,
+        "DROPBOX*B14XRKYBVQYB    SAN FRANCISCO",
+        incoming=False,
+        source="AMEX",
+        organization_id=ORG_ID,
+        session=empty_session,
     )
     assert c.bucket == "business"
     assert c.t2125_line == "8810"
@@ -135,8 +162,11 @@ async def test_dropbox_is_office(empty_session: AsyncMock) -> None:
 @pytest.mark.asyncio
 async def test_vercel_is_business(empty_session: AsyncMock) -> None:
     c = await classify(
-        "VERCEL DOMAINS          COVINA", incoming=False, source="AMEX",
-        organization_id=ORG_ID, session=empty_session,
+        "VERCEL DOMAINS          COVINA",
+        incoming=False,
+        source="AMEX",
+        organization_id=ORG_ID,
+        session=empty_session,
     )
     assert c.bucket == "business"
 
@@ -147,8 +177,11 @@ async def test_vercel_is_business(empty_session: AsyncMock) -> None:
 @pytest.mark.asyncio
 async def test_petro_canada_is_vehicle_fuel(empty_session: AsyncMock) -> None:
     c = await classify(
-        "PETRO-CANADA 89494      EDMONTON", incoming=False, source="AMEX",
-        organization_id=ORG_ID, session=empty_session,
+        "PETRO-CANADA 89494      EDMONTON",
+        incoming=False,
+        source="AMEX",
+        organization_id=ORG_ID,
+        session=empty_session,
     )
     assert c.bucket == "vehicle"
     assert c.t2125_line == "9224"
@@ -157,8 +190,11 @@ async def test_petro_canada_is_vehicle_fuel(empty_session: AsyncMock) -> None:
 @pytest.mark.asyncio
 async def test_primmum_insurance_is_vehicle(empty_session: AsyncMock) -> None:
     c = await classify(
-        "PRIMMUM INSURANCE COMP  MONTREAL", incoming=False, source="AMEX",
-        organization_id=ORG_ID, session=empty_session,
+        "PRIMMUM INSURANCE COMP  MONTREAL",
+        incoming=False,
+        source="AMEX",
+        organization_id=ORG_ID,
+        session=empty_session,
     )
     assert c.bucket == "vehicle"
 
@@ -166,8 +202,11 @@ async def test_primmum_insurance_is_vehicle(empty_session: AsyncMock) -> None:
 @pytest.mark.asyncio
 async def test_downtown_auto_is_vehicle(empty_session: AsyncMock) -> None:
     c = await classify(
-        "DOWNTOWN AUTO & TIRE DE EDMONTON", incoming=False, source="AMEX",
-        organization_id=ORG_ID, session=empty_session,
+        "DOWNTOWN AUTO & TIRE DE EDMONTON",
+        incoming=False,
+        source="AMEX",
+        organization_id=ORG_ID,
+        session=empty_session,
     )
     assert c.bucket == "vehicle"
 
@@ -181,8 +220,11 @@ async def test_td_unknown_vendor_is_personal(empty_session: AsyncMock) -> None:
     business rule is personal — we don't flag unknown TD vendors for review.
     """
     c = await classify(
-        "RANDOM RESTAURANT NAME", incoming=False, source="TD",
-        organization_id=ORG_ID, session=empty_session,
+        "RANDOM RESTAURANT NAME",
+        incoming=False,
+        source="TD",
+        organization_id=ORG_ID,
+        session=empty_session,
     )
     assert c.bucket == "personal"
 
@@ -191,8 +233,11 @@ async def test_td_unknown_vendor_is_personal(empty_session: AsyncMock) -> None:
 async def test_td_send_e_tfr_is_personal(empty_session: AsyncMock) -> None:
     """Per Henz's March decision: outgoing TD e-transfers are paying friends."""
     c = await classify(
-        "SEND E-TFR ***9hq", incoming=False, source="TD",
-        organization_id=ORG_ID, session=empty_session,
+        "SEND E-TFR ***9hq",
+        incoming=False,
+        source="TD",
+        organization_id=ORG_ID,
+        session=empty_session,
     )
     assert c.bucket == "personal"
 
@@ -203,8 +248,11 @@ async def test_td_send_e_tfr_is_personal(empty_session: AsyncMock) -> None:
 @pytest.mark.asyncio
 async def test_ups_on_amex_is_ambiguous(empty_session: AsyncMock) -> None:
     c = await classify(
-        "UPS*                    888-520-9090", incoming=False, source="AMEX",
-        organization_id=ORG_ID, session=empty_session,
+        "UPS*                    888-520-9090",
+        incoming=False,
+        source="AMEX",
+        organization_id=ORG_ID,
+        session=empty_session,
     )
     assert c.bucket == "ambiguous"
 
@@ -213,8 +261,11 @@ async def test_ups_on_amex_is_ambiguous(empty_session: AsyncMock) -> None:
 async def test_sandman_on_amex_is_ambiguous(empty_session: AsyncMock) -> None:
     """Hotels need per-instance decision — can't auto-tag business."""
     c = await classify(
-        "SANDMAN CALGARY AIRPORT CALGARY", incoming=False, source="AMEX",
-        organization_id=ORG_ID, session=empty_session,
+        "SANDMAN CALGARY AIRPORT CALGARY",
+        incoming=False,
+        source="AMEX",
+        organization_id=ORG_ID,
+        session=empty_session,
     )
     assert c.bucket == "ambiguous"
 
@@ -225,8 +276,11 @@ async def test_sandman_on_amex_is_ambiguous(empty_session: AsyncMock) -> None:
 @pytest.mark.asyncio
 async def test_uber_eats_is_personal(empty_session: AsyncMock) -> None:
     c = await classify(
-        "UBER EATS               TORONTO", incoming=False, source="AMEX",
-        organization_id=ORG_ID, session=empty_session,
+        "UBER EATS               TORONTO",
+        incoming=False,
+        source="AMEX",
+        organization_id=ORG_ID,
+        session=empty_session,
     )
     assert c.bucket == "personal"
 
@@ -234,8 +288,11 @@ async def test_uber_eats_is_personal(empty_session: AsyncMock) -> None:
 @pytest.mark.asyncio
 async def test_spotify_is_personal(empty_session: AsyncMock) -> None:
     c = await classify(
-        "SPOTIFY                 STOCKHOLM", incoming=False, source="AMEX",
-        organization_id=ORG_ID, session=empty_session,
+        "SPOTIFY                 STOCKHOLM",
+        incoming=False,
+        source="AMEX",
+        organization_id=ORG_ID,
+        session=empty_session,
     )
     assert c.bucket == "personal"
 
@@ -248,7 +305,10 @@ async def test_amex_unknown_vendor_is_ambiguous(empty_session: AsyncMock) -> Non
     """Per Henz's rule: AMEX is business-leaning, so unknown AMEX charges
     must be surfaced for review (not auto-personal like TD)."""
     c = await classify(
-        "WIDGET CORP  VANCOUVER", incoming=False, source="AMEX",
-        organization_id=ORG_ID, session=empty_session,
+        "WIDGET CORP  VANCOUVER",
+        incoming=False,
+        source="AMEX",
+        organization_id=ORG_ID,
+        session=empty_session,
     )
     assert c.bucket == "ambiguous"

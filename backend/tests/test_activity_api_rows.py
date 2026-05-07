@@ -5,7 +5,11 @@ from uuid import uuid4
 
 import pytest
 
-from app.api.activity import _build_activity_route, _coerce_activity_rows, _coerce_task_comment_rows
+from app.api.activity import (
+    _build_activity_route,
+    _coerce_activity_rows,
+    _coerce_task_comment_rows,
+)
 from app.models.activity_events import ActivityEvent
 from app.models.agents import Agent
 from app.models.boards import Board

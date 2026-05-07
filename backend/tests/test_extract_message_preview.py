@@ -50,7 +50,11 @@ def test_extract_skips_tool_result_role_when_looking_for_user():
         {
             "role": "assistant",
             "content": [
-                {"type": "thinking", "thinking": "Need to call a tool", "thinkingSignature": "x"},
+                {
+                    "type": "thinking",
+                    "thinking": "Need to call a tool",
+                    "thinkingSignature": "x",
+                },
                 {
                     "type": "toolCall",
                     "id": "t1",

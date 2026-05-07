@@ -167,7 +167,9 @@ async def test_dispatch_flush_processes_items_and_throttles(
 
 
 @pytest.mark.asyncio
-async def test_dispatch_flush_requeues_on_process_error(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_dispatch_flush_requeues_on_process_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     item = _FakeQueuedItem()
     _patch_dequeue(monkeypatch, [item, None])
 
@@ -192,7 +194,9 @@ async def test_dispatch_flush_requeues_on_process_error(monkeypatch: pytest.Monk
 
 
 @pytest.mark.asyncio
-async def test_dispatch_flush_recovers_from_dequeue_error(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_dispatch_flush_recovers_from_dequeue_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     item = _FakeQueuedItem()
     call_count = 0
 
@@ -224,7 +228,9 @@ async def test_dispatch_flush_recovers_from_dequeue_error(monkeypatch: pytest.Mo
 
 
 @pytest.mark.asyncio
-async def test_notify_target_agent_prefers_mapped_agent(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_notify_target_agent_prefers_mapped_agent(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     agent_id = uuid4()
     mapped_agent = SimpleNamespace(
         id=agent_id,
@@ -289,7 +295,9 @@ async def test_notify_target_agent_prefers_mapped_agent(monkeypatch: pytest.Monk
 
 
 @pytest.mark.asyncio
-async def test_notify_target_agent_falls_back_to_lead(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_notify_target_agent_falls_back_to_lead(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     lead_agent = SimpleNamespace(
         id=uuid4(),
         name="Lead Agent",
@@ -345,7 +353,9 @@ async def test_notify_target_agent_falls_back_to_lead(monkeypatch: pytest.Monkey
     assert sent == [{"session_key": "lead:session", "agent_name": "Lead Agent"}]
 
 
-def test_dispatch_run_entrypoint_calls_async_flush(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_dispatch_run_entrypoint_calls_async_flush(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     called: list[bool] = []
 
     async def _flush() -> None:

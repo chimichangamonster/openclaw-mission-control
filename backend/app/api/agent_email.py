@@ -81,9 +81,7 @@ async def _require_agent_accessible_account(
     return account
 
 
-async def _enforce_email_to_llm_policy(
-    session: AsyncSession, organization_id: UUID
-) -> None:
+async def _enforce_email_to_llm_policy(session: AsyncSession, organization_id: UUID) -> None:
     """Reject the request if this org has disabled sending email content to LLMs.
 
     Default is True (allowed). Setting `data_policy.allow_email_content_to_llm =

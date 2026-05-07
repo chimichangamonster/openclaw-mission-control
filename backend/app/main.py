@@ -15,9 +15,11 @@ from app.api.activity import router as activity_router
 from app.api.agent import router as agent_router
 from app.api.agent_contacts import router as agent_contacts_router
 from app.api.agent_email import router as agent_email_router
+from app.api.agent_grants import router as agent_grants_router
 from app.api.agent_memory_vector import router as agent_memory_vector_router
 from app.api.agent_org_context import router as agent_org_context_router
 from app.api.agent_polymarket import router as agent_polymarket_router
+from app.api.agent_regulatory import router as agent_regulatory_router
 from app.api.agents import router as agents_router
 from app.api.approvals import router as approvals_router
 from app.api.auth import router as auth_router
@@ -28,7 +30,6 @@ from app.api.board_onboarding import router as board_onboarding_router
 from app.api.board_webhooks import router as board_webhooks_router
 from app.api.boards import router as boards_router
 from app.api.bookkeeping import router as bookkeeping_router
-from app.api.personal_bookkeeping import router as personal_bookkeeping_router
 from app.api.chat_projects import router as chat_projects_router
 from app.api.contacts import router as contacts_router
 from app.api.cost_tracker import router as cost_tracker_router
@@ -45,6 +46,7 @@ from app.api.gateway import router as gateway_router
 from app.api.gateway_live import router as gateway_live_router
 from app.api.gateways import router as gateways_router
 from app.api.google_calendar import router as google_calendar_router
+from app.api.grants import router as grants_router
 from app.api.industry_templates import router as industry_templates_router
 from app.api.invoice_pdf import router as invoice_pdf_router
 from app.api.legal import router as legal_router
@@ -61,11 +63,9 @@ from app.api.organizations import router as organizations_router
 from app.api.paper_bets import router as paper_bets_router
 from app.api.paper_trading import router as paper_trading_router
 from app.api.pentest import router as pentest_router
+from app.api.personal_bookkeeping import router as personal_bookkeeping_router
 from app.api.platform_admin import router as platform_admin_router
 from app.api.polymarket import router as polymarket_router
-from app.api.agent_grants import router as agent_grants_router
-from app.api.agent_regulatory import router as agent_regulatory_router
-from app.api.grants import router as grants_router
 from app.api.regulatory import router as regulatory_router
 from app.api.regulatory_public import router as regulatory_public_router
 from app.api.skill_config import router as skill_config_router

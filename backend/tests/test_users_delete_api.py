@@ -36,7 +36,9 @@ class _FakeOrganizationMemberModel:
 
 
 @pytest.mark.asyncio
-async def test_delete_me_aborts_when_clerk_delete_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_delete_me_aborts_when_clerk_delete_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Local deletion should not run if Clerk account deletion fails."""
     session = _FakeSession()
     user = User(id=uuid4(), clerk_user_id="user_123")

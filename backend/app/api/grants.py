@@ -93,9 +93,7 @@ router = APIRouter(
 # ---------------------------------------------------------------------------
 
 
-async def _grant_for_org(
-    grant_id: UUID, org_id: UUID, session: AsyncSession
-) -> Grant:
+async def _grant_for_org(grant_id: UUID, org_id: UUID, session: AsyncSession) -> Grant:
     """Load a grant and verify it belongs to the calling org.
 
     Raises 404 on missing or cross-org access (never leak existence).
@@ -106,9 +104,7 @@ async def _grant_for_org(
     return grant
 
 
-async def _draw_for_org(
-    draw_id: UUID, org_id: UUID, session: AsyncSession
-) -> GrantDrawSchedule:
+async def _draw_for_org(draw_id: UUID, org_id: UUID, session: AsyncSession) -> GrantDrawSchedule:
     draw = await session.get(GrantDrawSchedule, draw_id)
     if draw is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
@@ -380,14 +376,10 @@ async def add_prerequisite(
 ) -> GrantPrerequisiteRead:
     grant = await _grant_for_org(grant_id, ctx.organization.id, session)
     # Same-org guard for the M2M silent-leak surface.
-    task = await _regulatory_task_for_org(
-        payload.regulatory_task_id, ctx.organization.id, session
-    )
+    task = await _regulatory_task_for_org(payload.regulatory_task_id, ctx.organization.id, session)
 
     # Idempotent: if the link already exists, return it instead of failing.
-    existing = await session.get(
-        GrantPrerequisiteTask, (grant.id, task.id)
-    )
+    existing = await session.get(GrantPrerequisiteTask, (grant.id, task.id))
     if existing is not None:
         return GrantPrerequisiteRead(
             grant_id=existing.grant_id,

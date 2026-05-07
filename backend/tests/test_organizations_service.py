@@ -19,7 +19,10 @@ from app.models.organization_members import OrganizationMember
 from app.models.organizations import Organization
 from app.models.skills import SkillPack
 from app.models.users import User
-from app.schemas.organizations import OrganizationBoardAccessSpec, OrganizationMemberAccessUpdate
+from app.schemas.organizations import (
+    OrganizationBoardAccessSpec,
+    OrganizationMemberAccessUpdate,
+)
 from app.services import organizations
 
 
@@ -261,7 +264,10 @@ async def test_ensure_member_for_user_creates_personal_org_and_owner(
     )
     skill_packs = [
         item
-        for item in [*session.added, *[record for batch in session.added_all for record in batch]]
+        for item in [
+            *session.added,
+            *[record for batch in session.added_all for record in batch],
+        ]
         if isinstance(item, SkillPack)
     ]
     assert len(skill_packs) == 2

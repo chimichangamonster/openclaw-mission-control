@@ -238,7 +238,9 @@ def _normalize_item(item: dict[str, Any], category: str) -> dict[str, Any] | Non
         "full_name": full_name,
         "owner": owner,
         "name": name,
-        "description": item.get("description") if isinstance(item.get("description"), str) else None,
+        "description": (
+            item.get("description") if isinstance(item.get("description"), str) else None
+        ),
         "html_url": item.get("html_url") or f"https://github.com/{full_name}",
         "language": item.get("language") if isinstance(item.get("language"), str) else None,
         "category": category,

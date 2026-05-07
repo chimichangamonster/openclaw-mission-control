@@ -370,7 +370,9 @@ async def test_toggle_task_in_other_org_returns_404(env: dict[str, Any]) -> None
 
 
 @pytest.mark.asyncio
-async def test_POST_phase_with_cross_org_stream_returns_404(env: dict[str, Any]) -> None:
+async def test_POST_phase_with_cross_org_stream_returns_404(
+    env: dict[str, Any],
+) -> None:
     """Org A admin cannot create a phase referencing org B's stream.
 
     This is the silent-leak surface the model layer permits. Only the API
@@ -391,7 +393,9 @@ async def test_POST_phase_with_cross_org_stream_returns_404(env: dict[str, Any])
 
 
 @pytest.mark.asyncio
-async def test_POST_phase_with_cross_org_country_returns_404(env: dict[str, Any]) -> None:
+async def test_POST_phase_with_cross_org_country_returns_404(
+    env: dict[str, Any],
+) -> None:
     """Org A admin cannot create a phase referencing org B's country."""
     d = env["data"]
     app = _make_app(env["maker"], _ctx(d["org_a"], d["admin_a"]))
@@ -424,7 +428,9 @@ async def test_POST_task_in_cross_org_phase_returns_404(env: dict[str, Any]) -> 
 
 
 @pytest.mark.asyncio
-async def test_POST_task_tag_with_cross_org_tag_returns_404(env: dict[str, Any]) -> None:
+async def test_POST_task_tag_with_cross_org_tag_returns_404(
+    env: dict[str, Any],
+) -> None:
     """Org A operator cannot link org B's tag to org A's task.
 
     THE M2M silent-leak surface. The model permits any (task_id, tag_id) pair;
@@ -444,7 +450,9 @@ async def test_POST_task_tag_with_cross_org_tag_returns_404(env: dict[str, Any])
 
 
 @pytest.mark.asyncio
-async def test_POST_task_tag_with_cross_org_task_returns_404(env: dict[str, Any]) -> None:
+async def test_POST_task_tag_with_cross_org_task_returns_404(
+    env: dict[str, Any],
+) -> None:
     """Org A operator cannot link org A's tag to org B's task."""
     d = env["data"]
     app = _make_app(env["maker"], _ctx(d["org_a"], d["admin_a"]))
@@ -561,7 +569,9 @@ async def test_POST_task_tag_same_org_succeeds_and_is_idempotent(
 
 
 @pytest.mark.asyncio
-async def test_routes_blocked_when_regulatory_flag_disabled(env: dict[str, Any]) -> None:
+async def test_routes_blocked_when_regulatory_flag_disabled(
+    env: dict[str, Any],
+) -> None:
     """When the regulatory feature flag is off, routes return 403.
 
     This re-overrides the require_feature dep that _make_app set to a no-op,
@@ -573,9 +583,7 @@ async def test_routes_blocked_when_regulatory_flag_disabled(env: dict[str, Any])
     app = _make_app(env["maker"], _ctx(d["org_a"], d["admin_a"]))
 
     def _flag_off() -> None:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="regulatory disabled"
-        )
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="regulatory disabled")
 
     app.dependency_overrides[REGULATORY_FEATURE_GATE] = _flag_off
 
@@ -668,20 +676,11 @@ async def test_GET_authored_snapshot_excludes_other_org_data(
     assert d["stream_a_id"] in stream_ids
     assert d["stream_b_id"] not in stream_ids
 
-    phase_ids = {
-        UUID(p["id"])
-        for s in snap["streams"]
-        for p in s["phases"]
-    }
+    phase_ids = {UUID(p["id"]) for s in snap["streams"] for p in s["phases"]}
     assert d["phase_a_id"] in phase_ids
     assert d["phase_b_id"] not in phase_ids
 
-    task_ids = {
-        UUID(t["id"])
-        for s in snap["streams"]
-        for p in s["phases"]
-        for t in p["tasks"]
-    }
+    task_ids = {UUID(t["id"]) for s in snap["streams"] for p in s["phases"] for t in p["tasks"]}
     assert d["task_a_id"] in task_ids
     assert d["task_b_id"] not in task_ids
 
@@ -709,9 +708,7 @@ async def test_GET_authored_snapshot_blocked_when_regulatory_flag_disabled(
     app = _make_app(env["maker"], _ctx(d["org_a"], d["admin_a"]))
 
     def _flag_off() -> None:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="regulatory disabled"
-        )
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="regulatory disabled")
 
     app.dependency_overrides[REGULATORY_FEATURE_GATE] = _flag_off
 

@@ -33,7 +33,6 @@ from app.models.organization_members import OrganizationMember
 from app.models.organizations import Organization
 from app.models.users import User
 
-
 MEMBER_USER_ID = uuid4()
 NONMEMBER_USER_ID = uuid4()
 ORG_VANTAGE_ID = uuid4()  # User is a member
@@ -175,9 +174,7 @@ async def test_multi_org_member_can_list_non_active_org_boards(app_with_seed) ->
 
     app.dependency_overrides[get_auth_context] = _auth_override
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.get(f"/api/v1/organizations/{ORG_MAGNETIK_ID}/boards")
 
     assert response.status_code == 200
@@ -201,9 +198,7 @@ async def test_non_member_gets_403_for_outsider_org(app_with_seed) -> None:
 
     app.dependency_overrides[get_auth_context] = _auth_override
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.get(f"/api/v1/organizations/{ORG_OUTSIDER_ID}/boards")
 
     assert response.status_code == 403
@@ -219,9 +214,7 @@ async def test_unauthenticated_request_gets_401(app_with_seed) -> None:
 
     app.dependency_overrides[get_auth_context] = _auth_override
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.get(f"/api/v1/organizations/{ORG_VANTAGE_ID}/boards")
 
     assert response.status_code == 401

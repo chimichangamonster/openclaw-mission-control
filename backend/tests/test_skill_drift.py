@@ -20,7 +20,6 @@ from app.services.skill_drift import (
     parse_registry,
 )
 
-
 # ---------------------------------------------------------------------------
 # Registry parser — must match the regex parser in audit-shared-skills.sh
 # ---------------------------------------------------------------------------

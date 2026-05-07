@@ -76,11 +76,10 @@ def _mock_intake_and_embedding(monkeypatch):
     async def _fake_embedding(content: str, org_id):
         return FAKE_EMBEDDING
 
-    monkeypatch.setattr(
-        "app.api.org_context.process_document", _fake_process
-    )
+    monkeypatch.setattr("app.api.org_context.process_document", _fake_process)
     monkeypatch.setattr("app.api.org_context.get_embedding", _fake_embedding)
     yield
+
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -303,9 +302,7 @@ async def test_admin_can_upload_list_get_patch_delete(env_admin):
         uploaded_size = len(b"ICP: dealerships >$5M revenue, multi-location.")
         assert stats["total_bytes"] == uploaded_size
         assert stats["files_with_unknown_size"] == 0
-        customers_cat = next(
-            c for c in stats["by_category"] if c["category"] == "customers"
-        )
+        customers_cat = next(c for c in stats["by_category"] if c["category"] == "customers")
         assert customers_cat["bytes"] == uploaded_size
         assert customers_cat["count"] == 1
 
@@ -588,12 +585,12 @@ async def test_redaction_level_routes_by_category(env_admin):
         assert contracts_resp.status_code == 201, contracts_resp.text
         contracts_id = contracts_resp.json()["id"]
 
-        prospects_body = (
-            await client.get(f"/api/v1/org-context/{prospects_id}")
-        ).json()["extracted_text"]
-        contracts_body = (
-            await client.get(f"/api/v1/org-context/{contracts_id}")
-        ).json()["extracted_text"]
+        prospects_body = (await client.get(f"/api/v1/org-context/{prospects_id}")).json()[
+            "extracted_text"
+        ]
+        contracts_body = (await client.get(f"/api/v1/org-context/{contracts_id}")).json()[
+            "extracted_text"
+        ]
 
         # Prospects keeps the phone (MODERATE doesn't apply PII patterns)
         assert "780-555-1234" in prospects_body
@@ -652,6 +649,7 @@ def _build_agent_app(
     """Build a FastAPI app for the agent search router with the agent
     auth + feature-flag check stubbed to a known-good org."""
     from dataclasses import dataclass
+
     from app.api.agent_org_context import router as agent_router
     from app.core.agent_auth import get_agent_auth_context
 
@@ -782,9 +780,9 @@ async def test_agent_search_endpoint_passes_correct_args(env_admin, monkeypatch)
         assert resp.status_code == 200, resp.text
 
     # Service was called with the security-critical kwargs
-    assert captured["include_private"] is False, (
-        "Agent endpoint must NEVER include private files in search results"
-    )
+    assert (
+        captured["include_private"] is False
+    ), "Agent endpoint must NEVER include private files in search results"
     assert captured["query"] == "ICP for auto dealers"
     assert captured["limit"] == 10
     assert captured["org_id"] == ORG_ID
@@ -793,7 +791,13 @@ async def test_agent_search_endpoint_passes_correct_args(env_admin, monkeypatch)
     hits = resp.json()
     assert len(hits) == 1
     hit = hits[0]
-    for required in ("filename", "is_living_data", "uploaded_at", "snippet", "similarity"):
+    for required in (
+        "filename",
+        "is_living_data",
+        "uploaded_at",
+        "snippet",
+        "similarity",
+    ):
         assert required in hit
 
 

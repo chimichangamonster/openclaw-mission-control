@@ -223,13 +223,9 @@ def audit_skill_drift(
     /platform stat card degrades gracefully on dev/test boxes.
     """
     if registry_path is None:
-        registry_path = Path(
-            os.environ.get("SKILL_REGISTRY_PATH", "/app/registry.yml")
-        )
+        registry_path = Path(os.environ.get("SKILL_REGISTRY_PATH", "/app/registry.yml"))
     if shared_skills_root is None:
-        shared_skills_root = Path(
-            os.environ.get("SHARED_SKILLS_ROOT", "/app/shared-skills")
-        )
+        shared_skills_root = Path(os.environ.get("SHARED_SKILLS_ROOT", "/app/shared-skills"))
     if workspaces_root is None:
         workspaces_root_env = os.environ.get("GATEWAY_WORKSPACES_ROOT")
         workspaces_root = Path(workspaces_root_env) if workspaces_root_env else None
@@ -237,9 +233,7 @@ def audit_skill_drift(
     registry_available = registry_path.exists() and registry_path.is_file()
     shared_available = shared_skills_root.exists() and shared_skills_root.is_dir()
     workspaces_available = (
-        workspaces_root is not None
-        and workspaces_root.exists()
-        and workspaces_root.is_dir()
+        workspaces_root is not None and workspaces_root.exists() and workspaces_root.is_dir()
     )
 
     if registry_available:

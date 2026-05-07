@@ -287,7 +287,11 @@ class TestDeprecationChecking:
     def test_deprecated_pin_warns(self) -> None:
         reg = ModelRegistry()
         reg.add(
-            _make_entry("anthropic/claude-sonnet-4-20260101", status="deprecated", last_seen=100.0)
+            _make_entry(
+                "anthropic/claude-sonnet-4-20260101",
+                status="deprecated",
+                last_seen=100.0,
+            )
         )
         reg.add(_make_entry("anthropic/claude-sonnet-4-20260514", status="active", last_seen=200.0))
         warnings = reg.check_pins({"primary": "anthropic/claude-sonnet-4-20260101"})

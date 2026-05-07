@@ -239,9 +239,7 @@ async def fetch_messages(
             list_data = list_resp.json()
             message_ids = [m["id"] for m in list_data.get("messages", [])]
 
-            profile_resp = await client.get(
-                f"{GMAIL_BASE}/profile", headers=_headers(access_token)
-            )
+            profile_resp = await client.get(f"{GMAIL_BASE}/profile", headers=_headers(access_token))
             profile_resp.raise_for_status()
             next_cursor = str(profile_resp.json().get("historyId", "")) or None
 
@@ -263,9 +261,7 @@ async def fetch_messages(
         )
         if history_resp.status_code == 404:
             # historyId too old (Gmail purges history after ~7 days). Re-bootstrap.
-            logger.warning(
-                "gmail.history.cursor_expired", extra={"cursor": history_cursor}
-            )
+            logger.warning("gmail.history.cursor_expired", extra={"cursor": history_cursor})
             return await fetch_messages(access_token, history_cursor=None, limit=limit)
         history_resp.raise_for_status()
         history_data = history_resp.json()

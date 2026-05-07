@@ -48,7 +48,11 @@ def test_blocked_by_dependency_ids_flags_not_done_and_missing_status():
         # A -> B -> C -> A (cycle)
         (
             [UUID(int=1), UUID(int=2), UUID(int=3)],
-            {UUID(int=1): {UUID(int=2)}, UUID(int=2): {UUID(int=3)}, UUID(int=3): {UUID(int=1)}},
+            {
+                UUID(int=1): {UUID(int=2)},
+                UUID(int=2): {UUID(int=3)},
+                UUID(int=3): {UUID(int=1)},
+            },
             True,
         ),
         # Self-loop (cycle)

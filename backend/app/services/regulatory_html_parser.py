@@ -289,8 +289,10 @@ class _TrackerParser(HTMLParser):
             # badge_kind is derived from the class itself, not the visible label.
             self._phase.badge_kind = _badge_kind_from_classes(cls)
             return
-        if "tag" in cls and self._task_text is not None or (
-            "tag" in cls and self._div_stack and self._div_stack[-1].kind == _FRAME_TASK
+        if (
+            "tag" in cls
+            and self._task_text is not None
+            or ("tag" in cls and self._div_stack and self._div_stack[-1].kind == _FRAME_TASK)
         ):
             # Tag spans appear inside task-tags inside the task body. We're
             # inside a task frame.
@@ -300,9 +302,7 @@ class _TrackerParser(HTMLParser):
                 self._begin_span_collect("tag-label")
             return
 
-    def _handle_div_open(
-        self, cls: set[str], attrs: list[tuple[str, str | None]]
-    ) -> None:
+    def _handle_div_open(self, cls: set[str], attrs: list[tuple[str, str | None]]) -> None:
         # ----- panel (country) ----------------------------------------------
         if "tab-panel" in cls:
             panel_id = _attr(attrs, "id") or ""
@@ -433,9 +433,7 @@ class _TrackerParser(HTMLParser):
                 self._phase.tasks.append(
                     ParsedTask.make(
                         text=_normalize_text(self._task_text),
-                        note=_normalize_text(self._task_note)
-                        if self._task_note
-                        else None,
+                        note=_normalize_text(self._task_note) if self._task_note else None,
                         tags=list(self._task_tags),
                     )
                 )
@@ -496,9 +494,7 @@ class _TrackerParser(HTMLParser):
             return
         if label == "priority-note" and self._phase is not None:
             severity = extra or "info"
-            self._phase.priority_notes.append(
-                ParsedPriorityNote(body=text, severity=severity)
-            )
+            self._phase.priority_notes.append(ParsedPriorityNote(body=text, severity=severity))
             return
 
     def _begin_span_collect(self, label: str) -> None:

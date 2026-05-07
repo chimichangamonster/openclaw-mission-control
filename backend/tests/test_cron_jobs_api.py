@@ -460,8 +460,16 @@ class TestNormalizeJob:
             "name": "morning-scan",
             "agentId": "stock-analyst",
             "enabled": True,
-            "schedule": {"kind": "cron", "expr": "0 9 * * 1-5", "tz": "America/Edmonton"},
-            "payload": {"message": "Run scan", "thinking": "low", "timeoutSeconds": 120},
+            "schedule": {
+                "kind": "cron",
+                "expr": "0 9 * * 1-5",
+                "tz": "America/Edmonton",
+            },
+            "payload": {
+                "message": "Run scan",
+                "thinking": "low",
+                "timeoutSeconds": 120,
+            },
             "delivery": {"mode": "announce"},
             "sessionTarget": "isolated",
         }

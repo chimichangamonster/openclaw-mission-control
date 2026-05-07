@@ -269,9 +269,7 @@ async def test_snapshot_returns_only_token_owning_org_data(env: dict[str, Any]) 
     d = env["data"]
     # Rotate Org A's token
     app_a = _make_app(env["maker"], _ctx(d["org_a"], d["admin_a"]))
-    async with AsyncClient(
-        transport=ASGITransport(app=app_a), base_url="http://test"
-    ) as c:
+    async with AsyncClient(transport=ASGITransport(app=app_a), base_url="http://test") as c:
         rotation = await c.post("/api/v1/regulatory/snapshot/public/rotate-token")
         token_a = rotation.json()["token"]
         snap = await c.get(f"/api/v1/regulatory/snapshot/public/{token_a}")

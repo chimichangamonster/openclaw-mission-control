@@ -166,9 +166,7 @@ async def _seed(session: AsyncSession) -> dict[str, Any]:
         status="active",
         display_label="Canada",
     )
-    stream_b = RegulatoryStream(
-        organization_id=ORG_B_ID, slug="corporate", name="Corporate"
-    )
+    stream_b = RegulatoryStream(organization_id=ORG_B_ID, slug="corporate", name="Corporate")
     session.add_all([country_b, stream_b])
     await session.flush()
 
@@ -178,9 +176,7 @@ async def _seed(session: AsyncSession) -> dict[str, Any]:
     session.add(phase_b)
     await session.flush()
 
-    reg_task_b = RegulatoryTask(
-        phase_id=phase_b.id, body="Org B incorporate task", completed=False
-    )
+    reg_task_b = RegulatoryTask(phase_id=phase_b.id, body="Org B incorporate task", completed=False)
     session.add(reg_task_b)
     await session.flush()
 
@@ -247,9 +243,7 @@ async def env() -> AsyncIterator[dict[str, Any]]:
     await engine.dispose()
 
 
-def _make_app(
-    maker: async_sessionmaker[AsyncSession], ctx: OrganizationContext
-) -> FastAPI:
+def _make_app(maker: async_sessionmaker[AsyncSession], ctx: OrganizationContext) -> FastAPI:
     @asynccontextmanager
     async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         yield
@@ -280,9 +274,7 @@ def _make_app(
 async def test_GET_grants_returns_only_caller_org(env: dict[str, Any]) -> None:
     d = env["data"]
     app = _make_app(env["maker"], _ctx(d["org_a"], d["admin_a"]))
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as c:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         resp = await c.get("/api/v1/grants")
     assert resp.status_code == 200
     grants = resp.json()
@@ -297,9 +289,7 @@ async def test_GET_grant_detail_includes_nested_draws_deadlines(
 ) -> None:
     d = env["data"]
     app = _make_app(env["maker"], _ctx(d["org_a"], d["admin_a"]))
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as c:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         resp = await c.get(f"/api/v1/grants/{d['grant_a_id']}")
     assert resp.status_code == 200, resp.text
     body = resp.json()
@@ -315,9 +305,7 @@ async def test_GET_grant_detail_includes_nested_draws_deadlines(
 async def test_GET_grant_in_other_org_returns_404(env: dict[str, Any]) -> None:
     d = env["data"]
     app = _make_app(env["maker"], _ctx(d["org_a"], d["admin_a"]))
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as c:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         resp = await c.get(f"/api/v1/grants/{d['grant_b_id']}")
     assert resp.status_code == 404
 
@@ -331,9 +319,7 @@ async def test_GET_grant_in_other_org_returns_404(env: dict[str, Any]) -> None:
 async def test_PATCH_grant_in_other_org_returns_404(env: dict[str, Any]) -> None:
     d = env["data"]
     app = _make_app(env["maker"], _ctx(d["org_a"], d["admin_a"]))
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as c:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         resp = await c.patch(
             f"/api/v1/grants/{d['grant_b_id']}",
             json={"program_name": "Hijacked"},
@@ -345,9 +331,7 @@ async def test_PATCH_grant_in_other_org_returns_404(env: dict[str, Any]) -> None
 async def test_DELETE_grant_in_other_org_returns_404(env: dict[str, Any]) -> None:
     d = env["data"]
     app = _make_app(env["maker"], _ctx(d["org_a"], d["admin_a"]))
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as c:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         resp = await c.delete(f"/api/v1/grants/{d['grant_b_id']}")
     assert resp.status_code == 404
 
@@ -358,9 +342,7 @@ async def test_create_draw_on_other_org_grant_returns_404(
 ) -> None:
     d = env["data"]
     app = _make_app(env["maker"], _ctx(d["org_a"], d["admin_a"]))
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as c:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         resp = await c.post(
             f"/api/v1/grants/{d['grant_b_id']}/draws",
             json={"milestone_label": "Sneak", "target_amount": "100.00"},
@@ -377,9 +359,7 @@ async def test_create_draw_on_other_org_grant_returns_404(
 async def test_POST_grant_creates_with_caller_org(env: dict[str, Any]) -> None:
     d = env["data"]
     app = _make_app(env["maker"], _ctx(d["org_a"], d["admin_a"]))
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as c:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         resp = await c.post(
             "/api/v1/grants",
             json={
@@ -400,9 +380,7 @@ async def test_POST_grant_creates_with_caller_org(env: dict[str, Any]) -> None:
 async def test_PATCH_grant_updates_status_to_awarded(env: dict[str, Any]) -> None:
     d = env["data"]
     app = _make_app(env["maker"], _ctx(d["org_a"], d["admin_a"]))
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as c:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         resp = await c.patch(
             f"/api/v1/grants/{d['grant_a_id']}",
             json={
@@ -425,9 +403,7 @@ async def test_POST_prerequisite_links_when_task_in_same_org(
 ) -> None:
     d = env["data"]
     app = _make_app(env["maker"], _ctx(d["org_a"], d["admin_a"]))
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as c:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         resp = await c.post(
             f"/api/v1/grants/{d['grant_a_id']}/prerequisites",
             json={
@@ -454,9 +430,7 @@ async def test_POST_prerequisite_blocked_when_task_in_other_org(
     """
     d = env["data"]
     app = _make_app(env["maker"], _ctx(d["org_a"], d["admin_a"]))
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as c:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         resp = await c.post(
             f"/api/v1/grants/{d['grant_a_id']}/prerequisites",
             json={"regulatory_task_id": str(d["reg_task_b_id"])},
@@ -471,9 +445,7 @@ async def test_POST_prerequisite_idempotent_on_duplicate_link(
     """Re-linking the same task returns the existing link, not a duplicate."""
     d = env["data"]
     app = _make_app(env["maker"], _ctx(d["org_a"], d["admin_a"]))
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as c:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         first = await c.post(
             f"/api/v1/grants/{d['grant_a_id']}/prerequisites",
             json={"regulatory_task_id": str(d["reg_task_a_incomplete_id"])},
@@ -494,9 +466,7 @@ async def test_GET_prerequisite_status_aggregates_correctly(
     """1 critical-incomplete + 1 complete = 2 total, 1 complete, 1 blocking, 50%."""
     d = env["data"]
     app = _make_app(env["maker"], _ctx(d["org_a"], d["admin_a"]))
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as c:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         await c.post(
             f"/api/v1/grants/{d['grant_a_id']}/prerequisites",
             json={
@@ -511,9 +481,7 @@ async def test_GET_prerequisite_status_aggregates_correctly(
                 "is_critical": True,
             },
         )
-        resp = await c.get(
-            f"/api/v1/grants/{d['grant_a_id']}/prerequisites/status"
-        )
+        resp = await c.get(f"/api/v1/grants/{d['grant_a_id']}/prerequisites/status")
     assert resp.status_code == 200
     body = resp.json()
     assert body["total"] == 2
@@ -526,9 +494,7 @@ async def test_GET_prerequisite_status_aggregates_correctly(
 async def test_DELETE_prerequisite_removes_link(env: dict[str, Any]) -> None:
     d = env["data"]
     app = _make_app(env["maker"], _ctx(d["org_a"], d["admin_a"]))
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as c:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         await c.post(
             f"/api/v1/grants/{d['grant_a_id']}/prerequisites",
             json={"regulatory_task_id": str(d["reg_task_a_incomplete_id"])},
@@ -538,12 +504,8 @@ async def test_DELETE_prerequisite_removes_link(env: dict[str, Any]) -> None:
         )
     assert resp.status_code == 204
     # Status should now show 0 prereqs.
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as c:
-        resp = await c.get(
-            f"/api/v1/grants/{d['grant_a_id']}/prerequisites/status"
-        )
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+        resp = await c.get(f"/api/v1/grants/{d['grant_a_id']}/prerequisites/status")
     assert resp.json()["total"] == 0
 
 
@@ -568,9 +530,7 @@ async def test_PATCH_draw_in_other_org_returns_404(env: dict[str, Any]) -> None:
         draw_b_id = draw_b.id
 
     app = _make_app(env["maker"], _ctx(d["org_a"], d["admin_a"]))
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as c:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         resp = await c.patch(
             f"/api/v1/grants/draws/{draw_b_id}",
             json={"status": "approved"},
@@ -587,7 +547,8 @@ async def test_PATCH_draw_in_other_org_returns_404(env: dict[str, Any]) -> None:
 async def test_routes_blocked_when_grants_flag_disabled(
     env: dict[str, Any],
 ) -> None:
-    from fastapi import HTTPException, status as http_status
+    from fastapi import HTTPException
+    from fastapi import status as http_status
 
     d = env["data"]
     app = _make_app(env["maker"], _ctx(d["org_a"], d["admin_a"]))
@@ -600,9 +561,7 @@ async def test_routes_blocked_when_grants_flag_disabled(
 
     app.dependency_overrides[GRANTS_FEATURE_GATE] = _flag_off
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as c:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         resp = await c.get("/api/v1/grants")
         assert resp.status_code == 403
         resp = await c.get(f"/api/v1/grants/{d['grant_a_id']}")

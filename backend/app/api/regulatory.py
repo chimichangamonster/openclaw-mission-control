@@ -104,9 +104,7 @@ router = APIRouter(
 # ---------------------------------------------------------------------------
 
 
-async def _phase_for_org(
-    phase_id: UUID, org_id: UUID, session: AsyncSession
-) -> RegulatoryPhase:
+async def _phase_for_org(phase_id: UUID, org_id: UUID, session: AsyncSession) -> RegulatoryPhase:
     """Load a phase and verify it belongs to the calling org via Stream→org.
 
     Raises 404 on missing or cross-org access (intentional ambiguity — never
@@ -121,9 +119,7 @@ async def _phase_for_org(
     return phase
 
 
-async def _task_for_org(
-    task_id: UUID, org_id: UUID, session: AsyncSession
-) -> RegulatoryTask:
+async def _task_for_org(task_id: UUID, org_id: UUID, session: AsyncSession) -> RegulatoryTask:
     """Load a task and verify org via Phase→Stream→org chain."""
     task = await session.get(RegulatoryTask, task_id)
     if task is None:
@@ -882,9 +878,7 @@ async def create_task_tag(
             detail="Tag not found.",
         )
     # Idempotent: return existing link if already present.
-    existing = await session.get(
-        RegulatoryTaskTag, (payload.task_id, payload.tag_id)
-    )
+    existing = await session.get(RegulatoryTaskTag, (payload.task_id, payload.tag_id))
     if existing is not None:
         return existing
 
@@ -1107,12 +1101,16 @@ async def import_tracker_html(
 
                 # Priority notes — dedupe on (phase, body).
                 existing_notes = (
-                    await session.execute(
-                        select(RegulatoryPriorityNote).where(
-                            RegulatoryPriorityNote.phase_id == phase.id,
+                    (
+                        await session.execute(
+                            select(RegulatoryPriorityNote).where(
+                                RegulatoryPriorityNote.phase_id == phase.id,
+                            )
                         )
                     )
-                ).scalars().all()
+                    .scalars()
+                    .all()
+                )
                 existing_note_bodies = {n.body for n in existing_notes}
                 for parsed_note in parsed_phase.priority_notes:
                     if parsed_note.body in existing_note_bodies:
@@ -1130,15 +1128,17 @@ async def import_tracker_html(
 
                 # Tasks — dedupe on body_hash within phase.
                 existing_tasks = (
-                    await session.execute(
-                        select(RegulatoryTask).where(
-                            RegulatoryTask.phase_id == phase.id,
+                    (
+                        await session.execute(
+                            select(RegulatoryTask).where(
+                                RegulatoryTask.phase_id == phase.id,
+                            )
                         )
                     )
-                ).scalars().all()
-                existing_task_hashes = {
-                    _hash_for_dedup(t.body) for t in existing_tasks
-                }
+                    .scalars()
+                    .all()
+                )
+                existing_task_hashes = {_hash_for_dedup(t.body) for t in existing_tasks}
                 for parsed_task in parsed_phase.tasks:
                     if parsed_task.body_hash in existing_task_hashes:
                         summary["tasks_skipped_duplicate"] += 1
@@ -1160,14 +1160,10 @@ async def import_tracker_html(
 
                     # Tags + task_tag links
                     for parsed_tag in parsed_task.tags:
-                        tag = await _get_or_create_tag(
-                            parsed_tag.slug, parsed_tag.label
-                        )
+                        tag = await _get_or_create_tag(parsed_tag.slug, parsed_tag.label)
                         # Link is unique on (task_id, tag_id) by composite PK,
                         # so no extra dedup query needed for new tasks.
-                        link = RegulatoryTaskTag(
-                            task_id=task.id, tag_id=tag.id, created_at=now
-                        )
+                        link = RegulatoryTaskTag(task_id=task.id, tag_id=tag.id, created_at=now)
                         session.add(link)
 
     await session.commit()
@@ -1393,13 +1389,9 @@ async def get_authored_snapshot(
                         "note": task.note,
                         "completed": task.completed,
                         "assignee_user_id": (
-                            str(task.assignee_user_id)
-                            if task.assignee_user_id
-                            else None
+                            str(task.assignee_user_id) if task.assignee_user_id else None
                         ),
-                        "due_date": (
-                            task.due_date.isoformat() if task.due_date else None
-                        ),
+                        "due_date": (task.due_date.isoformat() if task.due_date else None),
                         "tags": [
                             {
                                 "id": str(t.id),

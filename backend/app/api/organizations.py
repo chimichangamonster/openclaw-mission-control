@@ -38,6 +38,7 @@ from app.models.task_dependencies import TaskDependency
 from app.models.task_fingerprints import TaskFingerprint
 from app.models.tasks import Task
 from app.models.users import User
+from app.schemas.boards import BoardRead
 from app.schemas.common import OkResponse
 from app.schemas.organizations import (
     OrganizationActiveUpdate,
@@ -53,7 +54,6 @@ from app.schemas.organizations import (
     OrganizationRead,
     OrganizationUserRead,
 )
-from app.schemas.boards import BoardRead
 from app.schemas.pagination import DefaultLimitOffsetPage
 from app.services.organizations import (
     OrganizationContext,

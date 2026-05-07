@@ -85,7 +85,9 @@ def test_extract_clerk_profile_prefers_primary_email() -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_or_sync_user_updates_email_and_name(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_get_or_sync_user_updates_email_and_name(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     existing = User(clerk_user_id="user_123", email="old@example.com", name=None)
 
     async def _fake_get_or_create(*_args: Any, **_kwargs: Any) -> tuple[User, bool]:

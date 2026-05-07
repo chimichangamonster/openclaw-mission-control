@@ -259,10 +259,7 @@ async def test_no_settings_row_defaults_to_allow():
 # ---------------------------------------------------------------------------
 
 # Body containing a credential pattern that MODERATE-level redaction strips.
-SECRET_BODY = (
-    "Hi team,\nHere's the staging password: hunter2-secret\n"
-    "Let me know when you're in."
-)
+SECRET_BODY = "Hi team,\nHere's the staging password: hunter2-secret\nLet me know when you're in."
 
 
 async def _seed_with_secret_body(session: AsyncSession) -> dict:
@@ -325,9 +322,7 @@ async def test_reply_approval_preview_is_redacted():
             session=session,
         )
 
-        approvals = list(
-            (await session.execute(select(Approval))).scalars().all()
-        )
+        approvals = list((await session.execute(select(Approval))).scalars().all())
         assert len(approvals) == 1
         preview = (approvals[0].payload or {}).get("original_preview", "")
         assert isinstance(preview, str)

@@ -45,7 +45,9 @@ class _Maker:
 
 
 @pytest.mark.asyncio
-async def test_get_session_rolls_back_on_dependency_error(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_get_session_rolls_back_on_dependency_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     @dataclass
     class _FakeDependencySession:
         rollbacks: int = 0

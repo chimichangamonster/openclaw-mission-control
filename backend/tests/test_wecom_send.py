@@ -190,7 +190,10 @@ class TestSendNewsMessage:
                 mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
                 mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
                 mock_resp = MagicMock()
-                mock_resp.json.return_value = {"errcode": 40001, "errmsg": "invalid credential"}
+                mock_resp.json.return_value = {
+                    "errcode": 40001,
+                    "errmsg": "invalid credential",
+                }
                 mock_client.post.return_value = mock_resp
 
                 result = await send_news_message(
@@ -297,7 +300,10 @@ class TestSendFileMessage:
                 mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
 
                 upload_resp = MagicMock()
-                upload_resp.json.return_value = {"errcode": 40004, "errmsg": "invalid media type"}
+                upload_resp.json.return_value = {
+                    "errcode": 40004,
+                    "errmsg": "invalid media type",
+                }
                 mock_client.post.return_value = upload_resp
 
                 result = await send_file_message(
@@ -332,7 +338,10 @@ class TestWeComSendService:
     @pytest.mark.asyncio()
     async def test_get_org_wecom_connection_skips_inactive(self, db_session):
         """Skips inactive WeCom connections."""
-        from app.services.wecom_send import NoWeComConnectionError, get_org_wecom_connection
+        from app.services.wecom_send import (
+            NoWeComConnectionError,
+            get_org_wecom_connection,
+        )
 
         org_id = uuid4()
         conn = _make_connection(organization_id=org_id, is_active=False)
@@ -345,7 +354,10 @@ class TestWeComSendService:
     @pytest.mark.asyncio()
     async def test_get_org_wecom_connection_no_connections(self, db_session):
         """Raises when no WeCom connections exist."""
-        from app.services.wecom_send import NoWeComConnectionError, get_org_wecom_connection
+        from app.services.wecom_send import (
+            NoWeComConnectionError,
+            get_org_wecom_connection,
+        )
 
         with pytest.raises(NoWeComConnectionError):
             await get_org_wecom_connection(db_session, uuid4())

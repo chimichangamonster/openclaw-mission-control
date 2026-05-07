@@ -247,7 +247,12 @@ class TestTradeFlow:
             # Buy
             await c.post(
                 f"/api/v1/paper-trading/portfolios/{pid}/trades",
-                params={"symbol": "MSFT", "trade_type": "buy", "quantity": 5, "price": 200.0},
+                params={
+                    "symbol": "MSFT",
+                    "trade_type": "buy",
+                    "quantity": 5,
+                    "price": 200.0,
+                },
             )
             # Check positions
             resp = await c.get(f"/api/v1/paper-trading/portfolios/{pid}/positions")
@@ -268,12 +273,22 @@ class TestTradeFlow:
             # Buy 10 @ $100
             await c.post(
                 f"/api/v1/paper-trading/portfolios/{pid}/trades",
-                params={"symbol": "GOOG", "trade_type": "buy", "quantity": 10, "price": 100.0},
+                params={
+                    "symbol": "GOOG",
+                    "trade_type": "buy",
+                    "quantity": 10,
+                    "price": 100.0,
+                },
             )
             # Buy 10 more @ $120 (average up)
             await c.post(
                 f"/api/v1/paper-trading/portfolios/{pid}/trades",
-                params={"symbol": "GOOG", "trade_type": "buy", "quantity": 10, "price": 120.0},
+                params={
+                    "symbol": "GOOG",
+                    "trade_type": "buy",
+                    "quantity": 10,
+                    "price": 120.0,
+                },
             )
             # Check position: qty=20, entry_price=(100*10+120*10)/20=110
             resp = await c.get(f"/api/v1/paper-trading/portfolios/{pid}/positions")
@@ -291,12 +306,22 @@ class TestTradeFlow:
             # Buy 10 @ $100
             await c.post(
                 f"/api/v1/paper-trading/portfolios/{pid}/trades",
-                params={"symbol": "AAPL", "trade_type": "buy", "quantity": 10, "price": 100.0},
+                params={
+                    "symbol": "AAPL",
+                    "trade_type": "buy",
+                    "quantity": 10,
+                    "price": 100.0,
+                },
             )
             # Sell 10 @ $120 (profit = (120-100)*10 = $200)
             resp = await c.post(
                 f"/api/v1/paper-trading/portfolios/{pid}/trades",
-                params={"symbol": "AAPL", "trade_type": "sell", "quantity": 10, "price": 120.0},
+                params={
+                    "symbol": "AAPL",
+                    "trade_type": "sell",
+                    "quantity": 10,
+                    "price": 120.0,
+                },
             )
             assert resp.status_code == 200
             body = resp.json()
@@ -320,12 +345,22 @@ class TestTradeFlow:
             # Buy 20 @ $50
             await c.post(
                 f"/api/v1/paper-trading/portfolios/{pid}/trades",
-                params={"symbol": "AMD", "trade_type": "buy", "quantity": 20, "price": 50.0},
+                params={
+                    "symbol": "AMD",
+                    "trade_type": "buy",
+                    "quantity": 20,
+                    "price": 50.0,
+                },
             )
             # Sell 5 @ $60
             await c.post(
                 f"/api/v1/paper-trading/portfolios/{pid}/trades",
-                params={"symbol": "AMD", "trade_type": "sell", "quantity": 5, "price": 60.0},
+                params={
+                    "symbol": "AMD",
+                    "trade_type": "sell",
+                    "quantity": 5,
+                    "price": 60.0,
+                },
             )
             # Position still open with 15 remaining
             resp = await c.get(f"/api/v1/paper-trading/portfolios/{pid}/positions")
@@ -342,7 +377,12 @@ class TestTradeFlow:
         ) as c:
             resp = await c.post(
                 f"/api/v1/paper-trading/portfolios/{pid}/trades",
-                params={"symbol": "FAKE", "trade_type": "sell", "quantity": 5, "price": 100.0},
+                params={
+                    "symbol": "FAKE",
+                    "trade_type": "sell",
+                    "quantity": 5,
+                    "price": 100.0,
+                },
             )
             assert resp.status_code == 400
 
@@ -354,7 +394,12 @@ class TestTradeFlow:
         ) as c:
             resp = await c.post(
                 f"/api/v1/paper-trading/portfolios/{pid}/trades",
-                params={"symbol": "BRK", "trade_type": "buy", "quantity": 100, "price": 1000.0},
+                params={
+                    "symbol": "BRK",
+                    "trade_type": "buy",
+                    "quantity": 100,
+                    "price": 1000.0,
+                },
             )
             assert resp.status_code == 400
 
@@ -367,20 +412,40 @@ class TestTradeFlow:
             # Buy 10 @ $100, sell 10 @ $130 (win: $300)
             await c.post(
                 f"/api/v1/paper-trading/portfolios/{pid}/trades",
-                params={"symbol": "WIN", "trade_type": "buy", "quantity": 10, "price": 100.0},
+                params={
+                    "symbol": "WIN",
+                    "trade_type": "buy",
+                    "quantity": 10,
+                    "price": 100.0,
+                },
             )
             await c.post(
                 f"/api/v1/paper-trading/portfolios/{pid}/trades",
-                params={"symbol": "WIN", "trade_type": "sell", "quantity": 10, "price": 130.0},
+                params={
+                    "symbol": "WIN",
+                    "trade_type": "sell",
+                    "quantity": 10,
+                    "price": 130.0,
+                },
             )
             # Buy 5 @ $80, sell 5 @ $70 (loss: -$50)
             await c.post(
                 f"/api/v1/paper-trading/portfolios/{pid}/trades",
-                params={"symbol": "LOSE", "trade_type": "buy", "quantity": 5, "price": 80.0},
+                params={
+                    "symbol": "LOSE",
+                    "trade_type": "buy",
+                    "quantity": 5,
+                    "price": 80.0,
+                },
             )
             await c.post(
                 f"/api/v1/paper-trading/portfolios/{pid}/trades",
-                params={"symbol": "LOSE", "trade_type": "sell", "quantity": 5, "price": 70.0},
+                params={
+                    "symbol": "LOSE",
+                    "trade_type": "sell",
+                    "quantity": 5,
+                    "price": 70.0,
+                },
             )
 
             resp = await c.get(f"/api/v1/paper-trading/portfolios/{pid}/summary")
@@ -405,12 +470,22 @@ class TestTradeFlow:
             # Buy 10 @ $100
             await c.post(
                 f"/api/v1/paper-trading/portfolios/{pid}/trades",
-                params={"symbol": "CURV", "trade_type": "buy", "quantity": 10, "price": 100.0},
+                params={
+                    "symbol": "CURV",
+                    "trade_type": "buy",
+                    "quantity": 10,
+                    "price": 100.0,
+                },
             )
             # Sell 10 @ $150 (realized P&L = $500)
             await c.post(
                 f"/api/v1/paper-trading/portfolios/{pid}/trades",
-                params={"symbol": "CURV", "trade_type": "sell", "quantity": 10, "price": 150.0},
+                params={
+                    "symbol": "CURV",
+                    "trade_type": "sell",
+                    "quantity": 10,
+                    "price": 150.0,
+                },
             )
 
             resp = await c.get(f"/api/v1/paper-trading/portfolios/{pid}/equity-curve")
@@ -432,7 +507,12 @@ class TestTradeFlow:
             # Buy only — no sells means no realized P&L, empty curve
             await c.post(
                 f"/api/v1/paper-trading/portfolios/{pid}/trades",
-                params={"symbol": "HOLD", "trade_type": "buy", "quantity": 5, "price": 50.0},
+                params={
+                    "symbol": "HOLD",
+                    "trade_type": "buy",
+                    "quantity": 5,
+                    "price": 50.0,
+                },
             )
             resp = await c.get(f"/api/v1/paper-trading/portfolios/{pid}/equity-curve")
             assert resp.status_code == 200
@@ -446,11 +526,21 @@ class TestTradeFlow:
         ) as c:
             await c.post(
                 f"/api/v1/paper-trading/portfolios/{pid}/trades",
-                params={"symbol": "LOG", "trade_type": "buy", "quantity": 10, "price": 50.0},
+                params={
+                    "symbol": "LOG",
+                    "trade_type": "buy",
+                    "quantity": 10,
+                    "price": 50.0,
+                },
             )
             await c.post(
                 f"/api/v1/paper-trading/portfolios/{pid}/trades",
-                params={"symbol": "LOG", "trade_type": "sell", "quantity": 10, "price": 55.0},
+                params={
+                    "symbol": "LOG",
+                    "trade_type": "sell",
+                    "quantity": 10,
+                    "price": 55.0,
+                },
             )
             resp = await c.get(f"/api/v1/paper-trading/portfolios/{pid}/trades")
             assert resp.status_code == 200
@@ -469,7 +559,12 @@ class TestTradeFlow:
             # Buy 10 @ $100 → cash drops by 1009.99
             await c.post(
                 f"/api/v1/paper-trading/portfolios/{pid}/trades",
-                params={"symbol": "VAL", "trade_type": "buy", "quantity": 10, "price": 100.0},
+                params={
+                    "symbol": "VAL",
+                    "trade_type": "buy",
+                    "quantity": 10,
+                    "price": 100.0,
+                },
             )
             resp = await c.get(f"/api/v1/paper-trading/portfolios/{pid}")
             assert resp.status_code == 200
@@ -978,7 +1073,11 @@ class TestWatchlistFlow:
             s2 = [i for i in items if i["symbol"] == "S2"][0]
             await c.patch(
                 f"/api/v1/watchlist/portfolios/{pid}/items/{s2['id']}",
-                params={"status": "alerting", "alert_reason": "Volume spike", "rsi": 25.0},
+                params={
+                    "status": "alerting",
+                    "alert_reason": "Volume spike",
+                    "rsi": 25.0,
+                },
             )
 
             # Check summary

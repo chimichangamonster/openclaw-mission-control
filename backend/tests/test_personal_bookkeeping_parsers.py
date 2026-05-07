@@ -73,7 +73,7 @@ def test_parse_td_csv_skips_malformed_lines() -> None:
     bad = (
         b'"2026-01-02","GOOD LINE","33.58",,"821.41"\n'
         b'"not-a-date","bad row","10",,"0"\n'
-        b',,,\n'
+        b",,,\n"
     )
     rows = parse_td_csv(bad)
     assert len(rows) == 1
@@ -94,8 +94,18 @@ def _build_amex_xls(transactions: list[tuple[str, str, str]]) -> bytes:
     # Header padding — AMEX export has 11 rows of header/summary
     for r in range(11):
         sh.write(r, 0, "")
-    headers = ["Date", "Date Processed", "Description", "Amount", "Foreign Spend Amount",
-               "Commission", "Exchange Rate", "Merchant", "Merchant Address", "Additional"]
+    headers = [
+        "Date",
+        "Date Processed",
+        "Description",
+        "Amount",
+        "Foreign Spend Amount",
+        "Commission",
+        "Exchange Rate",
+        "Merchant",
+        "Merchant Address",
+        "Additional",
+    ]
     for c, h in enumerate(headers):
         sh.write(11, c, h)
     for i, (d, desc, amt) in enumerate(transactions, start=12):
@@ -110,21 +120,25 @@ def _build_amex_xls(transactions: list[tuple[str, str, str]]) -> bytes:
 
 
 def test_parse_amex_xls_basic() -> None:
-    data = _build_amex_xls([
-        ("5 Jan. 2026", "PAYPAL *GODADDY.COM 4805058855", "$23.09"),
-        ("20 Jan. 2026", "GOOGLE *GOOGLE ONE G.CO/HELPPAY#", "$28.34"),
-        ("30 Jan. 2026", "PAYMENT RECEIVED - THANK YOU", "-$600.00"),
-    ])
+    data = _build_amex_xls(
+        [
+            ("5 Jan. 2026", "PAYPAL *GODADDY.COM 4805058855", "$23.09"),
+            ("20 Jan. 2026", "GOOGLE *GOOGLE ONE G.CO/HELPPAY#", "$28.34"),
+            ("30 Jan. 2026", "PAYMENT RECEIVED - THANK YOU", "-$600.00"),
+        ]
+    )
     rows = parse_amex_xls(data)
     assert len(rows) == 3
     assert all(r.source == "AMEX" for r in rows)
 
 
 def test_parse_amex_xls_amount_sign_and_incoming() -> None:
-    data = _build_amex_xls([
-        ("5 Jan. 2026", "GODADDY", "$23.09"),
-        ("30 Jan. 2026", "PAYMENT RECEIVED", "-$600.00"),
-    ])
+    data = _build_amex_xls(
+        [
+            ("5 Jan. 2026", "GODADDY", "$23.09"),
+            ("30 Jan. 2026", "PAYMENT RECEIVED", "-$600.00"),
+        ]
+    )
     rows = parse_amex_xls(data)
     godaddy, payment = rows[0], rows[1]
     assert godaddy.amount == 23.09
@@ -134,11 +148,13 @@ def test_parse_amex_xls_amount_sign_and_incoming() -> None:
 
 
 def test_parse_amex_xls_period_filter() -> None:
-    data = _build_amex_xls([
-        ("5 Jan. 2026", "LINE JAN", "$10.00"),
-        ("10 Feb. 2026", "LINE FEB", "$20.00"),
-        ("15 Mar. 2026", "LINE MAR", "$30.00"),
-    ])
+    data = _build_amex_xls(
+        [
+            ("5 Jan. 2026", "LINE JAN", "$10.00"),
+            ("10 Feb. 2026", "LINE FEB", "$20.00"),
+            ("15 Mar. 2026", "LINE MAR", "$30.00"),
+        ]
+    )
     rows_feb = parse_amex_xls(data, period="2026-02")
     assert len(rows_feb) == 1
     assert rows_feb[0].description == "LINE FEB"
@@ -146,29 +162,35 @@ def test_parse_amex_xls_period_filter() -> None:
 
 def test_parse_amex_xls_sorted_by_date() -> None:
     # Deliberately out of order to prove sort behavior
-    data = _build_amex_xls([
-        ("30 Jan. 2026", "LATE", "$1.00"),
-        ("2 Jan. 2026", "EARLY", "$2.00"),
-        ("15 Jan. 2026", "MIDDLE", "$3.00"),
-    ])
+    data = _build_amex_xls(
+        [
+            ("30 Jan. 2026", "LATE", "$1.00"),
+            ("2 Jan. 2026", "EARLY", "$2.00"),
+            ("15 Jan. 2026", "MIDDLE", "$3.00"),
+        ]
+    )
     rows = parse_amex_xls(data)
     assert [r.description for r in rows] == ["EARLY", "MIDDLE", "LATE"]
 
 
 def test_parse_amex_xls_comma_thousands() -> None:
-    data = _build_amex_xls([
-        ("5 Jan. 2026", "BIG CHARGE", "$1,234.56"),
-    ])
+    data = _build_amex_xls(
+        [
+            ("5 Jan. 2026", "BIG CHARGE", "$1,234.56"),
+        ]
+    )
     rows = parse_amex_xls(data)
     assert rows[0].amount == 1234.56
 
 
 def test_parse_amex_xls_skips_malformed() -> None:
-    data = _build_amex_xls([
-        ("5 Jan. 2026", "GOOD", "$10.00"),
-        ("bad date", "BAD DATE", "$20.00"),
-        ("10 Jan. 2026", "BAD AMOUNT", "not a number"),
-    ])
+    data = _build_amex_xls(
+        [
+            ("5 Jan. 2026", "GOOD", "$10.00"),
+            ("bad date", "BAD DATE", "$20.00"),
+            ("10 Jan. 2026", "BAD AMOUNT", "not a number"),
+        ]
+    )
     rows = parse_amex_xls(data)
     assert len(rows) == 1
     assert rows[0].description == "GOOD"

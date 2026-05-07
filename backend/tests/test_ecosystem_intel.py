@@ -115,9 +115,7 @@ async def test_upsert_preserves_skills_ecosystem_category() -> None:
     """A repo first seen in skills_ecosystem should not be downgraded to ai_ml."""
     session = await _make_session()
 
-    skills_item = svc._normalize_item(
-        _fake_item(full_name="x/y"), "skills_ecosystem"
-    )
+    skills_item = svc._normalize_item(_fake_item(full_name="x/y"), "skills_ecosystem")
     assert skills_item is not None
     await svc._upsert_repo(session, skills_item)
 
@@ -228,7 +226,9 @@ async def test_growth_delta_clamps_negative_to_zero() -> None:
 
 
 @pytest.mark.asyncio
-async def test_refresh_short_circuits_without_token(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_refresh_short_circuits_without_token(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr(svc.settings, "github_api_token", "")
     session = await _make_session()
     result = await svc.refresh_ecosystem(session)

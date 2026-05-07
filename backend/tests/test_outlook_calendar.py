@@ -24,7 +24,10 @@ class TestEventToDict:
             "subject": "Team Meeting",
             "body": {"contentType": "text", "content": "Weekly sync"},
             "location": {"displayName": "Board Room"},
-            "start": {"dateTime": "2026-03-25T14:00:00", "timeZone": "America/Edmonton"},
+            "start": {
+                "dateTime": "2026-03-25T14:00:00",
+                "timeZone": "America/Edmonton",
+            },
             "end": {"dateTime": "2026-03-25T15:00:00", "timeZone": "America/Edmonton"},
             "isAllDay": False,
             "showAs": "busy",
@@ -58,7 +61,10 @@ class TestEventToDict:
             "subject": "Q1 Deadline",
             "body": None,
             "location": None,
-            "start": {"dateTime": "2026-03-31T00:00:00", "timeZone": "America/Edmonton"},
+            "start": {
+                "dateTime": "2026-03-31T00:00:00",
+                "timeZone": "America/Edmonton",
+            },
             "end": {"dateTime": "2026-04-01T00:00:00", "timeZone": "America/Edmonton"},
             "isAllDay": True,
             "attendees": [],

@@ -31,7 +31,8 @@ from app.api.deps import (
     require_org_from_actor,
     require_org_member,
 )
-from app.api.personal_bookkeeping import require_personal_org, router as pbk_router
+from app.api.personal_bookkeeping import require_personal_org
+from app.api.personal_bookkeeping import router as pbk_router
 from app.models.organization_members import OrganizationMember
 from app.models.organization_settings import DEFAULT_FEATURE_FLAGS, OrganizationSettings
 from app.models.organizations import Organization
@@ -156,8 +157,8 @@ def _build_app(
 async def env(tmp_path: Path, monkeypatch):
     # Point statement storage at a tmpdir and give encryption a test key
     monkeypatch.setenv("ENCRYPTION_KEY", "test-master-key-for-personal-bookkeeping-x")
-    from app.core.config import settings as app_settings
     from app.core import encryption as enc_module
+    from app.core.config import settings as app_settings
 
     app_settings.personal_bookkeeping_statements_root = str(tmp_path)
     app_settings.encryption_key = "test-master-key-for-personal-bookkeeping-x"
@@ -205,8 +206,6 @@ TD_CSV_MULTIMONTH = (
 )
 
 
-
-
 # ===========================================================================
 # Gating tests
 # ===========================================================================
@@ -216,8 +215,8 @@ class TestFeatureFlagGating:
     @pytest.mark.asyncio
     async def test_flag_off_returns_403(self, tmp_path, monkeypatch):
         monkeypatch.setenv("ENCRYPTION_KEY", "test-key-x")
-        from app.core.config import settings as app_settings
         from app.core import encryption as enc_module
+        from app.core.config import settings as app_settings
 
         app_settings.personal_bookkeeping_statements_root = str(tmp_path)
         app_settings.encryption_key = "test-key-x"
@@ -229,9 +228,7 @@ class TestFeatureFlagGating:
             ctx = await _seed(session, personal_flag_on=False)
 
         app = _build_app(maker, ctx)
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://t"
-        ) as c:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
             resp = await c.get("/api/v1/personal-bookkeeping/months")
             assert resp.status_code == 403
             assert "personal_bookkeeping" in resp.json()["detail"]
@@ -240,8 +237,8 @@ class TestFeatureFlagGating:
     @pytest.mark.asyncio
     async def test_wrong_slug_returns_403(self, tmp_path, monkeypatch):
         monkeypatch.setenv("ENCRYPTION_KEY", "test-key-x")
-        from app.core.config import settings as app_settings
         from app.core import encryption as enc_module
+        from app.core.config import settings as app_settings
 
         app_settings.personal_bookkeeping_statements_root = str(tmp_path)
         app_settings.encryption_key = "test-key-x"
@@ -253,18 +250,14 @@ class TestFeatureFlagGating:
             ctx = await _seed(session, slug="waste-gurus")
 
         app = _build_app(maker, ctx)
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://t"
-        ) as c:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
             resp = await c.get("/api/v1/personal-bookkeeping/months")
             assert resp.status_code == 403
         await engine.dispose()
 
     @pytest.mark.asyncio
     async def test_flag_on_and_personal_slug_returns_200(self, env):
-        async with AsyncClient(
-            transport=ASGITransport(app=env["app"]), base_url="http://t"
-        ) as c:
+        async with AsyncClient(transport=ASGITransport(app=env["app"]), base_url="http://t") as c:
             resp = await c.get("/api/v1/personal-bookkeeping/months")
             assert resp.status_code == 200
             assert resp.json() == []
@@ -278,34 +271,22 @@ class TestFeatureFlagGating:
 class TestMonths:
     @pytest.mark.asyncio
     async def test_create_is_idempotent(self, env):
-        async with AsyncClient(
-            transport=ASGITransport(app=env["app"]), base_url="http://t"
-        ) as c:
-            r1 = await c.post(
-                "/api/v1/personal-bookkeeping/months", json={"period": "2026-05"}
-            )
-            r2 = await c.post(
-                "/api/v1/personal-bookkeeping/months", json={"period": "2026-05"}
-            )
+        async with AsyncClient(transport=ASGITransport(app=env["app"]), base_url="http://t") as c:
+            r1 = await c.post("/api/v1/personal-bookkeeping/months", json={"period": "2026-05"})
+            r2 = await c.post("/api/v1/personal-bookkeeping/months", json={"period": "2026-05"})
             assert r1.status_code == 201
             assert r2.status_code == 201
             assert r1.json()["id"] == r2.json()["id"]
 
     @pytest.mark.asyncio
     async def test_invalid_period_rejected(self, env):
-        async with AsyncClient(
-            transport=ASGITransport(app=env["app"]), base_url="http://t"
-        ) as c:
-            resp = await c.post(
-                "/api/v1/personal-bookkeeping/months", json={"period": "bad"}
-            )
+        async with AsyncClient(transport=ASGITransport(app=env["app"]), base_url="http://t") as c:
+            resp = await c.post("/api/v1/personal-bookkeeping/months", json={"period": "bad"})
             assert resp.status_code == 422  # pydantic pattern mismatch
 
     @pytest.mark.asyncio
     async def test_lock_rejects_when_flagged(self, env):
-        async with AsyncClient(
-            transport=ASGITransport(app=env["app"]), base_url="http://t"
-        ) as c:
+        async with AsyncClient(transport=ASGITransport(app=env["app"]), base_url="http://t") as c:
             # Upload TD statement which produces 1 income_pending (E-TRANSFER)
             files = {"file": ("td.csv", TD_CSV.encode(), "text/csv")}
             up = await c.post(
@@ -322,12 +303,8 @@ class TestMonths:
     @pytest.mark.asyncio
     async def test_lock_then_double_lock_conflicts(self, env):
         # Create empty month → lock succeeds (zero flagged), second lock 409
-        async with AsyncClient(
-            transport=ASGITransport(app=env["app"]), base_url="http://t"
-        ) as c:
-            await c.post(
-                "/api/v1/personal-bookkeeping/months", json={"period": "2026-06"}
-            )
+        async with AsyncClient(transport=ASGITransport(app=env["app"]), base_url="http://t") as c:
+            await c.post("/api/v1/personal-bookkeeping/months", json={"period": "2026-06"})
             r1 = await c.post("/api/v1/personal-bookkeeping/months/2026-06/lock")
             assert r1.status_code == 200
             assert r1.json()["status"] == "locked"
@@ -344,9 +321,7 @@ class TestMonths:
 class TestStatementUpload:
     @pytest.mark.asyncio
     async def test_td_upload_classifies_and_persists(self, env, tmp_path):
-        async with AsyncClient(
-            transport=ASGITransport(app=env["app"]), base_url="http://t"
-        ) as c:
+        async with AsyncClient(transport=ASGITransport(app=env["app"]), base_url="http://t") as c:
             files = {"file": ("td.csv", TD_CSV.encode(), "text/csv")}
             resp = await c.post(
                 "/api/v1/personal-bookkeeping/months/2026-05/statements",
@@ -376,9 +351,7 @@ class TestStatementUpload:
 
     @pytest.mark.asyncio
     async def test_same_file_twice_returns_409(self, env):
-        async with AsyncClient(
-            transport=ASGITransport(app=env["app"]), base_url="http://t"
-        ) as c:
+        async with AsyncClient(transport=ASGITransport(app=env["app"]), base_url="http://t") as c:
             files = {"file": ("td.csv", TD_CSV.encode(), "text/csv")}
             r1 = await c.post(
                 "/api/v1/personal-bookkeeping/months/2026-05/statements",
@@ -398,9 +371,7 @@ class TestStatementUpload:
     @pytest.mark.asyncio
     async def test_overlapping_file_dedups_by_row_hash(self, env):
         """Upload TD_CSV, then a superset — overlap rows get skipped, new row inserted."""
-        async with AsyncClient(
-            transport=ASGITransport(app=env["app"]), base_url="http://t"
-        ) as c:
+        async with AsyncClient(transport=ASGITransport(app=env["app"]), base_url="http://t") as c:
             r1 = await c.post(
                 "/api/v1/personal-bookkeeping/months/2026-05/statements",
                 data={"source": "TD"},
@@ -420,9 +391,7 @@ class TestStatementUpload:
 
     @pytest.mark.asyncio
     async def test_retention_date_is_tax_year_plus_6(self, env):
-        async with AsyncClient(
-            transport=ASGITransport(app=env["app"]), base_url="http://t"
-        ) as c:
+        async with AsyncClient(transport=ASGITransport(app=env["app"]), base_url="http://t") as c:
             await c.post(
                 "/api/v1/personal-bookkeeping/months/2026-05/statements",
                 data={"source": "TD"},
@@ -433,12 +402,8 @@ class TestStatementUpload:
 
     @pytest.mark.asyncio
     async def test_upload_into_locked_month_rejected(self, env):
-        async with AsyncClient(
-            transport=ASGITransport(app=env["app"]), base_url="http://t"
-        ) as c:
-            await c.post(
-                "/api/v1/personal-bookkeeping/months", json={"period": "2026-07"}
-            )
+        async with AsyncClient(transport=ASGITransport(app=env["app"]), base_url="http://t") as c:
+            await c.post("/api/v1/personal-bookkeeping/months", json={"period": "2026-07"})
             await c.post("/api/v1/personal-bookkeeping/months/2026-07/lock")
             resp = await c.post(
                 "/api/v1/personal-bookkeeping/months/2026-07/statements",
@@ -449,9 +414,7 @@ class TestStatementUpload:
 
     @pytest.mark.asyncio
     async def test_invalid_source_rejected(self, env):
-        async with AsyncClient(
-            transport=ASGITransport(app=env["app"]), base_url="http://t"
-        ) as c:
+        async with AsyncClient(transport=ASGITransport(app=env["app"]), base_url="http://t") as c:
             resp = await c.post(
                 "/api/v1/personal-bookkeeping/months/2026-05/statements",
                 data={"source": "CIBC"},
@@ -461,9 +424,7 @@ class TestStatementUpload:
 
     @pytest.mark.asyncio
     async def test_empty_file_rejected(self, env):
-        async with AsyncClient(
-            transport=ASGITransport(app=env["app"]), base_url="http://t"
-        ) as c:
+        async with AsyncClient(transport=ASGITransport(app=env["app"]), base_url="http://t") as c:
             resp = await c.post(
                 "/api/v1/personal-bookkeeping/months/2026-05/statements",
                 data={"source": "TD"},
@@ -475,9 +436,7 @@ class TestStatementUpload:
 class TestBulkImport:
     @pytest.mark.asyncio
     async def test_bulk_import_splits_across_months(self, env):
-        async with AsyncClient(
-            transport=ASGITransport(app=env["app"]), base_url="http://t"
-        ) as c:
+        async with AsyncClient(transport=ASGITransport(app=env["app"]), base_url="http://t") as c:
             resp = await c.post(
                 "/api/v1/personal-bookkeeping/statements/bulk-import",
                 data={"source": "TD"},
@@ -494,21 +453,15 @@ class TestBulkImport:
             assert periods["2026-06"]["inserted_count"] == 1
 
             # All three months were auto-created as drafts
-            months = (
-                await c.get("/api/v1/personal-bookkeeping/months")
-            ).json()
+            months = (await c.get("/api/v1/personal-bookkeeping/months")).json()
             created_periods = {m["period"] for m in months}
             assert {"2026-04", "2026-05", "2026-06"}.issubset(created_periods)
 
     @pytest.mark.asyncio
     async def test_bulk_import_skips_locked_month(self, env):
-        async with AsyncClient(
-            transport=ASGITransport(app=env["app"]), base_url="http://t"
-        ) as c:
+        async with AsyncClient(transport=ASGITransport(app=env["app"]), base_url="http://t") as c:
             # Pre-lock April (empty month)
-            await c.post(
-                "/api/v1/personal-bookkeeping/months", json={"period": "2026-04"}
-            )
+            await c.post("/api/v1/personal-bookkeeping/months", json={"period": "2026-04"})
             await c.post("/api/v1/personal-bookkeeping/months/2026-04/lock")
 
             resp = await c.post(
@@ -531,9 +484,7 @@ class TestBulkImport:
 
     @pytest.mark.asyncio
     async def test_bulk_import_rejects_duplicate_file(self, env):
-        async with AsyncClient(
-            transport=ASGITransport(app=env["app"]), base_url="http://t"
-        ) as c:
+        async with AsyncClient(transport=ASGITransport(app=env["app"]), base_url="http://t") as c:
             r1 = await c.post(
                 "/api/v1/personal-bookkeeping/statements/bulk-import",
                 data={"source": "TD"},
@@ -556,17 +507,13 @@ class TestBulkImport:
 class TestTransactions:
     @pytest.mark.asyncio
     async def test_patch_updates_classified_by_and_totals(self, env):
-        async with AsyncClient(
-            transport=ASGITransport(app=env["app"]), base_url="http://t"
-        ) as c:
+        async with AsyncClient(transport=ASGITransport(app=env["app"]), base_url="http://t") as c:
             await c.post(
                 "/api/v1/personal-bookkeeping/months/2026-05/statements",
                 data={"source": "TD"},
                 files={"file": ("td.csv", TD_CSV.encode(), "text/csv")},
             )
-            list_resp = await c.get(
-                "/api/v1/personal-bookkeeping/months/2026-05/transactions"
-            )
+            list_resp = await c.get("/api/v1/personal-bookkeeping/months/2026-05/transactions")
             # Grab the income_pending row
             txns = list_resp.json()
             pending = [t for t in txns if t["bucket"] == "income_pending"]
@@ -592,21 +539,15 @@ class TestTransactions:
 
     @pytest.mark.asyncio
     async def test_patch_rejects_on_locked_month(self, env):
-        async with AsyncClient(
-            transport=ASGITransport(app=env["app"]), base_url="http://t"
-        ) as c:
+        async with AsyncClient(transport=ASGITransport(app=env["app"]), base_url="http://t") as c:
             await c.post(
                 "/api/v1/personal-bookkeeping/months/2026-05/statements",
                 data={"source": "TD"},
                 files={"file": ("td.csv", TD_CSV.encode(), "text/csv")},
             )
             # Resolve the income_pending so we can lock
-            list_resp = await c.get(
-                "/api/v1/personal-bookkeeping/months/2026-05/transactions"
-            )
-            pending_id = [
-                t for t in list_resp.json() if t["bucket"] == "income_pending"
-            ][0]["id"]
+            list_resp = await c.get("/api/v1/personal-bookkeeping/months/2026-05/transactions")
+            pending_id = [t for t in list_resp.json() if t["bucket"] == "income_pending"][0]["id"]
             await c.patch(
                 f"/api/v1/personal-bookkeeping/transactions/{pending_id}",
                 json={"bucket": "gift"},
@@ -624,17 +565,13 @@ class TestTransactions:
 
     @pytest.mark.asyncio
     async def test_promote_to_rule_creates_escaped_pattern(self, env):
-        async with AsyncClient(
-            transport=ASGITransport(app=env["app"]), base_url="http://t"
-        ) as c:
+        async with AsyncClient(transport=ASGITransport(app=env["app"]), base_url="http://t") as c:
             await c.post(
                 "/api/v1/personal-bookkeeping/months/2026-05/statements",
                 data={"source": "TD"},
                 files={"file": ("td.csv", TD_CSV.encode(), "text/csv")},
             )
-            txns = (
-                await c.get("/api/v1/personal-bookkeeping/months/2026-05/transactions")
-            ).json()
+            txns = (await c.get("/api/v1/personal-bookkeeping/months/2026-05/transactions")).json()
             # Pick the VERCEL txn (already business — promote to cement it)
             vercel = [t for t in txns if "VERCEL" in t["description"]][0]
             resp = await c.post(
@@ -657,9 +594,7 @@ class TestTransactions:
 class TestVendorRules:
     @pytest.mark.asyncio
     async def test_rule_crud_roundtrip(self, env):
-        async with AsyncClient(
-            transport=ASGITransport(app=env["app"]), base_url="http://t"
-        ) as c:
+        async with AsyncClient(transport=ASGITransport(app=env["app"]), base_url="http://t") as c:
             # Create
             create = await c.post(
                 "/api/v1/personal-bookkeeping/vendor-rules",
@@ -687,16 +622,12 @@ class TestVendorRules:
             assert patch.json()["active"] is False
 
             # Filter active=True no longer returns it
-            active_lst = await c.get(
-                "/api/v1/personal-bookkeeping/vendor-rules?active=true"
-            )
+            active_lst = await c.get("/api/v1/personal-bookkeeping/vendor-rules?active=true")
             assert not any(r["id"] == rule_id for r in active_lst.json())
 
     @pytest.mark.asyncio
     async def test_rule_bad_regex_rejected(self, env):
-        async with AsyncClient(
-            transport=ASGITransport(app=env["app"]), base_url="http://t"
-        ) as c:
+        async with AsyncClient(transport=ASGITransport(app=env["app"]), base_url="http://t") as c:
             resp = await c.post(
                 "/api/v1/personal-bookkeeping/vendor-rules",
                 json={"pattern": "[unclosed", "bucket": "business"},
@@ -705,9 +636,7 @@ class TestVendorRules:
 
     @pytest.mark.asyncio
     async def test_rule_bad_bucket_rejected(self, env):
-        async with AsyncClient(
-            transport=ASGITransport(app=env["app"]), base_url="http://t"
-        ) as c:
+        async with AsyncClient(transport=ASGITransport(app=env["app"]), base_url="http://t") as c:
             resp = await c.post(
                 "/api/v1/personal-bookkeeping/vendor-rules",
                 json={"pattern": "FOO", "bucket": "not-a-bucket"},
@@ -724,9 +653,7 @@ class TestOrgIsolation:
     @pytest.mark.asyncio
     async def test_personal_data_scoped_to_org(self, env):
         """Rows inserted for the personal org must carry its organization_id."""
-        async with AsyncClient(
-            transport=ASGITransport(app=env["app"]), base_url="http://t"
-        ) as c:
+        async with AsyncClient(transport=ASGITransport(app=env["app"]), base_url="http://t") as c:
             await c.post(
                 "/api/v1/personal-bookkeeping/months/2026-05/statements",
                 data={"source": "TD"},
@@ -734,12 +661,8 @@ class TestOrgIsolation:
             )
 
         async with env["maker"]() as session:
-            months = (
-                await session.execute(select(PersonalReconciliationMonth))
-            ).scalars().all()
-            txns = (
-                await session.execute(select(PersonalTransaction))
-            ).scalars().all()
+            months = (await session.execute(select(PersonalReconciliationMonth))).scalars().all()
+            txns = (await session.execute(select(PersonalTransaction))).scalars().all()
             for m in months:
                 assert m.organization_id == PERSONAL_ORG_ID
             for t in txns:
@@ -747,17 +670,13 @@ class TestOrgIsolation:
 
     @pytest.mark.asyncio
     async def test_vendor_rule_scoped_to_org(self, env):
-        async with AsyncClient(
-            transport=ASGITransport(app=env["app"]), base_url="http://t"
-        ) as c:
+        async with AsyncClient(transport=ASGITransport(app=env["app"]), base_url="http://t") as c:
             await c.post(
                 "/api/v1/personal-bookkeeping/vendor-rules",
                 json={"pattern": "STRIPE", "bucket": "business"},
             )
 
         async with env["maker"]() as session:
-            rules = (
-                await session.execute(select(PersonalVendorRule))
-            ).scalars().all()
+            rules = (await session.execute(select(PersonalVendorRule))).scalars().all()
             assert len(rules) == 1
             assert rules[0].organization_id == PERSONAL_ORG_ID

@@ -28,8 +28,18 @@ class ParsedTransaction:
 
 
 _MONTHS = {
-    "Jan": 1, "Feb": 2, "Mar": 3, "Apr": 4, "May": 5, "Jun": 6,
-    "Jul": 7, "Aug": 8, "Sep": 9, "Oct": 10, "Nov": 11, "Dec": 12,
+    "Jan": 1,
+    "Feb": 2,
+    "Mar": 3,
+    "Apr": 4,
+    "May": 5,
+    "Jun": 6,
+    "Jul": 7,
+    "Aug": 8,
+    "Sep": 9,
+    "Oct": 10,
+    "Nov": 11,
+    "Dec": 12,
 }
 
 
@@ -101,9 +111,7 @@ def parse_td_csv(file_bytes: bytes, period: str | None = None) -> list[ParsedTra
     return out
 
 
-def parse_amex_xls(
-    file_bytes: bytes, period: str | None = None
-) -> list[ParsedTransaction]:
+def parse_amex_xls(file_bytes: bytes, period: str | None = None) -> list[ParsedTransaction]:
     """Parse an AMEX Cobalt transaction-details XLS (BIFF/.xls, not .xlsx).
 
     Expected layout (AMEX Canada export):

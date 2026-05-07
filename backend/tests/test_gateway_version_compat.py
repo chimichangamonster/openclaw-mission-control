@@ -85,7 +85,9 @@ def test_evaluate_gateway_version_compares_calver(
 
 
 @pytest.mark.parametrize("invalid_current", ["dev", "latest", "2026.13.1", "2026.2.0-beta"])
-def test_evaluate_gateway_version_rejects_non_calver_current(invalid_current: str) -> None:
+def test_evaluate_gateway_version_rejects_non_calver_current(
+    invalid_current: str,
+) -> None:
     result = gateway_compat.evaluate_gateway_version(
         current_version=invalid_current,
         minimum_version="2026.1.30",

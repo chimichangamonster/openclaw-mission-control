@@ -85,9 +85,7 @@ async def test_resolve_returns_default_when_no_explicit_id():
         non_default = _make_sig(
             account_id=account.id, name="Short", body="<p>Short</p>", is_default=False
         )
-        default = _make_sig(
-            account_id=account.id, name="Full", body="<p>Full</p>", is_default=True
-        )
+        default = _make_sig(account_id=account.id, name="Full", body="<p>Full</p>", is_default=True)
         session.add_all([non_default, default])
         await session.commit()
 
@@ -101,9 +99,7 @@ async def test_resolve_returns_none_when_no_default_and_no_explicit_id():
     maker = await _make_session()
     async with maker() as session:
         account = await _seed_account(session)
-        only = _make_sig(
-            account_id=account.id, name="Only", body="<p>Only</p>", is_default=False
-        )
+        only = _make_sig(account_id=account.id, name="Only", body="<p>Only</p>", is_default=False)
         session.add(only)
         await session.commit()
 
@@ -117,10 +113,16 @@ async def test_resolve_returns_explicit_signature_even_when_not_default():
     async with maker() as session:
         account = await _seed_account(session)
         explicit = _make_sig(
-            account_id=account.id, name="Pick me", body="<p>Pick me</p>", is_default=False
+            account_id=account.id,
+            name="Pick me",
+            body="<p>Pick me</p>",
+            is_default=False,
         )
         default = _make_sig(
-            account_id=account.id, name="Default", body="<p>Default</p>", is_default=True
+            account_id=account.id,
+            name="Default",
+            body="<p>Default</p>",
+            is_default=True,
         )
         session.add_all([explicit, default])
         await session.commit()
@@ -234,17 +236,13 @@ async def test_only_one_default_at_a_time_per_account():
     maker = await _make_session()
     async with maker() as session:
         account = await _seed_account(session)
-        first = _make_sig(
-            account_id=account.id, name="First", body="<p>1</p>", is_default=True
-        )
+        first = _make_sig(account_id=account.id, name="First", body="<p>1</p>", is_default=True)
         session.add(first)
         await session.commit()
         await session.refresh(first)
 
         # Now add a second one as default + clear the prior default in the same txn.
-        second = _make_sig(
-            account_id=account.id, name="Second", body="<p>2</p>", is_default=True
-        )
+        second = _make_sig(account_id=account.id, name="Second", body="<p>2</p>", is_default=True)
         session.add(second)
         # Apply the same logic as _clear_other_defaults.
         stmt = select(EmailSignature).where(
@@ -293,12 +291,13 @@ async def test_send_email_appends_resolved_signature_to_html():
         await session.commit()
 
         send_mock = AsyncMock(return_value={"ok": True})
-        with patch.object(
-            email_send_module,
-            "get_valid_access_token",
-            AsyncMock(return_value="fake-token"),
-        ), patch(
-            "app.services.email.providers.microsoft.send_message", send_mock
+        with (
+            patch.object(
+                email_send_module,
+                "get_valid_access_token",
+                AsyncMock(return_value="fake-token"),
+            ),
+            patch("app.services.email.providers.microsoft.send_message", send_mock),
         ):
             await email_send_module.send_email(
                 session,
@@ -325,12 +324,13 @@ async def test_send_email_skips_signature_when_none_resolves():
         account = await _seed_account(session)
 
         send_mock = AsyncMock(return_value={"ok": True})
-        with patch.object(
-            email_send_module,
-            "get_valid_access_token",
-            AsyncMock(return_value="fake-token"),
-        ), patch(
-            "app.services.email.providers.microsoft.send_message", send_mock
+        with (
+            patch.object(
+                email_send_module,
+                "get_valid_access_token",
+                AsyncMock(return_value="fake-token"),
+            ),
+            patch("app.services.email.providers.microsoft.send_message", send_mock),
         ):
             await email_send_module.send_email(
                 session,

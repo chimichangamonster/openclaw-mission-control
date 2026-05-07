@@ -299,9 +299,7 @@ async def test_country_only_visible_to_own_org() -> None:
 async def test_tag_only_visible_to_own_org() -> None:
     async def _test(session, data):
         # Both orgs may have a tag with slug "abca" — they MUST be distinct rows.
-        result = await session.execute(
-            select(RegulatoryTag).where(RegulatoryTag.slug == "abca")
-        )
+        result = await session.execute(select(RegulatoryTag).where(RegulatoryTag.slug == "abca"))
         tags = result.scalars().all()
         assert len(tags) == 2, "Tag slugs collide across orgs but rows must be separate"
         org_a_tags = [t for t in tags if t.organization_id == ORG_A_ID]
@@ -443,9 +441,7 @@ async def test_tasktag_links_only_within_same_org() -> None:
 
             # Resolve tag's org directly
             tag_org_result = await session.execute(
-                select(RegulatoryTag.organization_id).where(
-                    RegulatoryTag.id == link.tag_id
-                )
+                select(RegulatoryTag.organization_id).where(RegulatoryTag.id == link.tag_id)
             )
             tag_org = tag_org_result.scalar_one()
 
@@ -595,8 +591,6 @@ async def test_seed_produces_parallel_per_org_trees() -> None:
         ):
             result = await session.execute(select(model))
             count = len(result.scalars().all())
-            assert count == expected, (
-                f"{model.__name__}: expected {expected} rows, got {count}"
-            )
+            assert count == expected, f"{model.__name__}: expected {expected} rows, got {count}"
 
     await _with_session(_test)

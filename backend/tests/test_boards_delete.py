@@ -97,7 +97,9 @@ async def test_delete_board_cleans_tag_assignments_before_tasks() -> None:
 
 
 @pytest.mark.asyncio
-async def test_delete_board_ignores_missing_gateway_agent(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_delete_board_ignores_missing_gateway_agent(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Deleting a board should continue when gateway reports agent not found."""
     session: Any = _FakeSession(exec_results=[[]])
     board = Board(

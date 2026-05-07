@@ -17,7 +17,6 @@ from app.models.personal_bookkeeping import (
     STATEMENT_SOURCES,
 )
 
-
 # ---------------------------------------------------------------------------
 # Reconciliation months
 # ---------------------------------------------------------------------------
@@ -186,15 +185,11 @@ def validate_bucket(value: str) -> str:
 
 def validate_source(value: str) -> str:
     if value not in STATEMENT_SOURCES:
-        raise ValueError(
-            f"Invalid source: {value!r}. Must be one of {STATEMENT_SOURCES}."
-        )
+        raise ValueError(f"Invalid source: {value!r}. Must be one of {STATEMENT_SOURCES}.")
     return value
 
 
 def validate_status(value: str) -> str:
     if value not in RECONCILIATION_STATUSES:
-        raise ValueError(
-            f"Invalid status: {value!r}. Must be one of {RECONCILIATION_STATUSES}."
-        )
+        raise ValueError(f"Invalid status: {value!r}. Must be one of {RECONCILIATION_STATUSES}.")
     return value

@@ -821,9 +821,7 @@ async def _listen(
                 state = payload.get("state", "")
                 session_key_for_buffer = payload.get("sessionKey") or ""
                 if state == "delta" and session_key_for_buffer:
-                    normalized = _normalise_event(
-                        event_name, payload, streaming_enabled=True
-                    )
+                    normalized = _normalise_event(event_name, payload, streaming_enabled=True)
                     if normalized is not None:
                         delta_text = normalized.metadata.get("delta", "")
                         flushed = delta_buffer.push(

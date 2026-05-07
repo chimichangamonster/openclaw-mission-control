@@ -158,7 +158,7 @@ class TestParseInbound:
         assert msg.encrypt == "enc_payload"
 
     def test_non_text_type(self) -> None:
-        xml = b"<xml>" b"<MsgType><![CDATA[image]]></MsgType>" b"<Content></Content>" b"</xml>"
+        xml = b"<xml><MsgType><![CDATA[image]]></MsgType><Content></Content></xml>"
         msg = parse_inbound_message(xml)
         assert msg.msg_type == "image"
         assert msg.content == ""
@@ -262,7 +262,10 @@ async def wecom_app(monkeypatch):
         type(
             "S",
             (),
-            {"encryption_key": "test-wecom-encryption-key", "email_token_encryption_key": ""},
+            {
+                "encryption_key": "test-wecom-encryption-key",
+                "email_token_encryption_key": "",
+            },
         )(),
     )
 
@@ -276,7 +279,10 @@ async def wecom_app(monkeypatch):
         await session.flush()
 
         user = User(
-            id=USER_ID, email="test@test.com", name="Test User", clerk_user_id="clerk_test_wecom"
+            id=USER_ID,
+            email="test@test.com",
+            name="Test User",
+            clerk_user_id="clerk_test_wecom",
         )
         session.add(user)
         await session.flush()

@@ -276,7 +276,12 @@ class TestQuickBooksExports:
 
         expenses = [
             {"amount": 100.0, "gst_amount": 5.0, "category": "fuel", "job_id": "j1"},
-            {"amount": 200.0, "gst_amount": 10.0, "category": "materials", "job_id": "j1"},
+            {
+                "amount": 200.0,
+                "gst_amount": 10.0,
+                "category": "materials",
+                "job_id": "j1",
+            },
             {"amount": 50.0, "gst_amount": 2.50, "category": "fuel", "job_id": "j2"},
         ]
         summary = generate_expense_summary(expenses)

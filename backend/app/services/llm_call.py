@@ -29,9 +29,7 @@ logger = get_logger(__name__)
 _ERROR_BODY_CLIP = 500
 
 
-def _classify_error(
-    *, http_status: int | None, exc: BaseException | None
-) -> tuple[str, str]:
+def _classify_error(*, http_status: int | None, exc: BaseException | None) -> tuple[str, str]:
     """Return (status, error_type) for a failed call.
 
     status ∈ {"error", "timeout"}
@@ -78,9 +76,7 @@ def _extract_provider_name(body: str | None) -> str | None:
     return None
 
 
-def _compute_cost(
-    model: str, tokens_in: int | None, tokens_out: int | None
-) -> float | None:
+def _compute_cost(model: str, tokens_in: int | None, tokens_out: int | None) -> float | None:
     """Compute USD cost via the model registry. Returns None if pricing unknown."""
     if tokens_in is None and tokens_out is None:
         return None

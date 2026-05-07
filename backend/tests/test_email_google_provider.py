@@ -36,7 +36,6 @@ from app.services.email.providers.google import (
     _walk_payload,
 )
 
-
 # ---------------------------------------------------------------------------
 # Factory
 # ---------------------------------------------------------------------------
@@ -86,9 +85,7 @@ def test_header_lookup_returns_none_when_missing():
 
 
 def test_parse_address_list_bare_email():
-    assert _parse_address_list("alice@example.com") == [
-        {"email": "alice@example.com", "name": ""}
-    ]
+    assert _parse_address_list("alice@example.com") == [{"email": "alice@example.com", "name": ""}]
 
 
 def test_parse_address_list_named_with_brackets():
@@ -176,9 +173,7 @@ def test_walk_payload_treats_filenamed_part_as_attachment():
             },
             {
                 "mimeType": "text/plain",
-                "body": {
-                    "data": base64.urlsafe_b64encode(b"body").decode().rstrip("=")
-                },
+                "body": {"data": base64.urlsafe_b64encode(b"body").decode().rstrip("=")},
             },
         ],
     }
@@ -403,7 +398,5 @@ async def test_sync_dispatch_routes_google_to_gmail_fetch():
     with patch("app.services.email.providers.google.fetch_messages", fake_fetch):
         await sync_module._fetch_from_provider("access-token", account)
 
-    fake_fetch.assert_awaited_once_with(
-        "access-token", history_cursor="old-cursor"
-    )
+    fake_fetch.assert_awaited_once_with("access-token", history_cursor="old-cursor")
     assert account.sync_cursor == "new-cursor"

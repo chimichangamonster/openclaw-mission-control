@@ -128,8 +128,8 @@ SAMPLE_HTML = """
 # Same logical content but with whitespace noise in one task body — should
 # hash to the same body_hash as SAMPLE_HTML and dedup.
 WHITESPACE_NOISE_HTML = SAMPLE_HTML.replace(
-    "<div class=\"task-text\">NUANS name search</div>",
-    "<div class=\"task-text\">  NUANS\n   name   search  </div>",
+    '<div class="task-text">NUANS name search</div>',
+    '<div class="task-text">  NUANS\n   name   search  </div>',
 )
 
 
@@ -158,12 +158,8 @@ async def _make_engine() -> Any:
 
 async def _seed(session: AsyncSession) -> dict[str, Any]:
     org = Organization(id=ORG_ID, name="Magnetik", slug="magnetik")
-    admin = OrganizationMember(
-        id=uuid4(), organization_id=ORG_ID, user_id=USER_ID, role="admin"
-    )
-    member = OrganizationMember(
-        id=uuid4(), organization_id=ORG_ID, user_id=uuid4(), role="member"
-    )
+    admin = OrganizationMember(id=uuid4(), organization_id=ORG_ID, user_id=USER_ID, role="admin")
+    member = OrganizationMember(id=uuid4(), organization_id=ORG_ID, user_id=uuid4(), role="member")
     session.add_all([org, admin, member])
     await session.commit()
     return {"org": org, "admin": admin, "member": member}

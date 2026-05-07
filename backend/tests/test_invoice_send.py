@@ -116,7 +116,10 @@ class TestEmailSendService:
     @pytest.mark.asyncio()
     async def test_get_org_shared_email_account_skips_private(self):
         """Does not return private accounts."""
-        from app.services.email_send import NoEmailAccountError, get_org_shared_email_account
+        from app.services.email_send import (
+            NoEmailAccountError,
+            get_org_shared_email_account,
+        )
 
         maker = await _make_session()
         async with maker() as session:
@@ -130,7 +133,10 @@ class TestEmailSendService:
     @pytest.mark.asyncio()
     async def test_get_org_shared_email_account_no_accounts(self):
         """Raises NoEmailAccountError when no accounts exist."""
-        from app.services.email_send import NoEmailAccountError, get_org_shared_email_account
+        from app.services.email_send import (
+            NoEmailAccountError,
+            get_org_shared_email_account,
+        )
 
         maker = await _make_session()
         async with maker() as session:

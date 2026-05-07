@@ -97,7 +97,14 @@ class TestLegalContent:
 
     def test_privacy_lists_all_providers(self):
         content = (self.TEMPLATES_DIR / "privacy-policy.html").read_text()
-        for provider in ["Anthropic", "DeepSeek", "xAI", "Google", "OpenAI", "OpenRouter"]:
+        for provider in [
+            "Anthropic",
+            "DeepSeek",
+            "xAI",
+            "Google",
+            "OpenAI",
+            "OpenRouter",
+        ]:
             assert provider in content, f"Provider {provider} not listed in privacy policy"
 
 

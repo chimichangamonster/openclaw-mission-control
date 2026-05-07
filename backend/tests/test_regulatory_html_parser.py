@@ -65,9 +65,7 @@ def _phase(name: str, badge: str, *items: str, open_: bool = False) -> str:
 
 def _task(text: str, note: str | None = None, *tag_specs: tuple[str, str]) -> str:
     note_html = f'<div class="task-note">{note}</div>' if note else ""
-    tags_html = "".join(
-        f'<span class="tag tag-{slug}">{label}</span>' for slug, label in tag_specs
-    )
+    tags_html = "".join(f'<span class="tag tag-{slug}">{label}</span>' for slug, label in tag_specs)
     return (
         '<div class="task-item" data-task-toggle>'
         '<div class="task-check"></div>'
@@ -105,9 +103,7 @@ def test_unpublished_panels_are_silently_skipped() -> None:
         _wrap_panel("canada", _wrap_stream("stream-navy", "navy", "Corp", _phase("P", "corp")))
         + _wrap_panel(
             "india",
-            _wrap_stream(
-                "india-stream-navy", "navy", "Indian Entry", _phase("IP", "now")
-            ),
+            _wrap_stream("india-stream-navy", "navy", "Indian Entry", _phase("IP", "now")),
         )
         + _wrap_panel("kenya", "")
     )

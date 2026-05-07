@@ -305,41 +305,63 @@ async def _seed_unread_mix(session: AsyncSession) -> dict:
     a private account owned by MEMBER_USER_ID (3 unread inbox), and a
     private account owned by OWNER_USER_ID (1 unread inbox)."""
     shared_account = EmailAccount(
-        id=uuid4(), organization_id=ORG_ID, user_id=OWNER_USER_ID,
-        provider="microsoft", email_address="shared@x.ca", visibility="shared",
+        id=uuid4(),
+        organization_id=ORG_ID,
+        user_id=OWNER_USER_ID,
+        provider="microsoft",
+        email_address="shared@x.ca",
+        visibility="shared",
         sync_enabled=True,
     )
     other_private = EmailAccount(
-        id=uuid4(), organization_id=ORG_ID, user_id=MEMBER_USER_ID,
-        provider="microsoft", email_address="samir@x.ca", visibility="private",
+        id=uuid4(),
+        organization_id=ORG_ID,
+        user_id=MEMBER_USER_ID,
+        provider="microsoft",
+        email_address="samir@x.ca",
+        visibility="private",
         sync_enabled=True,
     )
     own_private = EmailAccount(
-        id=uuid4(), organization_id=ORG_ID, user_id=OWNER_USER_ID,
-        provider="microsoft", email_address="owner-private@x.ca", visibility="private",
+        id=uuid4(),
+        organization_id=ORG_ID,
+        user_id=OWNER_USER_ID,
+        provider="microsoft",
+        email_address="owner-private@x.ca",
+        visibility="private",
         sync_enabled=True,
     )
     session.add_all([shared_account, other_private, own_private])
 
     def _msg(account_id, *, is_read: bool, folder: str = "inbox"):
         return EmailMessage(
-            id=uuid4(), organization_id=ORG_ID, email_account_id=account_id,
-            provider_message_id=str(uuid4()), subject="x",
-            sender_email="x@example.com", body_text="x",
-            received_at=utcnow(), folder=folder, triage_status="pending",
-            is_read=is_read, is_starred=False, has_attachments=False,
+            id=uuid4(),
+            organization_id=ORG_ID,
+            email_account_id=account_id,
+            provider_message_id=str(uuid4()),
+            subject="x",
+            sender_email="x@example.com",
+            body_text="x",
+            received_at=utcnow(),
+            folder=folder,
+            triage_status="pending",
+            is_read=is_read,
+            is_starred=False,
+            has_attachments=False,
         )
 
-    session.add_all([
-        _msg(shared_account.id, is_read=False),
-        _msg(shared_account.id, is_read=False),
-        _msg(shared_account.id, is_read=True),
-        _msg(shared_account.id, is_read=False, folder="archive"),
-        _msg(other_private.id, is_read=False),
-        _msg(other_private.id, is_read=False),
-        _msg(other_private.id, is_read=False),
-        _msg(own_private.id, is_read=False),
-    ])
+    session.add_all(
+        [
+            _msg(shared_account.id, is_read=False),
+            _msg(shared_account.id, is_read=False),
+            _msg(shared_account.id, is_read=True),
+            _msg(shared_account.id, is_read=False, folder="archive"),
+            _msg(other_private.id, is_read=False),
+            _msg(other_private.id, is_read=False),
+            _msg(other_private.id, is_read=False),
+            _msg(own_private.id, is_read=False),
+        ]
+    )
     await session.commit()
     return {
         "shared": shared_account,
@@ -476,12 +498,10 @@ async def test_private_inbox_with_agent_enabled_is_triageable():
             EmailAccount.organization_id == ORG_ID,
             EmailAccount.agent_access == "enabled",
         )
-        agent_visible = list(
-            (await session.execute(agent_stmt)).scalars().all()
-        )
-        assert any(a.email_address == "henry@wastegurus.ca" for a in agent_visible), (
-            "private+enabled inbox MUST be agent-accessible (the triggering bug)"
-        )
+        agent_visible = list((await session.execute(agent_stmt)).scalars().all())
+        assert any(
+            a.email_address == "henry@wastegurus.ca" for a in agent_visible
+        ), "private+enabled inbox MUST be agent-accessible (the triggering bug)"
 
 
 @pytest.mark.asyncio
@@ -504,9 +524,7 @@ async def test_shared_inbox_with_agent_disabled_is_invisible_to_agents():
             EmailAccount.organization_id == ORG_ID,
             EmailAccount.agent_access == "enabled",
         )
-        agent_visible = list(
-            (await session.execute(agent_stmt)).scalars().all()
-        )
+        agent_visible = list((await session.execute(agent_stmt)).scalars().all())
         assert not any(
             a.email_address == "sensitive-shared@x.ca" for a in agent_visible
         ), "shared+disabled inbox must NOT appear to agents"
@@ -534,24 +552,16 @@ async def test_private_inbox_with_agent_disabled_blocks_both():
             EmailAccount.organization_id == ORG_ID,
             EmailAccount.agent_access == "enabled",
         )
-        agent_visible = list(
-            (await session.execute(agent_stmt)).scalars().all()
-        )
-        assert not any(
-            a.email_address == "quiet-personal@x.ca" for a in agent_visible
-        )
+        agent_visible = list((await session.execute(agent_stmt)).scalars().all())
+        assert not any(a.email_address == "quiet-personal@x.ca" for a in agent_visible)
 
         # Non-owner member query (visibility=shared filter) also excludes it.
         member_stmt = select(EmailAccount).where(
             EmailAccount.organization_id == ORG_ID,
             EmailAccount.visibility == "shared",
         )
-        member_visible = list(
-            (await session.execute(member_stmt)).scalars().all()
-        )
-        assert not any(
-            a.email_address == "quiet-personal@x.ca" for a in member_visible
-        )
+        member_visible = list((await session.execute(member_stmt)).scalars().all())
+        assert not any(a.email_address == "quiet-personal@x.ca" for a in member_visible)
 
 
 @pytest.mark.asyncio

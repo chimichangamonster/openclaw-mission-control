@@ -253,7 +253,11 @@ class TestProcessDocument:
     @pytest.mark.asyncio()
     async def test_text_file_extraction(self):
         """Plain text files are decoded and classified."""
-        mock_classification = {"type": "correspondence", "confidence": 80, "summary": "A letter"}
+        mock_classification = {
+            "type": "correspondence",
+            "confidence": 80,
+            "summary": "A letter",
+        }
 
         with patch(
             "app.services.document_intake.classify_document", new_callable=AsyncMock
@@ -300,7 +304,11 @@ class TestProcessDocument:
         c.save()
         pdf_bytes = buf.getvalue()
 
-        mock_classification = {"type": "invoice", "confidence": 95, "summary": "Invoice #1234"}
+        mock_classification = {
+            "type": "invoice",
+            "confidence": 95,
+            "summary": "Invoice #1234",
+        }
 
         with patch(
             "app.services.document_intake.classify_document", new_callable=AsyncMock
@@ -344,7 +352,11 @@ class TestProcessDocument:
     async def test_json_file_extraction(self):
         """JSON files are decoded as text."""
         json_data = json.dumps({"report": "Q1 Summary", "total": 12500}).encode()
-        mock_classification = {"type": "report", "confidence": 70, "summary": "Q1 summary report"}
+        mock_classification = {
+            "type": "report",
+            "confidence": 70,
+            "summary": "Q1 summary report",
+        }
 
         with patch(
             "app.services.document_intake.classify_document", new_callable=AsyncMock

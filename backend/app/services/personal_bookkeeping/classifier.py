@@ -62,33 +62,92 @@ SEED_BUSINESS_RULES: tuple[tuple[str, str, str | None, str, bool, str], ...] = (
     (r"PROTON", "business", "8810", "Office", True, "Encrypted email"),
     (r"OPENROUTER", "business", "8871", "Mgmt/Admin", True, "LLM infrastructure"),
     (r"MEMORY EXPRESS", "business", "8871", "Mgmt/Admin", True, "IT hardware"),
-    (r"PETRO-CANADA|SHELL|ESSO|HUSKY|CO-OP GAS", "vehicle", "9224", "Fuel", False, "Vehicle % — track km"),
+    (
+        r"PETRO-CANADA|SHELL|ESSO|HUSKY|CO-OP GAS",
+        "vehicle",
+        "9224",
+        "Fuel",
+        False,
+        "Vehicle % — track km",
+    ),
     (r"PRIMMUM INSURANCE", "vehicle", None, "Auto Insurance", True, "Vehicle % — insurance"),
     (r"DOWNTOWN AUTO", "vehicle", None, "Maintenance", True, "Vehicle % — mechanic"),
 )
 
 SEED_PERSONAL_HINTS: tuple[str, ...] = (
-    r"UBER EATS", r"MCDONALD", r"A&W", r"PIZZA", r"PHO ", r"SQ \*", r"SOBEYS", r"LOBLAWS",
-    r"REAL CDN SUPERS", r"EL-SAFADI", r"LUCKY SUPERMARK", r"T&T SUPERMARKET", r"H & W PRODUCE",
-    r"ITALIAN CENTRE", r"COBS", r"DRIP N DIP", r"SUNBAKE", r"DQ GRILL", r"BOSTON PIZZA",
-    r"YMCA", r"JUNO", r"VALUE BUDS", r"CANNABIS", r"SPOTIFY", r"YOUTUBE", r"YOGALIFE",
-    r"SHOPPERS DRUG", r"SDM ", r"AESOP", r"WHITEPOUCHES", r"UBER ONE",
-    r"7-ELEVEN", r"BAEKJEONG", r"KITCHEN KING", r"BULGOGI", r"NUMO", r"TST-", r"ROYAL PIZZA",
-    r"CO DO HUE", r"BERNARDO", r"SKILOUISE", r"BROOK", r"SWISS DONAIR", r"KAHVE", r"ROCKIN ROBYNS",
-    r"MR\. & MRS\.", r"TOUCH OF THAI", r"XING WANG", r"COFFEE BURE",
-    r"AMAZON", r"AMZN",
+    r"UBER EATS",
+    r"MCDONALD",
+    r"A&W",
+    r"PIZZA",
+    r"PHO ",
+    r"SQ \*",
+    r"SOBEYS",
+    r"LOBLAWS",
+    r"REAL CDN SUPERS",
+    r"EL-SAFADI",
+    r"LUCKY SUPERMARK",
+    r"T&T SUPERMARKET",
+    r"H & W PRODUCE",
+    r"ITALIAN CENTRE",
+    r"COBS",
+    r"DRIP N DIP",
+    r"SUNBAKE",
+    r"DQ GRILL",
+    r"BOSTON PIZZA",
+    r"YMCA",
+    r"JUNO",
+    r"VALUE BUDS",
+    r"CANNABIS",
+    r"SPOTIFY",
+    r"YOUTUBE",
+    r"YOGALIFE",
+    r"SHOPPERS DRUG",
+    r"SDM ",
+    r"AESOP",
+    r"WHITEPOUCHES",
+    r"UBER ONE",
+    r"7-ELEVEN",
+    r"BAEKJEONG",
+    r"KITCHEN KING",
+    r"BULGOGI",
+    r"NUMO",
+    r"TST-",
+    r"ROYAL PIZZA",
+    r"CO DO HUE",
+    r"BERNARDO",
+    r"SKILOUISE",
+    r"BROOK",
+    r"SWISS DONAIR",
+    r"KAHVE",
+    r"ROCKIN ROBYNS",
+    r"MR\. & MRS\.",
+    r"TOUCH OF THAI",
+    r"XING WANG",
+    r"COFFEE BURE",
+    r"AMAZON",
+    r"AMZN",
 )
 
 SEED_TRANSFER_HINTS: tuple[str, ...] = (
-    r"AMEX CARDS", r"RBC MC", r"TD ATM W/D", r"TFR-TO", r"TO:\d",
-    r"WITHDRAWAL FEES", r"MONTHLY ACCOUNT FEE", r"PAYMENT RECEIVED",
-    r"MEMBERSHIP FEE INSTALLMENT", r"INTEREST$",
+    r"AMEX CARDS",
+    r"RBC MC",
+    r"TD ATM W/D",
+    r"TFR-TO",
+    r"TO:\d",
+    r"WITHDRAWAL FEES",
+    r"MONTHLY ACCOUNT FEE",
+    r"PAYMENT RECEIVED",
+    r"MEMBERSHIP FEE INSTALLMENT",
+    r"INTEREST$",
 )
 
 SEED_INCOME_HINTS: tuple[str, ...] = (r"E-TRANSFER \*\*\*", r"TD ATM DEP")
 
 SEED_AMBIGUOUS_EXPLICIT: tuple[str, ...] = (
-    r"UPS\*", r"MSSM", r"PAYPAL", r"SANDMAN",
+    r"UPS\*",
+    r"MSSM",
+    r"PAYPAL",
+    r"SANDMAN",
 )
 
 
@@ -146,13 +205,17 @@ async def classify(
 
     # 3. DB-stored learned rules for this org
     db_rules = (
-        await session.execute(
-            select(PersonalVendorRule).where(
-                PersonalVendorRule.organization_id == organization_id,
-                PersonalVendorRule.active == True,  # noqa: E712
+        (
+            await session.execute(
+                select(PersonalVendorRule).where(
+                    PersonalVendorRule.organization_id == organization_id,
+                    PersonalVendorRule.active == True,  # noqa: E712
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     for rule in db_rules:
         if rule.applies_to_source and rule.applies_to_source != source:

@@ -74,7 +74,9 @@ class TestGraphTokenManager:
         conn = MagicMock()
         test_key = Fernet.generate_key().decode()
         with patch(
-            "app.core.encryption.settings", encryption_key=test_key, email_token_encryption_key=""
+            "app.core.encryption.settings",
+            encryption_key=test_key,
+            email_token_encryption_key="",
         ):
             # Reset cached fernet instance
             import app.core.encryption as enc_mod

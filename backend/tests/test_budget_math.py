@@ -143,7 +143,12 @@ class TestProactiveCompaction:
 
     @staticmethod
     def _make_session(key: str, tokens: int, model: str = "anthropic/claude-sonnet-4") -> dict:
-        return {"key": key, "totalTokens": tokens, "model": model, "groupChannel": "#test"}
+        return {
+            "key": key,
+            "totalTokens": tokens,
+            "model": model,
+            "groupChannel": "#test",
+        }
 
     @pytest.mark.asyncio
     @patch("app.services.budget_monitor._send_discord_alert", new_callable=AsyncMock)

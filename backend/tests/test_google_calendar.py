@@ -89,7 +89,9 @@ class TestGoogleTokenManager:
         conn = MagicMock()
         test_key = Fernet.generate_key().decode()
         with patch(
-            "app.core.encryption.settings", encryption_key=test_key, email_token_encryption_key=""
+            "app.core.encryption.settings",
+            encryption_key=test_key,
+            email_token_encryption_key="",
         ):
             import app.core.encryption as enc_mod
 
@@ -117,7 +119,9 @@ class TestGoogleTokenManager:
         conn = MagicMock()
         test_key = Fernet.generate_key().decode()
         with patch(
-            "app.core.encryption.settings", encryption_key=test_key, email_token_encryption_key=""
+            "app.core.encryption.settings",
+            encryption_key=test_key,
+            email_token_encryption_key="",
         ):
             import app.core.encryption as enc_mod
 
@@ -166,8 +170,14 @@ class TestCalendarHelpers:
             "summary": "Team Meeting",
             "description": "Weekly standup",
             "location": "Office",
-            "start": {"dateTime": "2026-03-25T09:00:00-06:00", "timeZone": "America/Edmonton"},
-            "end": {"dateTime": "2026-03-25T09:30:00-06:00", "timeZone": "America/Edmonton"},
+            "start": {
+                "dateTime": "2026-03-25T09:00:00-06:00",
+                "timeZone": "America/Edmonton",
+            },
+            "end": {
+                "dateTime": "2026-03-25T09:30:00-06:00",
+                "timeZone": "America/Edmonton",
+            },
             "status": "confirmed",
             "htmlLink": "https://calendar.google.com/event?eid=ev123",
             "attendees": [

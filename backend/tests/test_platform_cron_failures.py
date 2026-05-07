@@ -33,9 +33,7 @@ def _summarize_error(error: Any, max_length: int = 200) -> str:
     return text[: max_length - 1] + "…"
 
 
-def _filter_failed_runs(
-    runs: list[dict[str, Any]], cutoff: datetime
-) -> list[dict[str, Any]]:
+def _filter_failed_runs(runs: list[dict[str, Any]], cutoff: datetime) -> list[dict[str, Any]]:
     failures = []
     for run in runs:
         if not isinstance(run, dict):
@@ -165,9 +163,7 @@ class TestFilterFailedRuns:
 
     def test_drops_runs_with_no_started_at(self) -> None:
         cutoff = datetime(2026, 5, 7, 0, 0, 0, tzinfo=UTC)
-        runs = [
-            {"run_id": "r1", "status": "error", "started_at": None, "error": "x"}
-        ]
+        runs = [{"run_id": "r1", "status": "error", "started_at": None, "error": "x"}]
         assert _filter_failed_runs(runs, cutoff) == []
 
     def test_drops_non_dict_entries(self) -> None:

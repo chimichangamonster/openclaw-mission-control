@@ -22,7 +22,11 @@ def test_none_returns_empty():
 
 
 def test_dict_with_string_content():
-    msg = {"role": "assistant", "content": "Hello there", "timestamp": "2026-04-14T20:00:00Z"}
+    msg = {
+        "role": "assistant",
+        "content": "Hello there",
+        "timestamp": "2026-04-14T20:00:00Z",
+    }
     assert _coerce_preview_text(msg) == "Hello there"
 
 

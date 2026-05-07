@@ -240,7 +240,8 @@ class TestCNFalsePositives:
 
     def test_normal_business_english(self) -> None:
         result = filter_content(
-            "Revenue increased 15% in Q3 2025. The manufacturing line ran at 92% OEE.", region="cn"
+            "Revenue increased 15% in Q3 2025. The manufacturing line ran at 92% OEE.",
+            region="cn",
         )
         assert result.filtered_count == 0
 

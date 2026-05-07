@@ -282,7 +282,9 @@ async def test_list_marketplace_skills_marks_installed_cards() -> None:
 
 
 @pytest.mark.asyncio
-async def test_sync_pack_clones_and_upserts_skills(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_sync_pack_clones_and_upserts_skills(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     engine = await _make_engine()
     session_maker = async_sessionmaker(
         engine,
@@ -710,7 +712,9 @@ async def test_update_skill_pack_normalizes_source_url_on_update() -> None:
         await engine.dispose()
 
 
-def test_collect_pack_skills_from_repo_uses_root_index_when_present(tmp_path: Path) -> None:
+def test_collect_pack_skills_from_repo_uses_root_index_when_present(
+    tmp_path: Path,
+) -> None:
     repo_dir = tmp_path / "repo"
     repo_dir.mkdir()
     (repo_dir / "skills").mkdir()

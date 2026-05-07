@@ -23,9 +23,9 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.schemas.gateway_api import GatewayResolveQuery
 from app.services.openclaw.gateway_rpc import GatewayConfig
 from app.services.openclaw.session_service import GatewaySessionService
-from app.schemas.gateway_api import GatewayResolveQuery
 
 
 async def _make_session() -> AsyncSession:
@@ -71,7 +71,9 @@ async def test_multi_org_member_can_query_non_active_org_gateway() -> None:
 
     async def _fake_compat(config: object, *, minimum_version: str | None = None) -> object:
         _ = (config, minimum_version)
-        return SimpleNamespace(compatible=True, minimum_version=None, current_version="x", message=None)
+        return SimpleNamespace(
+            compatible=True, minimum_version=None, current_version="x", message=None
+        )
 
     with (
         patch.object(

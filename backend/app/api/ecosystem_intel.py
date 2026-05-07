@@ -99,9 +99,7 @@ async def list_ecosystem_repos(
     result = await session.exec(stmt)
     repos = list(result.all())
 
-    deltas = await ecosystem_service.get_growth_deltas(
-        session, [r.id for r in repos], hours=24
-    )
+    deltas = await ecosystem_service.get_growth_deltas(session, [r.id for r in repos], hours=24)
 
     pinned_full_names = {f"{owner}/{name}" for owner, name in ecosystem_service.PINNED_REPOS}
 

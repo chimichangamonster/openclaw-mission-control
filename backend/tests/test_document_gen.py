@@ -23,7 +23,10 @@ class TestSimplePdf:
             title="Test Report",
             sections=[
                 {"heading": "Introduction", "content": "This is a test document."},
-                {"heading": "Details", "content": "More content here.\nSecond paragraph."},
+                {
+                    "heading": "Details",
+                    "content": "More content here.\nSecond paragraph.",
+                },
             ],
         )
         assert isinstance(result, bytes)
@@ -276,7 +279,12 @@ class TestTemplateRendering:
                 "title": "Q1 Report",
                 "date": "March 2026",
                 "kpis": [
-                    {"value": "+12%", "label": "Return", "change": "+2%", "direction": "up"},
+                    {
+                        "value": "+12%",
+                        "label": "Return",
+                        "change": "+2%",
+                        "direction": "up",
+                    },
                 ],
                 "sections": [],
             },

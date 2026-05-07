@@ -23,12 +23,12 @@ from app.models.tenancy import TenantScoped
 # Bucket enum values. Kept as strings (not a DB enum) so adding a bucket
 # later doesn't require a migration — only a code change + classifier update.
 BUCKET_VALUES = (
-    "business",        # Deductible business expense (with t2125_line set)
-    "personal",        # Henz's personal spending, out of scope for T2125
-    "vehicle",         # Goes to Motor Vehicle % sheet — business-km pct applies
-    "gift",            # Incoming money confirmed as a personal gift, not revenue
-    "transfer",        # Internal (CC payment, ATM, bank fees) — not an expense
-    "ambiguous",       # Needs Henz's review; blocks month lock until cleared
+    "business",  # Deductible business expense (with t2125_line set)
+    "personal",  # Henz's personal spending, out of scope for T2125
+    "vehicle",  # Goes to Motor Vehicle % sheet — business-km pct applies
+    "gift",  # Incoming money confirmed as a personal gift, not revenue
+    "transfer",  # Internal (CC payment, ATM, bank fees) — not an expense
+    "ambiguous",  # Needs Henz's review; blocks month lock until cleared
     "income_pending",  # Incoming money awaiting classification (business vs gift)
 )
 
@@ -126,9 +126,7 @@ class PersonalVendorRule(TenantScoped, table=True):
     """
 
     __tablename__ = "personal_vendor_rules"  # pyright: ignore[reportAssignmentType]
-    __table_args__ = (
-        Index("ix_personal_vendor_rule_org_active", "organization_id", "active"),
-    )
+    __table_args__ = (Index("ix_personal_vendor_rule_org_active", "organization_id", "active"),)
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     organization_id: UUID = Field(foreign_key="organizations.id", index=True)

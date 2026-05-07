@@ -576,7 +576,9 @@ async def test_control_plane_upsert_agent_retries_update_after_create_race(monke
 
 
 @pytest.mark.asyncio
-async def test_control_plane_upsert_agent_missing_after_already_exists_fails_fast(monkeypatch):
+async def test_control_plane_upsert_agent_missing_after_already_exists_fails_fast(
+    monkeypatch,
+):
     calls: list[tuple[str, dict[str, object] | None]] = []
     sleeps: list[float] = []
 
@@ -687,7 +689,9 @@ async def test_resolve_role_soul_markdown_returns_empty_on_directory_error(
 
 
 @pytest.mark.asyncio
-async def test_delete_agent_lifecycle_ignores_missing_gateway_agent(monkeypatch) -> None:
+async def test_delete_agent_lifecycle_ignores_missing_gateway_agent(
+    monkeypatch,
+) -> None:
     class _ControlPlaneStub:
         def __init__(self) -> None:
             self.deleted_sessions: list[str] = []
@@ -727,7 +731,9 @@ async def test_delete_agent_lifecycle_ignores_missing_gateway_agent(monkeypatch)
 
 
 @pytest.mark.asyncio
-async def test_delete_agent_lifecycle_raises_on_non_missing_agent_error(monkeypatch) -> None:
+async def test_delete_agent_lifecycle_raises_on_non_missing_agent_error(
+    monkeypatch,
+) -> None:
     class _ControlPlaneStub:
         async def delete_agent(self, agent_id: str, *, delete_files: bool = True) -> None:
             _ = (agent_id, delete_files)

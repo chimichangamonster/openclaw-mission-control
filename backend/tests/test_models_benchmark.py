@@ -386,9 +386,7 @@ class TestModelsBenchmark:
         ctx = OrganizationContext(organization=data["org"], member=data["member"])
         app = _build_app(maker, ctx)
         try:
-            async with AsyncClient(
-                transport=ASGITransport(app=app), base_url="http://test"
-            ) as c:
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
                 resp = await c.get("/api/v1/models/benchmark")
                 assert resp.status_code == 200
                 body = resp.json()

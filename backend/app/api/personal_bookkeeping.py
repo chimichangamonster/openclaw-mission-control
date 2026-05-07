@@ -168,9 +168,7 @@ async def _recompute_month_totals(
 ) -> None:
     """Rebuild cached aggregates on a month record from its live transactions."""
     result = await session.execute(
-        select(PersonalTransaction).where(
-            PersonalTransaction.reconciliation_month_id == month.id
-        )
+        select(PersonalTransaction).where(PersonalTransaction.reconciliation_month_id == month.id)
     )
     txns = list(result.scalars().all())
 
@@ -413,21 +411,23 @@ async def upload_statement(
 
     raw_bytes = await file.read()
     if not raw_bytes:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Empty file."
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Empty file.")
 
     file_sha = hashlib.sha256(raw_bytes).hexdigest()
 
     # Reject exact-duplicate file uploads at the org level
     dup = (
-        await session.execute(
-            select(PersonalStatementFile).where(
-                PersonalStatementFile.organization_id == org_ctx.organization.id,
-                PersonalStatementFile.sha256 == file_sha,
+        (
+            await session.execute(
+                select(PersonalStatementFile).where(
+                    PersonalStatementFile.organization_id == org_ctx.organization.id,
+                    PersonalStatementFile.sha256 == file_sha,
+                )
             )
         )
-    ).scalars().first()
+        .scalars()
+        .first()
+    )
     if dup is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -443,7 +443,9 @@ async def upload_statement(
     except Exception as exc:
         logger.warning(
             "personal_bookkeeping.parse_failed source=%s period=%s err=%s",
-            source, period, exc,
+            source,
+            period,
+            exc,
         )
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -481,7 +483,9 @@ async def upload_statement(
                     PersonalTransaction.organization_id == org_ctx.organization.id,
                 )
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     )
 
     inserted = 0
@@ -563,21 +567,23 @@ async def bulk_import_statement(
 
     raw_bytes = await file.read()
     if not raw_bytes:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Empty file."
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Empty file.")
 
     file_sha = hashlib.sha256(raw_bytes).hexdigest()
 
     # Reject exact-duplicate file uploads at the org level
     dup = (
-        await session.execute(
-            select(PersonalStatementFile).where(
-                PersonalStatementFile.organization_id == org_ctx.organization.id,
-                PersonalStatementFile.sha256 == file_sha,
+        (
+            await session.execute(
+                select(PersonalStatementFile).where(
+                    PersonalStatementFile.organization_id == org_ctx.organization.id,
+                    PersonalStatementFile.sha256 == file_sha,
+                )
             )
         )
-    ).scalars().first()
+        .scalars()
+        .first()
+    )
     if dup is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -591,9 +597,7 @@ async def bulk_import_statement(
         else:
             parsed = parse_amex_xls(raw_bytes, period=None)
     except Exception as exc:
-        logger.warning(
-            "personal_bookkeeping.bulk_parse_failed source=%s err=%s", source, exc
-        )
+        logger.warning("personal_bookkeeping.bulk_parse_failed source=%s err=%s", source, exc)
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Failed to parse {source} statement: {exc}",
@@ -645,7 +649,9 @@ async def bulk_import_statement(
                     PersonalTransaction.organization_id == org_ctx.organization.id,
                 )
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     )
 
     per_period_results: list[BulkImportPeriodResult] = []
@@ -855,9 +861,7 @@ async def update_transaction(
     if txn is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
 
-    month = await session.get(
-        PersonalReconciliationMonth, txn.reconciliation_month_id
-    )
+    month = await session.get(PersonalReconciliationMonth, txn.reconciliation_month_id)
     if month is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
     if month.status == "locked":
@@ -922,9 +926,7 @@ async def promote_to_rule(
     if txn is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
 
-    month = await session.get(
-        PersonalReconciliationMonth, txn.reconciliation_month_id
-    )
+    month = await session.get(PersonalReconciliationMonth, txn.reconciliation_month_id)
     source_month = month.period if month is not None else "manual"
 
     pattern = payload.pattern or re.escape(txn.description.strip().upper())

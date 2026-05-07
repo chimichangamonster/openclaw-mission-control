@@ -218,9 +218,7 @@ class GrantPrerequisiteTask(TenantScoped, table=True):
     )
 
     grant_id: UUID = Field(foreign_key="grants.id", primary_key=True)
-    regulatory_task_id: UUID = Field(
-        foreign_key="regulatory_tasks.id", primary_key=True
-    )
+    regulatory_task_id: UUID = Field(foreign_key="regulatory_tasks.id", primary_key=True)
 
     label_override: str | None = None
     is_critical: bool = Field(default=False)

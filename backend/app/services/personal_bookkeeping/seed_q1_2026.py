@@ -61,28 +61,113 @@ Q1_DECISIONS: dict[DecisionKey, DecisionValue] = {
     # --- January 2026: all 4 inflows gifts, 3 TD e-transfers personal,
     # Downtown Auto vehicle, Sandman business travel, rest personal.
     ("2026-01", "TD", "2026-01-12", "TD ATM DEP", 1530.0): ("gift", None, None, "Personal gift"),
-    ("2026-01", "TD", "2026-01-19", "E-TRANSFER ***ehp", 1400.0): ("gift", None, None, "Personal gift"),
-    ("2026-01", "TD", "2026-01-22", "E-TRANSFER ***Cby", 150.0): ("gift", None, None, "Personal gift"),
+    ("2026-01", "TD", "2026-01-19", "E-TRANSFER ***ehp", 1400.0): (
+        "gift",
+        None,
+        None,
+        "Personal gift",
+    ),
+    ("2026-01", "TD", "2026-01-22", "E-TRANSFER ***Cby", 150.0): (
+        "gift",
+        None,
+        None,
+        "Personal gift",
+    ),
     ("2026-01", "TD", "2026-01-26", "TD ATM DEP", 1400.0): ("gift", None, None, "Personal gift"),
-    ("2026-01", "AMEX", "2026-01-19", "DOWNTOWN AUTO", 497.22): ("vehicle", None, "Maintenance", "Mechanic — Motor Vehicle %"),
-    ("2026-01", "AMEX", "2026-01-30", "SANDMAN", 265.68): ("business", "9200", "Travel", "Calgary airport hotel — business trip"),
+    ("2026-01", "AMEX", "2026-01-19", "DOWNTOWN AUTO", 497.22): (
+        "vehicle",
+        None,
+        "Maintenance",
+        "Mechanic — Motor Vehicle %",
+    ),
+    ("2026-01", "AMEX", "2026-01-30", "SANDMAN", 265.68): (
+        "business",
+        "9200",
+        "Travel",
+        "Calgary airport hotel — business trip",
+    ),
     # --- February 2026
-    ("2026-02", "TD", "2026-02-02", "E-TRANSFER ***5wh", 1620.0): ("business", None, None, "Consulting income"),
-    ("2026-02", "TD", "2026-02-09", "E-TRANSFER ***ccQ", 530.0): ("gift", None, None, "Personal gift"),
-    ("2026-02", "TD", "2026-02-11", "E-TRANSFER ***aWz", 1325.0): ("gift", None, None, "Personal gift"),
-    ("2026-02", "TD", "2026-02-12", "TD ATM DEP    004543", 2045.0): ("business", None, None, "Consulting income"),
-    ("2026-02", "TD", "2026-02-12", "TD ATM DEP    004545", 640.0): ("gift", None, None, "Personal gift"),
+    ("2026-02", "TD", "2026-02-02", "E-TRANSFER ***5wh", 1620.0): (
+        "business",
+        None,
+        None,
+        "Consulting income",
+    ),
+    ("2026-02", "TD", "2026-02-09", "E-TRANSFER ***ccQ", 530.0): (
+        "gift",
+        None,
+        None,
+        "Personal gift",
+    ),
+    ("2026-02", "TD", "2026-02-11", "E-TRANSFER ***aWz", 1325.0): (
+        "gift",
+        None,
+        None,
+        "Personal gift",
+    ),
+    ("2026-02", "TD", "2026-02-12", "TD ATM DEP    004543", 2045.0): (
+        "business",
+        None,
+        None,
+        "Consulting income",
+    ),
+    ("2026-02", "TD", "2026-02-12", "TD ATM DEP    004545", 640.0): (
+        "gift",
+        None,
+        None,
+        "Personal gift",
+    ),
     ("2026-02", "TD", "2026-02-24", "TD ATM DEP", 1060.0): ("gift", None, None, "Personal gift"),
-    ("2026-02", "AMEX", "2026-02-22", "OPENROUTER", 297.79): ("business", "8871", "Mgmt/Admin", "LLM infrastructure"),
+    ("2026-02", "AMEX", "2026-02-22", "OPENROUTER", 297.79): (
+        "business",
+        "8871",
+        "Mgmt/Admin",
+        "LLM infrastructure",
+    ),
     # --- March 2026
-    ("2026-03", "TD", "2026-03-02", "E-TRANSFER ***dSj", 1550.0): ("business", None, None, "Consulting income"),
-    ("2026-03", "TD", "2026-03-17", "TD ATM DEP    004514", 1620.0): ("business", None, None, "Consulting income"),
-    ("2026-03", "TD", "2026-03-17", "TD ATM DEP    004516", 1020.0): ("gift", None, None, "Personal gift"),
-    ("2026-03", "TD", "2026-03-26", "TD ATM DEP    006938", 1840.0): ("gift", None, None, "Personal gift"),
-    ("2026-03", "TD", "2026-03-26", "TD ATM DEP    006940", 700.0): ("gift", None, None, "Personal gift"),
-    ("2026-03", "AMEX", "2026-03-27", "MEMORY EXPRESS", 288.70): ("business", "8871", "Mgmt/Admin", "IT hardware for consulting"),
+    ("2026-03", "TD", "2026-03-02", "E-TRANSFER ***dSj", 1550.0): (
+        "business",
+        None,
+        None,
+        "Consulting income",
+    ),
+    ("2026-03", "TD", "2026-03-17", "TD ATM DEP    004514", 1620.0): (
+        "business",
+        None,
+        None,
+        "Consulting income",
+    ),
+    ("2026-03", "TD", "2026-03-17", "TD ATM DEP    004516", 1020.0): (
+        "gift",
+        None,
+        None,
+        "Personal gift",
+    ),
+    ("2026-03", "TD", "2026-03-26", "TD ATM DEP    006938", 1840.0): (
+        "gift",
+        None,
+        None,
+        "Personal gift",
+    ),
+    ("2026-03", "TD", "2026-03-26", "TD ATM DEP    006940", 700.0): (
+        "gift",
+        None,
+        None,
+        "Personal gift",
+    ),
+    ("2026-03", "AMEX", "2026-03-27", "MEMORY EXPRESS", 288.70): (
+        "business",
+        "8871",
+        "Mgmt/Admin",
+        "IT hardware for consulting",
+    ),
     # AMEX ambiguous lines Henz decided personal:
-    ("2026-03", "AMEX", "2026-03-11", "UPS*", 38.28): ("personal", None, None, "UPS fee on personal shipment"),
+    ("2026-03", "AMEX", "2026-03-11", "UPS*", 38.28): (
+        "personal",
+        None,
+        None,
+        "UPS fee on personal shipment",
+    ),
 }
 
 
@@ -94,9 +179,7 @@ class SeedResult:
     skipped: bool
 
 
-def _apply_decision(
-    period: str, parsed: ParsedTransaction
-) -> DecisionValue | None:
+def _apply_decision(period: str, parsed: ParsedTransaction) -> DecisionValue | None:
     """Look up Henz's locked decision for this row, if any."""
     date_iso = parsed.txn_date.isoformat()
     amt_abs = round(abs(parsed.amount), 2)
@@ -112,9 +195,7 @@ def _apply_decision(
 
 
 async def _get_personal_org(session: AsyncSession) -> Organization | None:
-    result = await session.execute(
-        select(Organization).where(Organization.slug == "personal")
-    )
+    result = await session.execute(select(Organization).where(Organization.slug == "personal"))
     return result.scalars().first()
 
 
@@ -125,13 +206,17 @@ async def _seed_month(
     parsed_rows: list[ParsedTransaction],
 ) -> SeedResult:
     existing = (
-        await session.execute(
-            select(PersonalReconciliationMonth).where(
-                PersonalReconciliationMonth.organization_id == org_id,
-                PersonalReconciliationMonth.period == period,
+        (
+            await session.execute(
+                select(PersonalReconciliationMonth).where(
+                    PersonalReconciliationMonth.organization_id == org_id,
+                    PersonalReconciliationMonth.period == period,
+                )
             )
         )
-    ).scalars().first()
+        .scalars()
+        .first()
+    )
 
     if existing and existing.status == "locked":
         return SeedResult(period, "locked", 0, skipped=True)
@@ -244,9 +329,7 @@ async def seed_q1() -> list[SeedResult]:
     async with async_session_maker() as session:
         org = await _get_personal_org(session)
         if org is None:
-            raise RuntimeError(
-                'No organization with slug="personal" found. Create it first.'
-            )
+            raise RuntimeError('No organization with slug="personal" found. Create it first.')
 
         for period in ("2026-01", "2026-02", "2026-03"):
             td_parsed = parse_td_csv(td_bytes, period=period)
