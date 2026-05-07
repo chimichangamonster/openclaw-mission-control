@@ -3,7 +3,13 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
-import { AlertTriangle, CheckCircle2, ExternalLink, RefreshCw } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  ExternalLink,
+  RefreshCw,
+  XCircle,
+} from "lucide-react";
 import { useQueries, useQuery } from "@tanstack/react-query";
 
 import { useAuth } from "@/auth/clerk";
@@ -47,6 +53,48 @@ type PlatformGateway = {
 type GatewayHealthResponse = {
   org: string;
   gateways: PlatformGateway[];
+};
+
+type CronFailure = {
+  cron_id: string;
+  cron_name: string;
+  run_id: string;
+  started_at: string | null;
+  duration_ms: number | null;
+  error_summary: string;
+};
+
+type CronFailuresOrg = {
+  org_id: string;
+  org_name: string;
+  slug: string | null;
+  failure_count: number;
+  failures: CronFailure[];
+};
+
+type CronFailuresRollup = {
+  hours: number;
+  since: string;
+  total_failures: number;
+  orgs_with_failures: number;
+  orgs_with_rpc_error: number;
+  by_org: CronFailuresOrg[];
+};
+
+type SkillDriftSource = {
+  path: string | null;
+  available: boolean;
+};
+
+type SkillDriftResponse = {
+  available: boolean;
+  total_drift: number;
+  total_orphan: number;
+  sources: {
+    registry: SkillDriftSource & { shared_skill_count: number; org_count: number };
+    shared_skills_dir: SkillDriftSource & { skill_count: number };
+    workspaces_dir: SkillDriftSource & { gateway_count: number };
+  };
 };
 
 const READINESS_LABELS: Record<string, string> = {
@@ -114,10 +162,38 @@ export default function PlatformOwnerPage() {
     })),
   });
 
+  const cronFailuresQuery = useQuery<CronFailuresRollup>({
+    queryKey: ["/api/v1/platform/cron-failures", { hours: 24 }],
+    queryFn: async () => {
+      const res = (await customFetch("/api/v1/platform/cron-failures?hours=24", {
+        method: "GET",
+      })) as { data?: CronFailuresRollup } | CronFailuresRollup;
+      return ("data" in res ? res.data : res) as CronFailuresRollup;
+    },
+    enabled: Boolean(isSignedIn) && isPlatformOwner,
+    refetchOnMount: "always",
+    retry: false,
+  });
+
+  const skillDriftQuery = useQuery<SkillDriftResponse>({
+    queryKey: ["/api/v1/platform/skill-drift"],
+    queryFn: async () => {
+      const res = (await customFetch("/api/v1/platform/skill-drift", {
+        method: "GET",
+      })) as { data?: SkillDriftResponse } | SkillDriftResponse;
+      return ("data" in res ? res.data : res) as SkillDriftResponse;
+    },
+    enabled: Boolean(isSignedIn) && isPlatformOwner,
+    refetchOnMount: "always",
+    retry: false,
+  });
+
   const refetchAll = () => {
     void orgsQuery.refetch();
     readinessQueries.forEach((q) => void q.refetch());
     healthQueries.forEach((q) => void q.refetch());
+    void cronFailuresQuery.refetch();
+    void skillDriftQuery.refetch();
   };
 
   const attentionRows = orgs
@@ -135,10 +211,17 @@ export default function PlatformOwnerPage() {
   const totalOrgs = orgs.length;
   const readyOrgs = readinessQueries.filter((q) => q.data?.ready).length;
   const attentionCount = attentionRows.length;
+  const cronFailures = cronFailuresQuery.data;
+  const totalCronFailures = cronFailures?.total_failures ?? 0;
+  const skillDrift = skillDriftQuery.data;
+  const skillDriftIssues =
+    (skillDrift?.total_drift ?? 0) + (skillDrift?.total_orphan ?? 0);
+  const skillDriftAvailable = skillDrift?.available ?? false;
   const isLoading =
     isPlatformRoleLoading ||
     orgsQuery.isLoading ||
-    readinessQueries.some((q) => q.isLoading);
+    readinessQueries.some((q) => q.isLoading) ||
+    cronFailuresQuery.isLoading;
 
   return (
     <DashboardPageLayout
@@ -159,7 +242,7 @@ export default function PlatformOwnerPage() {
     >
       <div className="space-y-8">
         {/* Stat strip */}
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <StatCard label="Organizations" value={String(totalOrgs)} />
           <StatCard
             label="Ready"
@@ -170,6 +253,27 @@ export default function PlatformOwnerPage() {
             label="Need attention"
             value={String(attentionCount)}
             tone={attentionCount === 0 ? "ok" : "warn"}
+          />
+          <StatCard
+            label="Failed crons (24h)"
+            value={String(totalCronFailures)}
+            tone={totalCronFailures === 0 ? "ok" : "warn"}
+          />
+          <StatCard
+            label="Skill drift"
+            value={
+              skillDriftAvailable
+                ? `${skillDrift?.total_drift ?? 0} / ${skillDrift?.total_orphan ?? 0}`
+                : "—"
+            }
+            tone={
+              !skillDriftAvailable
+                ? "neutral"
+                : skillDriftIssues === 0
+                  ? "ok"
+                  : "warn"
+            }
+            sublabel={skillDriftAvailable ? "drift / orphan" : "audit unavailable"}
           />
         </div>
 
@@ -228,6 +332,95 @@ export default function PlatformOwnerPage() {
                       </li>
                     ))}
                   </ul>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* Failed crons (24h) panel */}
+        <section>
+          <div className="mb-3 flex items-center gap-2">
+            <XCircle className="h-4 w-4 text-rose-500" />
+            <h2 className="font-heading text-lg font-semibold text-[color:var(--text)]">
+              Failed crons (last 24h)
+            </h2>
+            {cronFailures && cronFailures.orgs_with_rpc_error > 0 ? (
+              <span className="text-xs text-amber-700">
+                {cronFailures.orgs_with_rpc_error} org(s) unreachable —
+                results may be incomplete
+              </span>
+            ) : null}
+          </div>
+          {cronFailuresQuery.isError ? (
+            <ErrorPanel message="Failed to load cron failures." />
+          ) : !cronFailures && cronFailuresQuery.isLoading ? (
+            <div className="rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)] p-4 text-sm text-[color:var(--text-muted)]">
+              Loading…
+            </div>
+          ) : !cronFailures || cronFailures.by_org.length === 0 ? (
+            <div className="rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)] p-4 text-sm text-emerald-700">
+              No cron failures in the last 24 hours.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {cronFailures.by_org.map((orgFailures) => (
+                <div
+                  key={orgFailures.org_id}
+                  className="rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)] p-4"
+                >
+                  <div className="mb-2 flex items-center justify-between">
+                    <div className="font-semibold text-[color:var(--text)]">
+                      {orgFailures.org_name}
+                      {orgFailures.slug ? (
+                        <span className="ml-2 text-xs text-[color:var(--text-muted)]">
+                          {orgFailures.slug}
+                        </span>
+                      ) : null}
+                    </div>
+                    <span className="text-xs text-rose-700">
+                      {orgFailures.failure_count} failure
+                      {orgFailures.failure_count === 1 ? "" : "s"}
+                    </span>
+                  </div>
+                  <ul className="space-y-1.5 text-sm">
+                    {orgFailures.failures.slice(0, 5).map((failure) => (
+                      <li
+                        key={failure.run_id || `${failure.cron_id}-${failure.started_at}`}
+                        className="flex flex-wrap items-baseline gap-2"
+                      >
+                        <span className="h-1.5 w-1.5 shrink-0 self-center rounded-full bg-rose-500" />
+                        <span className="font-medium text-[color:var(--text)]">
+                          {failure.cron_name || failure.cron_id}
+                        </span>
+                        <span className="text-xs text-[color:var(--text-muted)]">
+                          {failure.started_at
+                            ? new Date(failure.started_at).toLocaleString()
+                            : "—"}
+                        </span>
+                        {failure.error_summary ? (
+                          <span className="min-w-0 flex-1 truncate text-xs text-rose-600">
+                            {failure.error_summary}
+                          </span>
+                        ) : null}
+                      </li>
+                    ))}
+                    {orgFailures.failures.length > 5 ? (
+                      <li className="pl-3.5 text-xs text-[color:var(--text-muted)]">
+                        +{orgFailures.failures.length - 5} older failure
+                        {orgFailures.failures.length - 5 === 1 ? "" : "s"}
+                      </li>
+                    ) : null}
+                  </ul>
+                  {orgFailures.slug ? (
+                    <Link
+                      href={`/cron-jobs?org_slug=${orgFailures.slug}`}
+                      className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-[color:var(--accent-strong)] hover:underline"
+                    >
+                      View cron jobs
+                      <ExternalLink className="h-3 w-3" />
+                    </Link>
+                  ) : null}
                 </div>
               ))}
             </div>
@@ -332,10 +525,10 @@ export default function PlatformOwnerPage() {
             Coming next
           </p>
           <ul className="list-inside list-disc space-y-1">
-            <li>Cross-org failed-cron rollup (last 24h)</li>
-            <li>Cross-org audit feed (owner-only)</li>
-            <li>Per-org budget burn and circuit-breaker status</li>
-            <li>Backup health and Loki ingestion alerts</li>
+            <li>Skill-drift detail page (item 120 Tier 2 — Tier 1 stat card shipped)</li>
+            <li>Per-org budget burn and circuit-breaker status (item 122)</li>
+            <li>Backup health and Loki ingestion alerts (item 123)</li>
+            <li>Cross-org audit feed (owner-only, item 124 — gated on 2nd platform-admin user)</li>
           </ul>
         </section>
       </div>
@@ -347,10 +540,12 @@ function StatCard({
   label,
   value,
   tone = "neutral",
+  sublabel,
 }: {
   label: string;
   value: string;
   tone?: "neutral" | "ok" | "warn";
+  sublabel?: string;
 }) {
   const toneClass =
     tone === "ok"
@@ -364,6 +559,11 @@ function StatCard({
         {label}
       </div>
       <div className={`mt-1 text-2xl font-semibold ${toneClass}`}>{value}</div>
+      {sublabel ? (
+        <div className="mt-0.5 text-[10px] uppercase tracking-wider text-[color:var(--text-muted)]">
+          {sublabel}
+        </div>
+      ) : null}
     </div>
   );
 }

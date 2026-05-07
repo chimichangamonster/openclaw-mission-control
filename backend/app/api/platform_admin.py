@@ -10,6 +10,7 @@ Role separation:
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
@@ -27,6 +28,9 @@ from app.models.organization_members import OrganizationMember
 from app.models.organization_settings import OrganizationSettings
 from app.models.organizations import Organization
 from app.services.audit import log_audit
+from app.services.openclaw.gateway_resolver import gateway_client_config
+from app.services.openclaw.gateway_rpc import OpenClawGatewayError, openclaw_call
+from app.services.skill_drift import audit_skill_drift
 
 if TYPE_CHECKING:
     from sqlmodel.ext.asyncio.session import AsyncSession
@@ -397,6 +401,283 @@ async def org_readiness_check(
         "ready": passed == total,
         "checks": checks,
     }
+
+
+# ---------------------------------------------------------------------------
+# Cross-org failed-cron rollup (item 121)
+# ---------------------------------------------------------------------------
+
+
+def _parse_iso_timestamp(value: Any) -> datetime | None:
+    """Parse a gateway-emitted timestamp (ISO string or epoch ms) to UTC datetime."""
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        # Epoch milliseconds
+        return datetime.fromtimestamp(value / 1000, tz=UTC)
+    if isinstance(value, str):
+        try:
+            # Tolerate trailing 'Z'
+            return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    return None
+
+
+def _summarize_error(error: Any, max_length: int = 200) -> str:
+    """Truncate a gateway error string for UI display."""
+    if not error:
+        return ""
+    text = str(error).strip()
+    if len(text) <= max_length:
+        return text
+    return text[: max_length - 1] + "…"
+
+
+def _filter_failed_runs(
+    runs: list[dict[str, Any]], cutoff: datetime
+) -> list[dict[str, Any]]:
+    """Filter run records to failures that started after the cutoff.
+
+    Run record shape (from gateway cron.runs RPC, mirrored in /cron-jobs/page.tsx):
+    {run_id, status, started_at, finished_at, duration_ms, error}
+    Status "error" indicates failure; "success" / other are kept-out.
+    """
+    failures = []
+    for run in runs:
+        if not isinstance(run, dict):
+            continue
+        if run.get("status") != "error":
+            continue
+        started = _parse_iso_timestamp(run.get("started_at"))
+        if started is None or started < cutoff:
+            continue
+        failures.append(
+            {
+                "run_id": run.get("run_id", ""),
+                "started_at": run.get("started_at"),
+                "duration_ms": run.get("duration_ms"),
+                "error_summary": _summarize_error(run.get("error")),
+            }
+        )
+    return failures
+
+
+@router.get(
+    "/cron-failures",
+    summary="Cross-org failed-cron rollup (last N hours, owner-only)",
+)
+async def cron_failures_rollup(
+    hours: int = 24,
+    owner: User = OWNER_DEP,
+    session: AsyncSession = SESSION_DEP,
+) -> dict[str, Any]:
+    """Aggregate failed cron runs across all orgs in the last N hours.
+
+    Owner-only — failure context can include error messages with semi-sensitive
+    detail (paths, IDs, partial responses), so this stays out of the operator
+    permission tier.
+
+    Resilient: per-org RPC errors are logged and skipped; one bad gateway
+    cannot break the whole rollup.
+    """
+    hours = max(1, min(hours, 168))  # Clamp 1h..7d
+    cutoff = datetime.now(UTC) - timedelta(hours=hours)
+
+    # Load all orgs + settings + gateway in three queries.
+    orgs_result = await session.execute(select(Organization))
+    orgs = orgs_result.scalars().all()
+
+    by_org: list[dict[str, Any]] = []
+    total_failures = 0
+    orgs_skipped_no_flag = 0
+    orgs_skipped_no_gateway = 0
+    orgs_with_rpc_error = 0
+
+    for org in orgs:
+        # Feature-flag gate — skip orgs that don't have cron_jobs enabled.
+        settings_result = await session.execute(
+            select(OrganizationSettings).where(
+                OrganizationSettings.organization_id == org.id
+            )
+        )
+        org_settings = settings_result.scalars().first()
+        flags = org_settings.feature_flags if org_settings else {}
+        if not flags.get("cron_jobs"):
+            orgs_skipped_no_flag += 1
+            continue
+
+        # Resolve gateway. No gateway → skip silently (fresh org, not a failure).
+        gw_result = await session.execute(
+            select(Gateway).where(Gateway.organization_id == org.id).limit(1)
+        )
+        gateway = gw_result.scalars().first()
+        if not gateway or not gateway.url:
+            orgs_skipped_no_gateway += 1
+            continue
+
+        config = gateway_client_config(gateway)
+        org_id_str = str(org.id)
+
+        # Step 1: list cron jobs to know which IDs to query.
+        try:
+            jobs_result = await openclaw_call(
+                "cron.list", None, config=config, org_id=org_id_str
+            )
+        except OpenClawGatewayError as exc:
+            logger.warning(
+                "platform.cron_rollup.list_failed",
+                extra={"organization_id": org_id_str, "error": str(exc)},
+            )
+            orgs_with_rpc_error += 1
+            continue
+
+        if isinstance(jobs_result, dict) and "jobs" in jobs_result:
+            jobs = jobs_result["jobs"]
+        elif isinstance(jobs_result, list):
+            jobs = jobs_result
+        else:
+            jobs = []
+
+        # Step 2: for each job, query run history and filter to recent failures.
+        # Optimisation — skip jobs whose lastRunStatus isn't "error" AND whose
+        # last run was before the cutoff. Saves RPC round-trips on healthy orgs.
+        org_failures: list[dict[str, Any]] = []
+        for job in jobs:
+            if not isinstance(job, dict):
+                continue
+            state = job.get("state") or {}
+            last_status = state.get("lastRunStatus")
+            last_run_ms = state.get("lastRunAtMs")
+            last_run_dt = (
+                datetime.fromtimestamp(last_run_ms / 1000, tz=UTC)
+                if isinstance(last_run_ms, (int, float))
+                else None
+            )
+
+            # Cheap pre-filter — if last run was successful AND outside window,
+            # there can't be failures inside the window for this job.
+            if last_status != "error" and (last_run_dt is None or last_run_dt < cutoff):
+                continue
+
+            job_id = job.get("id", "")
+            if not job_id:
+                continue
+
+            try:
+                runs_result = await openclaw_call(
+                    "cron.runs", {"id": job_id}, config=config, org_id=org_id_str
+                )
+            except OpenClawGatewayError as exc:
+                logger.warning(
+                    "platform.cron_rollup.runs_failed",
+                    extra={
+                        "organization_id": org_id_str,
+                        "job_id": job_id,
+                        "error": str(exc),
+                    },
+                )
+                continue
+
+            if isinstance(runs_result, list):
+                runs = runs_result
+            elif isinstance(runs_result, dict) and "runs" in runs_result:
+                runs = runs_result["runs"]
+            else:
+                runs = []
+
+            failures = _filter_failed_runs(runs, cutoff)
+            for failure in failures:
+                org_failures.append(
+                    {
+                        **failure,
+                        "cron_id": job_id,
+                        "cron_name": job.get("name", ""),
+                    }
+                )
+
+        if org_failures:
+            # Sort newest first so most recent failures appear at top.
+            org_failures.sort(
+                key=lambda f: f.get("started_at") or "", reverse=True
+            )
+            total_failures += len(org_failures)
+            by_org.append(
+                {
+                    "org_id": str(org.id),
+                    "org_name": org.name,
+                    "slug": getattr(org, "slug", None),
+                    "failure_count": len(org_failures),
+                    "failures": org_failures,
+                }
+            )
+
+    # Sort orgs by failure count (most failures first) for "where is the fire?" UX.
+    by_org.sort(key=lambda o: o["failure_count"], reverse=True)
+
+    await log_audit(
+        org_id=orgs[0].id if orgs else UUID(int=0),
+        action="platform.cron_failures_rollup",
+        user_id=owner.id,
+        details={
+            "hours": hours,
+            "total_failures": total_failures,
+            "orgs_with_failures": len(by_org),
+            "orgs_skipped_no_flag": orgs_skipped_no_flag,
+            "orgs_skipped_no_gateway": orgs_skipped_no_gateway,
+            "orgs_with_rpc_error": orgs_with_rpc_error,
+        },
+    )
+
+    return {
+        "hours": hours,
+        "since": cutoff.isoformat(),
+        "total_failures": total_failures,
+        "orgs_with_failures": len(by_org),
+        "orgs_with_rpc_error": orgs_with_rpc_error,
+        "by_org": by_org,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Skill-drift audit (item 120 Tier 1)
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/skill-drift",
+    summary="Skill registry-vs-deploy drift audit (owner-only)",
+)
+async def skill_drift(
+    owner: User = OWNER_DEP,
+) -> dict[str, Any]:
+    """Compare gateways/registry.yml against the actual skills deployed on disk.
+
+    Server-side equivalent of `scripts/audit-shared-skills.sh`. Reads three
+    substrates (registry file, shared-skills dir, gateway workspaces dir) via
+    volume mounts. If any substrate is unreachable, the response includes a
+    per-source `available: false` flag and that side contributes empty sets
+    to the drift computation — the endpoint never 500s on missing dirs.
+
+    Owner-only because skill names can leak operational detail (e.g. an
+    org_skill named `bedroom-tscm-baseline` reveals an active engagement).
+    Counts alone could be operator-tier, but mixing counts and detail in one
+    response is simpler than splitting.
+    """
+    result = audit_skill_drift()
+
+    await log_audit(
+        org_id=UUID(int=0),
+        action="platform.skill_drift_audit",
+        user_id=owner.id,
+        details={
+            "available": result["available"],
+            "total_drift": result["total_drift"],
+            "total_orphan": result["total_orphan"],
+        },
+    )
+
+    return result
 
 
 # ---------------------------------------------------------------------------
