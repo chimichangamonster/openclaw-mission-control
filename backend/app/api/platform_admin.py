@@ -28,6 +28,7 @@ from app.models.organization_members import OrganizationMember
 from app.models.organization_settings import OrganizationSettings
 from app.models.organizations import Organization
 from app.services.audit import log_audit
+from app.services.infra_health import check_infra_health
 from app.services.openclaw.gateway_resolver import gateway_client_config
 from app.services.openclaw.gateway_rpc import OpenClawGatewayError, openclaw_call
 from app.services.skill_drift import audit_skill_drift
@@ -89,7 +90,10 @@ async def list_all_orgs(
         org_id=orgs[0].id if orgs else UUID(int=0),
         action="platform.list_orgs",
         user_id=admin.id,
-        details={"org_count": len(org_list), "role": getattr(admin, "platform_role", None)},
+        details={
+            "org_count": len(org_list),
+            "role": getattr(admin, "platform_role", None),
+        },
     )
 
     return org_list
@@ -203,7 +207,14 @@ async def get_org_settings(
         user_id=owner.id,
         resource_type="organization_settings",
         resource_id=settings.id,
-        details={"accessed_fields": ["feature_flags", "data_policy", "model_config", "key_status"]},
+        details={
+            "accessed_fields": [
+                "feature_flags",
+                "data_policy",
+                "model_config",
+                "key_status",
+            ]
+        },
     )
 
     return {
@@ -292,7 +303,11 @@ async def org_readiness_check(
         select(OrganizationSettings).where(OrganizationSettings.organization_id == org_id)
     )
     org_settings = settings_result.scalars().first()
-    add("org_settings_exist", org_settings is not None, "OrganizationSettings row exists")
+    add(
+        "org_settings_exist",
+        org_settings is not None,
+        "OrganizationSettings row exists",
+    )
 
     # 2. Feature flags configured (at least one enabled)
     if org_settings:
@@ -434,9 +449,7 @@ def _summarize_error(error: Any, max_length: int = 200) -> str:
     return text[: max_length - 1] + "…"
 
 
-def _filter_failed_runs(
-    runs: list[dict[str, Any]], cutoff: datetime
-) -> list[dict[str, Any]]:
+def _filter_failed_runs(runs: list[dict[str, Any]], cutoff: datetime) -> list[dict[str, Any]]:
     """Filter run records to failures that started after the cutoff.
 
     Run record shape (from gateway cron.runs RPC, mirrored in /cron-jobs/page.tsx):
@@ -497,9 +510,7 @@ async def cron_failures_rollup(
     for org in orgs:
         # Feature-flag gate — skip orgs that don't have cron_jobs enabled.
         settings_result = await session.execute(
-            select(OrganizationSettings).where(
-                OrganizationSettings.organization_id == org.id
-            )
+            select(OrganizationSettings).where(OrganizationSettings.organization_id == org.id)
         )
         org_settings = settings_result.scalars().first()
         flags = org_settings.feature_flags if org_settings else {}
@@ -521,9 +532,7 @@ async def cron_failures_rollup(
 
         # Step 1: list cron jobs to know which IDs to query.
         try:
-            jobs_result = await openclaw_call(
-                "cron.list", None, config=config, org_id=org_id_str
-            )
+            jobs_result = await openclaw_call("cron.list", None, config=config, org_id=org_id_str)
         except OpenClawGatewayError as exc:
             logger.warning(
                 "platform.cron_rollup.list_failed",
@@ -598,9 +607,7 @@ async def cron_failures_rollup(
 
         if org_failures:
             # Sort newest first so most recent failures appear at top.
-            org_failures.sort(
-                key=lambda f: f.get("started_at") or "", reverse=True
-            )
+            org_failures.sort(key=lambda f: f.get("started_at") or "", reverse=True)
             total_failures += len(org_failures)
             by_org.append(
                 {
@@ -674,6 +681,43 @@ async def skill_drift(
             "available": result["available"],
             "total_drift": result["total_drift"],
             "total_orphan": result["total_orphan"],
+        },
+    )
+
+    return result
+
+
+@router.get(
+    "/infra-health",
+    summary="Infrastructure health: backup + Loki + ClickHouse storage canaries (owner-only)",
+)
+async def infra_health(
+    owner: User = OWNER_DEP,
+) -> dict[str, Any]:
+    """Three-canary infrastructure health check for the /platform page.
+
+    - Backup: scans /app/backups for newest mc_backup_*.sql.gz, classifies by age
+      (<26h healthy, ≥26h stale, none missing) and reports size + checksum-pair.
+    - Loki: queries log-ingestion timestamp + 24h event count. Stale at >10min.
+    - ClickHouse: total bytes + per-table top 10 + dominance check (replays the
+      2026-05-07 incident shape — single system.text_log table eating the host).
+
+    Each substrate runs independently. One failing canary doesn't 500 the others;
+    callers see status="error" with a message. Owner-only because the response
+    includes raw infra metrics (table sizes, backup filenames, log volume) that
+    operators don't need.
+    """
+    result = check_infra_health()
+
+    await log_audit(
+        org_id=UUID(int=0),
+        action="platform.infra_health_check",
+        user_id=owner.id,
+        details={
+            "overall_status": result["overall_status"],
+            "backup_status": result["backup"]["status"],
+            "loki_status": result["loki"]["status"],
+            "clickhouse_status": result["clickhouse"]["status"],
         },
     )
 

@@ -97,6 +97,52 @@ type SkillDriftResponse = {
   };
 };
 
+type InfraStatus = "healthy" | "stale" | "amber" | "missing" | "red" | "error";
+
+type BackupHealth = {
+  status: InfraStatus;
+  newest_backup?: string;
+  newest_backup_at?: string;
+  age_hours?: number;
+  size_bytes?: number;
+  has_checksum?: boolean;
+  backup_count?: number;
+  message?: string;
+  backup_dir?: string;
+};
+
+type LokiHealth = {
+  status: InfraStatus;
+  last_event_at: string | null;
+  last_event_age_seconds: number | null;
+  events_24h: number;
+  message?: string;
+};
+
+type ClickHouseTable = {
+  database: string;
+  table: string;
+  bytes: number;
+  rows: number;
+};
+
+type ClickHouseHealth = {
+  status: InfraStatus;
+  total_bytes: number;
+  table_count?: number;
+  tables: ClickHouseTable[];
+  reason?: string | null;
+  message?: string;
+};
+
+type InfraHealthResponse = {
+  overall_status: InfraStatus;
+  backup: BackupHealth;
+  loki: LokiHealth;
+  clickhouse: ClickHouseHealth;
+  checked_at: string;
+};
+
 const READINESS_LABELS: Record<string, string> = {
   org_settings_exist: "Org settings exist",
   feature_flags_set: "Feature flags configured",
@@ -188,12 +234,26 @@ export default function PlatformOwnerPage() {
     retry: false,
   });
 
+  const infraHealthQuery = useQuery<InfraHealthResponse>({
+    queryKey: ["/api/v1/platform/infra-health"],
+    queryFn: async () => {
+      const res = (await customFetch("/api/v1/platform/infra-health", {
+        method: "GET",
+      })) as { data?: InfraHealthResponse } | InfraHealthResponse;
+      return ("data" in res ? res.data : res) as InfraHealthResponse;
+    },
+    enabled: Boolean(isSignedIn) && isPlatformOwner,
+    refetchOnMount: "always",
+    retry: false,
+  });
+
   const refetchAll = () => {
     void orgsQuery.refetch();
     readinessQueries.forEach((q) => void q.refetch());
     healthQueries.forEach((q) => void q.refetch());
     void cronFailuresQuery.refetch();
     void skillDriftQuery.refetch();
+    void infraHealthQuery.refetch();
   };
 
   const attentionRows = orgs
@@ -427,6 +487,79 @@ export default function PlatformOwnerPage() {
           )}
         </section>
 
+        {/* Infrastructure health (item 123) */}
+        <section>
+          <div className="mb-3 flex items-center gap-2">
+            <CheckCircle2
+              className={`h-4 w-4 ${infraToneIcon(infraHealthQuery.data?.overall_status)}`}
+            />
+            <h2 className="font-heading text-lg font-semibold text-[color:var(--text)]">
+              Infrastructure health
+            </h2>
+            {infraHealthQuery.data ? (
+              <span className="text-xs text-[color:var(--text-muted)]">
+                checked{" "}
+                {new Date(infraHealthQuery.data.checked_at).toLocaleTimeString()}
+              </span>
+            ) : null}
+          </div>
+          {infraHealthQuery.isError ? (
+            <ErrorPanel message="Failed to load infrastructure health." />
+          ) : !infraHealthQuery.data && infraHealthQuery.isLoading ? (
+            <div className="rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)] p-4 text-sm text-[color:var(--text-muted)]">
+              Loading…
+            </div>
+          ) : infraHealthQuery.data ? (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <InfraCard
+                title="Backup"
+                status={infraHealthQuery.data.backup.status}
+                primary={
+                  infraHealthQuery.data.backup.age_hours !== undefined
+                    ? `${infraHealthQuery.data.backup.age_hours}h ago`
+                    : infraHealthQuery.data.backup.message ?? "—"
+                }
+                detail={
+                  infraHealthQuery.data.backup.newest_backup
+                    ? `${infraHealthQuery.data.backup.newest_backup} • ${formatBytes(
+                        infraHealthQuery.data.backup.size_bytes ?? 0,
+                      )}${
+                        infraHealthQuery.data.backup.has_checksum === false
+                          ? " • no checksum"
+                          : ""
+                      }`
+                    : undefined
+                }
+              />
+              <InfraCard
+                title="Loki ingestion"
+                status={infraHealthQuery.data.loki.status}
+                primary={
+                  infraHealthQuery.data.loki.last_event_age_seconds !== null
+                    ? `${formatAge(
+                        infraHealthQuery.data.loki.last_event_age_seconds,
+                      )} ago`
+                    : infraHealthQuery.data.loki.message ?? "no events"
+                }
+                detail={`${infraHealthQuery.data.loki.events_24h.toLocaleString()} events / 24h`}
+              />
+              <InfraCard
+                title="ClickHouse storage"
+                status={infraHealthQuery.data.clickhouse.status}
+                primary={formatBytes(infraHealthQuery.data.clickhouse.total_bytes)}
+                detail={
+                  infraHealthQuery.data.clickhouse.reason ??
+                  (infraHealthQuery.data.clickhouse.tables[0]
+                    ? `largest: ${infraHealthQuery.data.clickhouse.tables[0].database}.${infraHealthQuery.data.clickhouse.tables[0].table} (${formatBytes(
+                        infraHealthQuery.data.clickhouse.tables[0].bytes,
+                      )})`
+                    : "no active parts")
+                }
+              />
+            </div>
+          ) : null}
+        </section>
+
         {/* Org table */}
         <section>
           <h2 className="mb-3 font-heading text-lg font-semibold text-[color:var(--text)]">
@@ -527,7 +660,6 @@ export default function PlatformOwnerPage() {
           <ul className="list-inside list-disc space-y-1">
             <li>Skill-drift detail page (item 120 Tier 2 — Tier 1 stat card shipped)</li>
             <li>Per-org budget burn and circuit-breaker status (item 122)</li>
-            <li>Backup health and Loki ingestion alerts (item 123)</li>
             <li>Cross-org audit feed (owner-only, item 124 — gated on 2nd platform-admin user)</li>
           </ul>
         </section>
@@ -574,4 +706,75 @@ function ErrorPanel({ message }: { message: string }) {
       {message}
     </div>
   );
+}
+
+function InfraCard({
+  title,
+  status,
+  primary,
+  detail,
+}: {
+  title: string;
+  status: InfraStatus;
+  primary: string;
+  detail?: string;
+}) {
+  const accent =
+    status === "healthy"
+      ? "border-emerald-300"
+      : status === "stale" || status === "amber"
+        ? "border-amber-300"
+        : status === "missing" || status === "red" || status === "error"
+          ? "border-rose-300"
+          : "border-[color:var(--border)]";
+  const tone =
+    status === "healthy"
+      ? "text-emerald-700"
+      : status === "stale" || status === "amber"
+        ? "text-amber-700"
+        : status === "missing" || status === "red" || status === "error"
+          ? "text-rose-700"
+          : "text-[color:var(--text)]";
+  return (
+    <div
+      className={`rounded-xl border ${accent} bg-[color:var(--surface)] p-4`}
+    >
+      <div className="flex items-baseline justify-between">
+        <div className="text-xs uppercase tracking-wider text-[color:var(--text-muted)]">
+          {title}
+        </div>
+        <div className={`text-xs font-semibold uppercase ${tone}`}>{status}</div>
+      </div>
+      <div className={`mt-1 text-xl font-semibold ${tone}`}>{primary}</div>
+      {detail ? (
+        <div className="mt-1 text-xs text-[color:var(--text-muted)]">
+          {detail}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function infraToneIcon(status: InfraStatus | undefined): string {
+  if (!status) return "text-[color:var(--text-muted)]";
+  if (status === "healthy") return "text-emerald-500";
+  if (status === "stale" || status === "amber") return "text-amber-500";
+  return "text-rose-500";
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return "0 B";
+  const units = ["B", "KiB", "MiB", "GiB", "TiB"];
+  const idx = Math.min(
+    units.length - 1,
+    Math.floor(Math.log(bytes) / Math.log(1024)),
+  );
+  return `${(bytes / Math.pow(1024, idx)).toFixed(idx === 0 ? 0 : 2)} ${units[idx]}`;
+}
+
+function formatAge(seconds: number): string {
+  if (seconds < 60) return `${Math.round(seconds)}s`;
+  if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
+  if (seconds < 86400) return `${(seconds / 3600).toFixed(1)}h`;
+  return `${(seconds / 86400).toFixed(1)}d`;
 }
