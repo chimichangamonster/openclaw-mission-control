@@ -407,7 +407,7 @@ async def _check_thresholds(
     # Send alerts and persist to error tracker
     for alert in alerts:
         await _send_discord_alert(gw_config, alert)
-        await track_error("budget", alert[:500], severity="warning")
+        await track_error("budget", alert[:500], severity="warning", organization_id=org_id)
 
     # Persist updated thresholds
     if alerts:

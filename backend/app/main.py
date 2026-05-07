@@ -882,62 +882,17 @@ async def system_health() -> Any:
         issues.append(f"{error_count_1h} errors in last hour")
 
     # ── Cron Health (per-org gateway scan) ─────────────────────────────────
-    # Walks both per-org workspaces (GATEWAY_WORKSPACES_ROOT/*/​.openclaw/cron/jobs.json)
-    # and the legacy single-tenant fallback path. Aggregates failed counts across
-    # all gateways. The previous implementation only checked the legacy path and
-    # always returned status: "unknown" once per-org gateways shipped.
+    # Disabled jobs are excluded from the failed count — see
+    # app.services.cron_health for the rationale (operator-disabled crons
+    # carrying stale `lastRunStatus: error` would otherwise pin /system/health
+    # to degraded forever).
     cron_failed = 0
-    cron_total = 0
-    cron_gateways_scanned = 0
     try:
-        import json
-        import os
-        from pathlib import Path
+        from app.services.cron_health import scan_cron_health
 
-        candidate_files: list[Path] = []
-
-        workspaces_root = os.environ.get("GATEWAY_WORKSPACES_ROOT")
-        if workspaces_root:
-            root = Path(workspaces_root)
-            if root.exists():
-                for org_dir in root.iterdir():
-                    if not org_dir.is_dir():
-                        continue
-                    jobs_file = org_dir / ".openclaw" / "cron" / "jobs.json"
-                    if jobs_file.exists():
-                        candidate_files.append(jobs_file)
-
-        # Legacy single-tenant fallback retired 2026-04-11. Per-org gateways
-        # are the only source of truth — falling back to /app/gateway-cron was
-        # double-counting Personal org cron jobs (phantom failures).
-        for jobs_path in candidate_files:
-            try:
-                data = json.loads(jobs_path.read_text())
-                jobs = data["jobs"] if isinstance(data, dict) and "jobs" in data else data
-                if not isinstance(jobs, list):
-                    continue
-                cron_gateways_scanned += 1
-                cron_total += len(jobs)
-                for job in jobs:
-                    raw_state = job.get("state") if isinstance(job, dict) else None
-                    job_state: dict[str, Any] = raw_state if isinstance(raw_state, dict) else {}
-                    last_status = job_state.get("lastRunStatus") or (
-                        job.get("last_status") if isinstance(job, dict) else None
-                    )
-                    if last_status in ("error", "failed"):
-                        cron_failed += 1
-            except (json.JSONDecodeError, OSError):
-                continue
-
-        if cron_gateways_scanned == 0:
-            components["cron_jobs"] = {"status": "no_data"}
-        else:
-            components["cron_jobs"] = {
-                "status": "ok" if cron_failed == 0 else "failing",
-                "failed": cron_failed,
-                "total": cron_total,
-                "gateways_scanned": cron_gateways_scanned,
-            }
+        cron_result = scan_cron_health()
+        components["cron_jobs"] = cron_result
+        cron_failed = cron_result.get("failed", 0)
     except Exception as exc:
         components["cron_jobs"] = {"status": "unknown", "error": str(exc)[:100]}
 

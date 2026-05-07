@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import text
@@ -66,11 +67,13 @@ async def check_stale_cron_tasks() -> None:
     async with async_session_maker() as session:
         result = await session.execute(
             text(
-                "SELECT id, title, board_id, in_progress_at, created_at "
-                "FROM tasks "
-                "WHERE status = 'in_progress' "
-                "AND created_at < :cutoff "
-                "ORDER BY created_at DESC "
+                "SELECT t.id, t.title, t.board_id, t.in_progress_at, t.created_at, "
+                "       b.organization_id "
+                "FROM tasks t "
+                "LEFT JOIN boards b ON b.id = t.board_id "
+                "WHERE t.status = 'in_progress' "
+                "AND t.created_at < :cutoff "
+                "ORDER BY t.created_at DESC "
                 "LIMIT 20"
             ),
             {"cutoff": cutoff},
@@ -81,14 +84,15 @@ async def check_stale_cron_tasks() -> None:
         return
 
     # Filter to cron-created tasks (match by title prefix)
-    cron_stale = []
+    cron_stale: list[tuple[UUID, str, Any, UUID | None]] = []
     for row in stale_tasks:
-        task_id, title, board_id, in_progress_at, created_at = row
+        task_id, title, board_id, in_progress_at, created_at, org_id = row
         task_uuid = UUID(str(task_id))
         if task_uuid in _alerted_task_ids:
             continue
         if any(title.startswith(prefix) for prefix in CRON_TASK_PREFIXES):
-            cron_stale.append((task_uuid, title, created_at))
+            org_uuid = UUID(str(org_id)) if org_id is not None else None
+            cron_stale.append((task_uuid, title, created_at, org_uuid))
 
     if not cron_stale:
         return
@@ -98,7 +102,7 @@ async def check_stale_cron_tasks() -> None:
         logger.warning("cron_watchdog.no_gateway_config")
         return
 
-    for task_uuid, title, created_at in cron_stale:
+    for task_uuid, title, created_at, org_uuid in cron_stale:
         age_min = int((now - created_at).total_seconds() / 60)
         alert_msg = (
             f"**CRON WATCHDOG — Stale Task Detected**\n"
@@ -112,6 +116,7 @@ async def check_stale_cron_tasks() -> None:
             "cron_watchdog",
             f"Stale cron task: {title} (created {created_at.isoformat()}, {age_min}min old)",
             severity="warning",
+            organization_id=org_uuid,
         )
         _alerted_task_ids.add(task_uuid)
         logger.info(

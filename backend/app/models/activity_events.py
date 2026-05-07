@@ -24,4 +24,9 @@ class ActivityEvent(QueryModel, table=True):
     agent_id: UUID | None = Field(default=None, foreign_key="agents.id", index=True)
     task_id: UUID | None = Field(default=None, foreign_key="tasks.id", index=True)
     board_id: UUID | None = Field(default=None, foreign_key="boards.id", index=True)
+    organization_id: UUID | None = Field(
+        default=None,
+        foreign_key="organizations.id",
+        index=True,
+    )
     created_at: datetime = Field(default_factory=utcnow)

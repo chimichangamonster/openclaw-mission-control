@@ -29,6 +29,11 @@ from app.models.budget import BudgetConfig, DailyAgentSpend
 from app.services.organizations import OrganizationContext
 
 logger = get_logger(__name__)
+
+# Capture role-factory output at module load so test-override lookups by key match.
+# See feedback_capture_factory_deps_for_test_override.md.
+require_org_admin = require_org_role("admin")
+
 router = APIRouter(
     prefix="/cost-tracker",
     tags=["cost-tracker"],
@@ -665,17 +670,30 @@ async def get_agent_spend(
     }
 
 
-@router.get("/errors", dependencies=[ORG_MEMBER_DEP])
+@router.get("/errors")
 async def get_error_log(
     limit: int = Query(20, description="Max errors to return"),
+    org_ctx: OrganizationContext = Depends(require_org_member),
 ) -> Any:
-    """Get recent system errors from activity events."""
-    from sqlalchemy import desc as sa_desc
+    """Get recent system errors from activity events.
 
+    Returns errors scoped to the current org PLUS truly platform-wide errors
+    (organization_id IS NULL — circuit breaker trips, HTTP middleware, etc.).
+    Org A never sees Org B's per-org errors (budget overage, cron watchdog).
+    """
+    from sqlalchemy import desc as sa_desc, or_
+
+    org_id = org_ctx.organization.id
     async with async_session_maker() as session:
         stmt = (
             select(ActivityEvent)
-            .where(ActivityEvent.event_type.startswith("system.error"))
+            .where(
+                ActivityEvent.event_type.startswith("system.error"),
+                or_(
+                    ActivityEvent.organization_id == org_id,
+                    ActivityEvent.organization_id.is_(None),  # type: ignore[union-attr]
+                ),
+            )
             .order_by(sa_desc(ActivityEvent.created_at))  # type: ignore[arg-type]
             .limit(min(limit, 100))
         )
@@ -688,19 +706,31 @@ async def get_error_log(
             "event_type": r.event_type,
             "message": r.message,
             "created_at": r.created_at.isoformat() if r.created_at else None,
+            "organization_id": str(r.organization_id) if r.organization_id else None,
         }
         for r in rows
     ]
 
 
-@router.delete("/errors", dependencies=[Depends(require_org_role("admin"))])
-async def clear_error_log() -> Any:
-    """Clear all system error events. Requires admin role."""
+@router.delete("/errors")
+async def clear_error_log(
+    org_ctx: OrganizationContext = Depends(require_org_admin),
+) -> Any:
+    """Clear system error events scoped to the current org.
+
+    Admins can only wipe THEIR OWN org's errors. Platform-wide entries
+    (organization_id IS NULL — circuit breaker trips, HTTP middleware) are
+    deliberately not deleted: they're shared across all orgs, and one org's
+    admin shouldn't be able to hide them from other orgs' admins. They age
+    out via the data-retention service (90-day default).
+    """
     from sqlalchemy import delete as sa_delete
 
+    org_id = org_ctx.organization.id
     async with async_session_maker() as session:
         stmt = sa_delete(ActivityEvent).where(
-            ActivityEvent.event_type.startswith("system.error")  # type: ignore[arg-type]
+            ActivityEvent.event_type.startswith("system.error"),  # type: ignore[arg-type]
+            ActivityEvent.organization_id == org_id,
         )
         result = await session.execute(stmt)
         await session.commit()

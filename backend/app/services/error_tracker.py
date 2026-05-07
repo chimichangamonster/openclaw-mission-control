@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from app.core.logging import get_logger
 from app.core.time import utcnow
@@ -20,6 +20,7 @@ async def track_error(
     message: str,
     *,
     severity: str = "error",
+    organization_id: UUID | None = None,
 ) -> None:
     """Persist an error event to the activity_events table.
 
@@ -27,6 +28,11 @@ async def track_error(
         source: Component that produced the error (e.g., "openrouter", "gateway_rpc", "cron")
         message: Human-readable error description
         severity: "error" or "warning"
+        organization_id: When the error is attributable to a single org's
+            workload (budget exceeded, per-org cron watchdog, etc.), pass the
+            org id so it shows only on that org's Error Log. Leave ``None`` for
+            genuinely platform-wide errors (circuit breaker trips, HTTP 5xx
+            from middleware) — those are visible to every org's admins.
     """
     event_type = f"{ERROR_PREFIX}.{source}"
     full_message = f"[{severity.upper()}] {message}"
@@ -37,6 +43,7 @@ async def track_error(
                 id=uuid4(),
                 event_type=event_type,
                 message=full_message[:1000],  # Truncate to avoid DB bloat
+                organization_id=organization_id,
                 created_at=utcnow(),
             )
             session.add(event)
