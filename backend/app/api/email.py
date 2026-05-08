@@ -12,7 +12,7 @@ from sqlalchemy import func, or_, select
 from app.api.deps import ORG_MEMBER_DEP, ORG_RATE_LIMIT_DEP, SESSION_DEP, require_feature
 from app.core.logging import get_logger
 from app.core.redact import RedactionLevel, redact_email_content
-from app.core.sanitize import sanitize_text
+from app.core.sanitize import sanitize_for_display
 from app.core.time import utcnow
 from app.models.email_accounts import EmailAccount
 from app.models.email_attachments import EmailAttachment
@@ -299,7 +299,7 @@ async def list_all_email_messages(
     result = await session.execute(stmt)
     messages = list(result.scalars().all())
     for msg in messages:
-        msg.body_text = sanitize_text(msg.body_text)
+        msg.body_text = sanitize_for_display(msg.body_text)
     return messages
 
 
@@ -347,7 +347,7 @@ async def list_email_messages(
     result = await session.execute(stmt)
     messages = list(result.scalars().all())
     for msg in messages:
-        msg.body_text = sanitize_text(msg.body_text)
+        msg.body_text = sanitize_for_display(msg.body_text)
     return messages
 
 
@@ -361,8 +361,8 @@ async def get_email_message(
     """Get a single email message with full body."""
     account = await _get_account_or_404(account_id, ctx, session)
     msg = await _get_message_or_404(message_id, account, session)
-    msg.body_text = sanitize_text(msg.body_text)
-    msg.body_html = sanitize_text(msg.body_html)
+    msg.body_text = sanitize_for_display(msg.body_text)
+    msg.body_html = sanitize_for_display(msg.body_html)
     text, html, _, _ = redact_email_content(
         msg.body_text, msg.body_html, level=RedactionLevel.MODERATE
     )
@@ -954,6 +954,97 @@ async def download_email_attachment(
         media_type=content_type,
         headers={
             "Content-Disposition": f'{disposition}; filename="{att.filename or filename}"',
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+@router.get("/accounts/{account_id}/messages/{message_id}/attachments/download-all")
+async def download_all_email_attachments(
+    account_id: UUID,
+    message_id: UUID,
+    ctx: OrganizationContext = ORG_MEMBER_DEP,
+    session: AsyncSession = SESSION_DEP,
+) -> Response:
+    """Download all non-inline attachments for a message as a single zip.
+
+    Inline attachments (signature logos, embedded images) are filtered out —
+    they're not what users mean by "attachments" and including them clutters
+    the zip. Filename collisions disambiguate as `name.ext`, `name (2).ext`.
+    """
+    from app.services.email.zip_builder import build_attachments_zip, build_zip_filename
+
+    account = await _get_account_or_404(account_id, ctx, session)
+    msg = await _get_message_or_404(message_id, account, session)
+
+    stmt = (
+        select(EmailAttachment)
+        .where(
+            EmailAttachment.email_message_id == msg.id,  # type: ignore[arg-type]
+            or_(
+                EmailAttachment.is_inline.is_(False),  # type: ignore[union-attr]
+                EmailAttachment.is_inline.is_(None),  # type: ignore[union-attr]
+            ),
+        )
+        .order_by(EmailAttachment.created_at)  # type: ignore[arg-type]
+    )
+    result = await session.execute(stmt)
+    attachments = list(result.scalars().all())
+
+    if not attachments:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No downloadable attachments on this message",
+        )
+
+    access_token = await get_valid_access_token(session, account)
+
+    items: list[tuple[str, bytes]] = []
+    for att in attachments:
+        if account.provider == "zoho":
+            from app.services.email.providers.zoho import (
+                download_attachment as zoho_download_attachment,
+            )
+
+            content, fallback_name, _ = await zoho_download_attachment(
+                access_token,
+                account.provider_account_id or "",
+                msg.provider_message_id,
+                att.provider_attachment_id or "",
+            )
+        elif account.provider == "microsoft":
+            from app.services.email.providers.microsoft import (
+                download_attachment as msft_download_attachment,
+            )
+
+            content, fallback_name, _ = await msft_download_attachment(
+                access_token,
+                msg.provider_message_id,
+                att.provider_attachment_id or "",
+            )
+        elif account.provider == "google":
+            from app.services.email.providers.google import (
+                download_attachment as google_download_attachment,
+            )
+
+            content, fallback_name, _ = await google_download_attachment(
+                access_token,
+                msg.provider_message_id,
+                att.provider_attachment_id or "",
+            )
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported provider")
+
+        items.append((att.filename or fallback_name, content))
+
+    zip_bytes = build_attachments_zip(items)
+    filename = build_zip_filename(str(msg.id))
+
+    return Response(
+        content=zip_bytes,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
             "X-Content-Type-Options": "nosniff",
         },
     )

@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import base64
 from email import message_from_bytes, policy
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
@@ -329,6 +329,23 @@ def _make_account(provider: str = "google") -> EmailAccount:
     )
 
 
+def _make_session_no_signature() -> AsyncMock:
+    """Mock session whose execute() returns 'no default signature found'.
+
+    send_email() calls resolve_signature() which does
+        result = await session.execute(stmt)
+        return result.scalars().first()
+    A bare AsyncMock(session) makes scalars() return a coroutine; this helper
+    returns a session whose execute() yields a sync Result-shaped MagicMock so
+    .scalars().first() resolves to None.
+    """
+    session = AsyncMock()
+    fake_result = MagicMock()
+    fake_result.scalars.return_value.first.return_value = None
+    session.execute = AsyncMock(return_value=fake_result)
+    return session
+
+
 @pytest.mark.asyncio
 async def test_email_send_dispatch_routes_google_to_gmail_module():
     """services.email_send.send_email should dispatch google to gmail send."""
@@ -347,7 +364,7 @@ async def test_email_send_dispatch_routes_google_to_gmail_module():
         ),
     ):
         result = await send_module.send_email(
-            session=AsyncMock(),
+            session=_make_session_no_signature(),
             account=account,
             to="client@example.com",
             subject="Hi",
@@ -376,7 +393,7 @@ async def test_email_send_dispatch_uses_bare_address_when_no_display_name():
         patch("app.services.email.providers.google.send_message", fake_send),
     ):
         await send_module.send_email(
-            session=AsyncMock(),
+            session=_make_session_no_signature(),
             account=account,
             to="c@e.com",
             subject="s",

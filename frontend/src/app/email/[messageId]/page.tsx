@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { inferPreviewMimeType, isImage, isPreviewable } from "@/lib/email-preview";
 
 /* ── Triage color maps (shared with list page) ── */
 
@@ -64,6 +65,7 @@ import {
   fetchEmailAttachments,
   fetchAttachmentBlob,
   downloadEmailAttachment,
+  downloadAllEmailAttachments,
   archiveEmail,
   replyToEmail,
   updateEmailMessage,
@@ -87,6 +89,7 @@ export default function EmailMessagePage() {
   const [previewAtt, setPreviewAtt] = useState<EmailAttachment | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [downloadingAll, setDownloadingAll] = useState(false);
   // Lazy-loaded blob URLs keyed by attachment id, used for inline image thumbnails
   // rendered below the body (Gmail/Outlook-style auto-preview).
   const [thumbUrls, setThumbUrls] = useState<Record<string, string>>({});
@@ -161,23 +164,8 @@ export default function EmailMessagePage() {
     };
   }, [attachments, accountId, messageId]);
 
-  const isPreviewable = (att: EmailAttachment) => {
-    const ct = att.content_type?.toLowerCase() ?? "";
-    const fn = att.filename.toLowerCase();
-    return (
-      ct.startsWith("image/") ||
-      ct === "application/pdf" ||
-      fn.endsWith(".pdf") ||
-      fn.endsWith(".jpg") || fn.endsWith(".jpeg") || fn.endsWith(".png") ||
-      fn.endsWith(".gif") || fn.endsWith(".webp")
-    );
-  };
-
-  const isImage = (att: EmailAttachment) => {
-    const ct = att.content_type?.toLowerCase() ?? "";
-    const fn = att.filename.toLowerCase();
-    return ct.startsWith("image/") || /\.(jpg|jpeg|png|gif|webp|svg)$/.test(fn);
-  };
+  // Previewability + MIME inference live in @/lib/email-preview (unit-tested).
+  // Tier A formats (item 131c): images + PDF + text/* + JSON/XML/CSV/MD/YAML/LOG/HTML.
 
   const getFileIcon = (att: EmailAttachment) => {
     const fn = att.filename.toLowerCase();
@@ -204,17 +192,8 @@ export default function EmailMessagePage() {
     setPreviewAtt(att);
     setPreviewLoading(true);
     try {
-      // Resolve a stable MIME type from the attachment metadata (or filename
-      // extension fallback) so the blob renders correctly in <iframe>/<img>.
-      const fn = (att.filename || "").toLowerCase();
-      const inferredType =
-        att.content_type ||
-        (fn.endsWith(".pdf") ? "application/pdf" :
-         fn.endsWith(".png") ? "image/png" :
-         fn.endsWith(".gif") ? "image/gif" :
-         fn.endsWith(".webp") ? "image/webp" :
-         (fn.endsWith(".jpg") || fn.endsWith(".jpeg")) ? "image/jpeg" :
-         null);
+      // Resolve a stable MIME type so the blob renders correctly in <iframe>/<img>.
+      const inferredType = att.content_type || inferPreviewMimeType(att.filename || "");
       const url = await fetchAttachmentBlob(accountId, messageId, att.id, {
         contentType: inferredType,
         disposition: "inline",
@@ -462,9 +441,32 @@ export default function EmailMessagePage() {
           {/* Attachments */}
           {attachments.length > 0 && (
             <div className="rounded-xl border border-slate-200 bg-white p-4">
-              <div className="mb-3 flex items-center gap-2 text-sm font-medium text-slate-700">
-                <Paperclip className="h-4 w-4" />
-                {attachments.length} attachment{attachments.length > 1 ? "s" : ""}
+              <div className="mb-3 flex items-center justify-between gap-2 text-sm font-medium text-slate-700">
+                <div className="flex items-center gap-2">
+                  <Paperclip className="h-4 w-4" />
+                  {attachments.length} attachment{attachments.length > 1 ? "s" : ""}
+                </div>
+                {attachments.length >= 2 && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setDownloadingAll(true);
+                      try {
+                        await downloadAllEmailAttachments(accountId, messageId);
+                      } catch (err) {
+                        console.error("Failed to download all attachments", err);
+                      } finally {
+                        setDownloadingAll(false);
+                      }
+                    }}
+                    disabled={downloadingAll}
+                    className="flex items-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1 text-xs text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    title="Download all attachments as a zip"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    {downloadingAll ? "Zipping…" : "Download all"}
+                  </button>
+                )}
               </div>
               <div className="flex flex-wrap gap-2">
                 {attachments.map((att) => {

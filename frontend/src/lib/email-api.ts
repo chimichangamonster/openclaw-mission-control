@@ -371,6 +371,40 @@ export async function downloadEmailAttachment(
   URL.revokeObjectURL(blobUrl);
 }
 
+export async function downloadAllEmailAttachments(
+  accountId: string,
+  messageId: string,
+): Promise<void> {
+  const { getApiBaseUrl } = await import("@/lib/api-base");
+  const baseUrl = getApiBaseUrl();
+  const headers = await _authHeaders();
+  const resp = await fetch(
+    `${baseUrl}${V1}/email/accounts/${accountId}/messages/${messageId}/attachments/download-all`,
+    { headers },
+  );
+  if (!resp.ok) throw new Error("Failed to fetch attachments zip");
+  const buf = await resp.arrayBuffer();
+  const blob = new Blob([buf], { type: "application/zip" });
+  const blobUrl = URL.createObjectURL(blob);
+
+  const filename = _filenameFromContentDisposition(resp.headers.get("content-disposition"))
+    ?? `email-attachments-${messageId.slice(0, 8)}.zip`;
+
+  const a = document.createElement("a");
+  a.href = blobUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(blobUrl);
+}
+
+function _filenameFromContentDisposition(header: string | null): string | null {
+  if (!header) return null;
+  const match = /filename="?([^"]+)"?/.exec(header);
+  return match ? match[1] : null;
+}
+
 export async function archiveEmail(
   accountId: string,
   messageId: string,

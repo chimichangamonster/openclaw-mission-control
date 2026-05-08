@@ -70,6 +70,27 @@ def sanitize_text(text: str | None, max_length: int = MAX_TEXT_LENGTH) -> str | 
     return text
 
 
+def sanitize_for_display(text: str | None) -> str | None:
+    """Sanitize text for HTTP response to a human-rendered surface (browser).
+
+    Distinct from sanitize_text() which is the agent-context defense:
+    - NO length cap. Email bodies, document text, etc. must round-trip in full
+      to the user's screen — truncating at 10K chars hides legitimate content.
+    - NO injection-pattern stripping. The browser is not an LLM; phrases like
+      "ignore previous instructions" appearing in marketing copy must render
+      verbatim. Mangling them produces false-positive content corruption with
+      no real defense (HTML XSS is a different threat model handled elsewhere).
+    - DOES strip null bytes (unsafe to round-trip through HTTP/JSON regardless).
+
+    Use this on email-body fields, document content, and any other free-text
+    field served to a browser. Keep sanitize_text() for fields that flow into
+    agent prompts.
+    """
+    if text is None:
+        return None
+    return text.replace("\x00", "")
+
+
 def sanitize_extracted_document(text: str | None, source: str = "document") -> str | None:
     """Sanitize text extracted from uploaded documents (PDF, images, OCR).
 
