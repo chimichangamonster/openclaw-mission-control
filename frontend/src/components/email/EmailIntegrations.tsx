@@ -175,16 +175,21 @@ export function EmailIntegrations() {
             ? "Redirecting..."
             : "Connect Outlook"}
         </Button>
-        <Button
-          variant="outline"
-          onClick={() => handleConnect("google")}
-          disabled={connectingProvider !== null}
-        >
-          <Mail className="h-4 w-4" />
-          {connectingProvider === "google"
-            ? "Redirecting..."
-            : "Connect Google Workspace"}
-        </Button>
+        <div className="flex flex-col gap-1">
+          <Button
+            variant="outline"
+            onClick={() => handleConnect("google")}
+            disabled={connectingProvider !== null}
+          >
+            <Mail className="h-4 w-4" />
+            {connectingProvider === "google"
+              ? "Redirecting..."
+              : "Connect Google Workspace"}
+          </Button>
+          <span className="text-xs text-amber-600">
+            Testing-mode only — refresh tokens expire every 7 days. Not recommended for production.
+          </span>
+        </div>
         <Button
           variant="outline"
           onClick={() => handleConnect("zoho")}
