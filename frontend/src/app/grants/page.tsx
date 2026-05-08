@@ -25,7 +25,6 @@ import { ExternalLink } from "lucide-react";
 import { useAuth } from "@/auth/clerk";
 import { DashboardPageLayout } from "@/components/templates/DashboardPageLayout";
 import { FeatureGate } from "@/components/molecules/FeatureGate";
-import { useOrganizationMembership } from "@/lib/use-organization-membership";
 import {
   getGrantDetail,
   listGrants,
@@ -169,7 +168,6 @@ function DeadlineBadge({ grantId, detail }: DeadlineBadgeProps) {
 
 function GrantsPageInner() {
   const { isSignedIn } = useAuth();
-  const { isAdmin } = useOrganizationMembership(isSignedIn);
   const [selectedGrantId, setSelectedGrantId] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
@@ -177,7 +175,7 @@ function GrantsPageInner() {
   const grantsQuery = useQuery({
     queryKey: ["grants", "list"],
     queryFn: listGrants,
-    enabled: isAdmin,
+    enabled: Boolean(isSignedIn),
   });
 
   const grants: Grant[] = useMemo(
@@ -193,7 +191,7 @@ function GrantsPageInner() {
     queries: grants.map((g) => ({
       queryKey: ["grants", "detail", g.id],
       queryFn: () => getGrantDetail(g.id),
-      enabled: isAdmin && !!g.id,
+      enabled: Boolean(isSignedIn) && !!g.id,
     })),
   });
 
@@ -238,30 +236,6 @@ function GrantsPageInner() {
   const selectedDetail = selectedGrantId
     ? detailById.get(selectedGrantId)
     : undefined;
-
-  if (!isAdmin) {
-    return (
-      <DashboardPageLayout
-        title="Grants Tracker"
-        signedOut={{
-          message: "Sign in to view the grants tracker.",
-          forceRedirectUrl: "/grants",
-          signUpForceRedirectUrl: "/grants",
-        }}
-      >
-        <div className={styles.emptyState}>
-          <p>
-            <strong>Admin access required.</strong>
-          </p>
-          <p style={{ marginTop: "0.5rem" }}>
-            The grants tracker is restricted to organization admins. Ask your
-            admin to grant access if you need to manage grant programs and draw
-            schedules.
-          </p>
-        </div>
-      </DashboardPageLayout>
-    );
-  }
 
   const headerSubtitle =
     grants.length > 0

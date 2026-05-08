@@ -12,7 +12,6 @@ import {
 import { useAuth } from "@/auth/clerk";
 import { DashboardPageLayout } from "@/components/templates/DashboardPageLayout";
 import { FeatureGate } from "@/components/molecules/FeatureGate";
-import { useOrganizationMembership } from "@/lib/use-organization-membership";
 import { useOrgMembers } from "@/lib/use-org-members";
 import {
   listTags,
@@ -381,7 +380,6 @@ function StatBar({ snapshot }: { snapshot: AuthoredSnapshot }) {
 
 function RegulatoryPageInner() {
   const { isSignedIn } = useAuth();
-  const { isAdmin } = useOrganizationMembership(isSignedIn);
   const { members: orgMembers } = useOrgMembers();
   const queryClient = useQueryClient();
 
@@ -407,13 +405,13 @@ function RegulatoryPageInner() {
   const snapshotQuery = useQuery({
     queryKey: ["regulatory", "snapshot", countryCode],
     queryFn: () => loadAuthoredSnapshot(countryCode),
-    enabled: isAdmin,
+    enabled: Boolean(isSignedIn),
   });
 
   const tagsQuery = useQuery({
     queryKey: ["regulatory", "tags"],
     queryFn: () => listTags(),
-    enabled: isAdmin,
+    enabled: Boolean(isSignedIn),
   });
 
   const snapshot = snapshotQuery.data ?? null;
@@ -538,29 +536,6 @@ function RegulatoryPageInner() {
       color_token: t.color_token,
     }));
   }, [tagsQuery.data]);
-
-  if (!isAdmin) {
-    return (
-      <DashboardPageLayout
-        title="Regulatory Tracker"
-        signedOut={{
-          message: "Sign in to view the regulatory tracker.",
-          forceRedirectUrl: "/regulatory",
-          signUpForceRedirectUrl: "/regulatory",
-        }}
-      >
-        <div className={styles.emptyState}>
-          <p>
-            <strong>Admin access required.</strong>
-          </p>
-          <p style={{ marginTop: "0.5rem" }}>
-            The regulatory tracker is restricted to organization admins. Ask
-            your admin to grant access if you need to manage approval timelines.
-          </p>
-        </div>
-      </DashboardPageLayout>
-    );
-  }
 
   return (
     <DashboardPageLayout
