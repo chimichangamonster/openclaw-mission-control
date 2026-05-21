@@ -12,6 +12,7 @@ from fastapi.openapi.utils import get_openapi
 from fastapi_pagination import add_pagination
 
 from app.api.activity import router as activity_router
+from app.api.admin_partner_keys import router as admin_partner_keys_router
 from app.api.agent import router as agent_router
 from app.api.agent_contacts import router as agent_contacts_router
 from app.api.agent_email import router as agent_email_router
@@ -62,6 +63,7 @@ from app.api.organization_settings import router as org_settings_router
 from app.api.organizations import router as organizations_router
 from app.api.paper_bets import router as paper_bets_router
 from app.api.paper_trading import router as paper_trading_router
+from app.api.partner import router as partner_router
 from app.api.pentest import router as pentest_router
 from app.api.personal_bookkeeping import router as personal_bookkeeping_router
 from app.api.platform_admin import router as platform_admin_router
@@ -1040,6 +1042,8 @@ api_v1.include_router(wechat_auth_router)
 api_v1.include_router(wecom_router)
 api_v1.include_router(document_intake_router)
 api_v1.include_router(observability_router)
+api_v1.include_router(partner_router)
+api_v1.include_router(admin_partner_keys_router)
 app.include_router(api_v1)
 
 add_pagination(app)
