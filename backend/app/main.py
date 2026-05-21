@@ -64,6 +64,7 @@ from app.api.organizations import router as organizations_router
 from app.api.paper_bets import router as paper_bets_router
 from app.api.paper_trading import router as paper_trading_router
 from app.api.partner import router as partner_router
+from app.api.partner_openapi import router as partner_openapi_router
 from app.api.pentest import router as pentest_router
 from app.api.personal_bookkeeping import router as personal_bookkeeping_router
 from app.api.platform_admin import router as platform_admin_router
@@ -1043,6 +1044,7 @@ api_v1.include_router(wecom_router)
 api_v1.include_router(document_intake_router)
 api_v1.include_router(observability_router)
 api_v1.include_router(partner_router)
+api_v1.include_router(partner_openapi_router)
 api_v1.include_router(admin_partner_keys_router)
 app.include_router(api_v1)
 
