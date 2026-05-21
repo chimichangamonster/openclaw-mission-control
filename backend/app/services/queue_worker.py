@@ -14,6 +14,12 @@ from app.services.openclaw.lifecycle_queue import (
     requeue_lifecycle_queue_task,
 )
 from app.services.openclaw.lifecycle_reconcile import process_lifecycle_queue_task
+from app.services.partner_webhook_dispatch import (
+    TASK_TYPE as PARTNER_WEBHOOK_TASK_TYPE,
+)
+from app.services.partner_webhook_dispatch import (
+    process_partner_webhook_task,
+)
 from app.services.queue import QueuedTask, dequeue_task
 from app.services.webhooks.dispatch import (
     process_webhook_queue_task,
@@ -48,6 +54,18 @@ _TASK_HANDLERS: dict[str, _TaskHandler] = {
             settings.rq_dispatch_retry_max_seconds,
         ),
         requeue=lambda task, delay: requeue_webhook_queue_task(task, delay_seconds=delay),
+    ),
+    # Partner webhooks own their entire retry lifecycle internally. The
+    # handler returns normally on partner-side failures + schedules its
+    # own retry per the 1m/5m/30m/2h/6h/24h schedule from the scope doc,
+    # so the generic worker-level requeue must never re-fire. The shim
+    # below is only reached if the handler itself raises an exception
+    # (true bug, not a partner-side failure) — in which case dropping the
+    # task is the right call so the bug surfaces in logs.
+    PARTNER_WEBHOOK_TASK_TYPE: _TaskHandler(
+        handler=process_partner_webhook_task,
+        attempts_to_delay=lambda attempts: 0.0,
+        requeue=lambda _task, _delay: False,
     ),
 }
 

@@ -52,6 +52,9 @@ from app.models.organization_members import OrganizationMember
 from app.models.organizations import Organization
 from app.models.paper_bets import PaperBet
 from app.models.paper_trading import PaperPortfolio, PaperPosition, PaperTrade
+from app.models.partner_api_key import PartnerApiKey
+from app.models.partner_webhook_delivery import PartnerWebhookDelivery
+from app.models.partner_webhook_subscription import PartnerWebhookSubscription
 from app.models.pentest_scans import PentestScanRecord
 from app.models.personal_bookkeeping import (
     PersonalReconciliationMonth,
@@ -145,6 +148,9 @@ __all__ = [
     "TagAssignment",
     "User",
     "PaperBet",
+    "PartnerApiKey",
+    "PartnerWebhookDelivery",
+    "PartnerWebhookSubscription",
     "PentestScanRecord",
     "PersonalReconciliationMonth",
     "PersonalStatementFile",
