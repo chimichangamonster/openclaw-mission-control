@@ -21,8 +21,20 @@
 | <img src="..." width="600" /> | <img src="..." width="300" /> |
 
 ## Docs impact
-- [ ] No user/operator docs changes required
-- [ ] Docs updated: <paths/links>
+
+### Internal docs (this repo + parent platform)
+- [ ] No internal docs changes required
+- [ ] Internal docs updated: <paths/links>
+
+### Partner API docs (chimichangamonster/vantageclaw-docs)
+Required when this PR touches anything partner-facing — partner router endpoints, schemas, scopes, webhook event vocabulary, signature/retry/timeout semantics, error shapes.
+
+- [ ] N/A — this PR doesn't touch partner-facing surface
+- [ ] Spec auto-sync sufficient — OpenAPI sync workflow handles it (small schema tweak, new optional field, internal refactor with no contract change)
+- [ ] Conceptual docs PR needed — opened at: <link to vantageclaw-docs PR>
+- [ ] Conceptual docs PR will follow in a separate change — tracked in: <issue/note link>
+
+**Heuristic:** if a partner couldn't figure out how to use this change by reading the auto-synced OpenAPI spec alone, conceptual docs need updating. Run `/docs-partner` on the parent repo to surface candidates.
 
 ## Risk / rollout notes
 - Risk level: low / medium / high
@@ -32,4 +44,4 @@
 - [ ] Branch created from `origin/master` (no unrelated commits)
 - [ ] PR is focused (one theme)
 - [ ] No secrets in code/logs/docs
-- [ ] If API/behavior changes: docs updated (OpenAPI + `docs/reference/api.md`)
+- [ ] Docs impact section above is filled out (not skipped)
