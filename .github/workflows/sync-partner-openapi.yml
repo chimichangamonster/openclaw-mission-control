@@ -61,6 +61,7 @@ jobs:
           # walks its routes — zero network, zero DB, zero token use).
           AUTH_MODE: local
           LOCAL_AUTH_TOKEN: "ci-openapi-export-synthetic-token-not-used-for-real-auth-1234567890"
+          BASE_URL: "http://ci-openapi-export.invalid"
         run: |
           python - <<'PY'
           import json
