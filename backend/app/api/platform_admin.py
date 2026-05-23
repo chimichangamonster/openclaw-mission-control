@@ -725,6 +725,112 @@ async def infra_health(
 
 
 # ---------------------------------------------------------------------------
+# Partner-webhook operational health (Session B Step 10)
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/partner-webhooks-health",
+    summary="Partner-webhook delivery health: failures + dead-letter + auto-disabled (owner-only)",
+)
+async def partner_webhooks_health(
+    hours: int = 24,
+    owner: User = OWNER_DEP,
+    session: AsyncSession = SESSION_DEP,
+) -> dict[str, Any]:
+    """Operational metrics for the partner-webhook delivery pipeline.
+
+    Three quantities for the /platform page widget:
+
+    - ``failed_deliveries_window``: count of rows in ``partner_webhook_deliveries``
+      created in the last ``hours`` hours. Successful first-attempt deliveries do
+      NOT write rows (per the table's design), so this is *failures only* — name
+      reflects that honestly.
+    - ``dead_lettered_window``: subset where ``status='dead_lettered'``. These are
+      events that exhausted the 7-attempt retry schedule (1m/5m/30m/2h/6h/24h).
+      Each one is a partner whose endpoint was down for >33h or returned non-2xx
+      throughout. Distinct from ``failed`` (single failed attempt that may retry).
+    - ``auto_disabled_subscriptions``: current count of subscriptions where
+      ``active=false AND auto_disabled_at IS NOT NULL``. NOT time-windowed — this
+      is a state snapshot. Reaching 20 consecutive failures flips a sub here, and
+      it stays until the partner deletes + recreates the subscription.
+
+    Owner-only because subscription URLs + failure reasons can leak partner
+    infrastructure detail (the partner's domain, their HTTP status patterns,
+    inferred outage windows).
+    """
+    hours = max(1, min(hours, 168))  # Clamp 1h..7d, same as cron-failures
+    cutoff = datetime.now(UTC) - timedelta(hours=hours)
+
+    # Imports kept local so this section is self-contained — touching partner
+    # models in platform_admin should not pull them into every other endpoint
+    # (lighter import graph + clearer dependency direction).
+    from app.models.partner_webhook_delivery import (
+        DELIVERY_STATUS_DEAD_LETTERED,
+        PartnerWebhookDelivery,
+    )
+    from app.models.partner_webhook_subscription import PartnerWebhookSubscription
+
+    # Aggregate counters via three independent SELECTs. Could combine with
+    # subqueries, but separate is clearer to read and the table sizes are
+    # small (failures only).
+    failed_count_stmt = select(func.count()).select_from(
+        select(PartnerWebhookDelivery)
+        .where(PartnerWebhookDelivery.created_at >= cutoff)
+        .subquery()
+    )
+    failed_deliveries = (await session.execute(failed_count_stmt)).scalar_one() or 0
+
+    dead_count_stmt = select(func.count()).select_from(
+        select(PartnerWebhookDelivery)
+        .where(PartnerWebhookDelivery.created_at >= cutoff)
+        .where(PartnerWebhookDelivery.status == DELIVERY_STATUS_DEAD_LETTERED)
+        .subquery()
+    )
+    dead_lettered = (await session.execute(dead_count_stmt)).scalar_one() or 0
+
+    auto_disabled_stmt = select(func.count()).select_from(
+        select(PartnerWebhookSubscription)
+        .where(PartnerWebhookSubscription.active.is_(False))  # type: ignore[union-attr]
+        .where(PartnerWebhookSubscription.auto_disabled_at.is_not(None))  # type: ignore[union-attr]
+        .subquery()
+    )
+    auto_disabled = (await session.execute(auto_disabled_stmt)).scalar_one() or 0
+
+    # Overall status: tri-state matching infra-health pattern.
+    # - ok:    no auto-disabled subs, no dead-letters in window
+    # - warn:  dead-letters in window OR any auto-disabled subs (partner endpoint
+    #          flaky but not necessarily our problem)
+    # - error: never — we don't 500 on partner-side issues, that's their endpoint
+    if auto_disabled == 0 and dead_lettered == 0:
+        overall_status = "ok"
+    else:
+        overall_status = "warn"
+
+    await log_audit(
+        org_id=UUID(int=0),
+        action="platform.partner_webhooks_health_check",
+        user_id=owner.id,
+        details={
+            "hours": hours,
+            "failed_deliveries_window": failed_deliveries,
+            "dead_lettered_window": dead_lettered,
+            "auto_disabled_subscriptions": auto_disabled,
+            "overall_status": overall_status,
+        },
+    )
+
+    return {
+        "hours": hours,
+        "since": cutoff.isoformat(),
+        "failed_deliveries_window": failed_deliveries,
+        "dead_lettered_window": dead_lettered,
+        "auto_disabled_subscriptions": auto_disabled,
+        "overall_status": overall_status,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 

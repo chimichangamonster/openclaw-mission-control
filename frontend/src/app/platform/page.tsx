@@ -97,7 +97,15 @@ type SkillDriftResponse = {
   };
 };
 
-type InfraStatus = "healthy" | "stale" | "amber" | "missing" | "red" | "error";
+type InfraStatus =
+  | "healthy"
+  | "stale"
+  | "amber"
+  | "missing"
+  | "red"
+  | "error"
+  | "ok"
+  | "warn";
 
 type BackupHealth = {
   status: InfraStatus;
@@ -141,6 +149,15 @@ type InfraHealthResponse = {
   loki: LokiHealth;
   clickhouse: ClickHouseHealth;
   checked_at: string;
+};
+
+type PartnerWebhooksHealthResponse = {
+  hours: number;
+  since: string;
+  failed_deliveries_window: number;
+  dead_lettered_window: number;
+  auto_disabled_subscriptions: number;
+  overall_status: "ok" | "warn";
 };
 
 const READINESS_LABELS: Record<string, string> = {
@@ -247,6 +264,20 @@ export default function PlatformOwnerPage() {
     retry: false,
   });
 
+  const partnerWebhooksHealthQuery = useQuery<PartnerWebhooksHealthResponse>({
+    queryKey: ["/api/v1/platform/partner-webhooks-health", { hours: 24 }],
+    queryFn: async () => {
+      const res = (await customFetch(
+        "/api/v1/platform/partner-webhooks-health?hours=24",
+        { method: "GET" },
+      )) as { data?: PartnerWebhooksHealthResponse } | PartnerWebhooksHealthResponse;
+      return ("data" in res ? res.data : res) as PartnerWebhooksHealthResponse;
+    },
+    enabled: Boolean(isSignedIn) && isPlatformOwner,
+    refetchOnMount: "always",
+    retry: false,
+  });
+
   const refetchAll = () => {
     void orgsQuery.refetch();
     readinessQueries.forEach((q) => void q.refetch());
@@ -254,6 +285,7 @@ export default function PlatformOwnerPage() {
     void cronFailuresQuery.refetch();
     void skillDriftQuery.refetch();
     void infraHealthQuery.refetch();
+    void partnerWebhooksHealthQuery.refetch();
   };
 
   const attentionRows = orgs
@@ -560,6 +592,69 @@ export default function PlatformOwnerPage() {
           ) : null}
         </section>
 
+        {/* Partner-webhook health (Session B Step 10) */}
+        <section>
+          <div className="mb-3 flex items-center gap-2">
+            <CheckCircle2
+              className={`h-4 w-4 ${infraToneIcon(partnerWebhooksHealthQuery.data?.overall_status)}`}
+            />
+            <h2 className="font-heading text-lg font-semibold text-[color:var(--text)]">
+              Partner webhooks
+            </h2>
+            {partnerWebhooksHealthQuery.data ? (
+              <span className="text-xs text-[color:var(--text-muted)]">
+                last {partnerWebhooksHealthQuery.data.hours}h
+              </span>
+            ) : null}
+          </div>
+          {partnerWebhooksHealthQuery.isError ? (
+            <ErrorPanel message="Failed to load partner-webhook health." />
+          ) : !partnerWebhooksHealthQuery.data && partnerWebhooksHealthQuery.isLoading ? (
+            <div className="rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)] p-4 text-sm text-[color:var(--text-muted)]">
+              Loading…
+            </div>
+          ) : partnerWebhooksHealthQuery.data ? (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <InfraCard
+                title="Failed deliveries (24h)"
+                status={
+                  partnerWebhooksHealthQuery.data.failed_deliveries_window === 0
+                    ? "ok"
+                    : "warn"
+                }
+                primary={String(
+                  partnerWebhooksHealthQuery.data.failed_deliveries_window,
+                )}
+                detail="rows in partner_webhook_deliveries (successes don't log)"
+              />
+              <InfraCard
+                title="Dead-lettered (24h)"
+                status={
+                  partnerWebhooksHealthQuery.data.dead_lettered_window === 0
+                    ? "ok"
+                    : "warn"
+                }
+                primary={String(
+                  partnerWebhooksHealthQuery.data.dead_lettered_window,
+                )}
+                detail="exhausted retry schedule (~33h of attempts)"
+              />
+              <InfraCard
+                title="Auto-disabled subs"
+                status={
+                  partnerWebhooksHealthQuery.data.auto_disabled_subscriptions === 0
+                    ? "ok"
+                    : "warn"
+                }
+                primary={String(
+                  partnerWebhooksHealthQuery.data.auto_disabled_subscriptions,
+                )}
+                detail="≥20 consecutive failures — partner must delete + recreate"
+              />
+            </div>
+          ) : null}
+        </section>
+
         {/* Org table */}
         <section>
           <h2 className="mb-3 font-heading text-lg font-semibold text-[color:var(--text)]">
@@ -720,17 +815,17 @@ function InfraCard({
   detail?: string;
 }) {
   const accent =
-    status === "healthy"
+    status === "healthy" || status === "ok"
       ? "border-emerald-300"
-      : status === "stale" || status === "amber"
+      : status === "stale" || status === "amber" || status === "warn"
         ? "border-amber-300"
         : status === "missing" || status === "red" || status === "error"
           ? "border-rose-300"
           : "border-[color:var(--border)]";
   const tone =
-    status === "healthy"
+    status === "healthy" || status === "ok"
       ? "text-emerald-700"
-      : status === "stale" || status === "amber"
+      : status === "stale" || status === "amber" || status === "warn"
         ? "text-amber-700"
         : status === "missing" || status === "red" || status === "error"
           ? "text-rose-700"
@@ -757,8 +852,9 @@ function InfraCard({
 
 function infraToneIcon(status: InfraStatus | undefined): string {
   if (!status) return "text-[color:var(--text-muted)]";
-  if (status === "healthy") return "text-emerald-500";
-  if (status === "stale" || status === "amber") return "text-amber-500";
+  if (status === "healthy" || status === "ok") return "text-emerald-500";
+  if (status === "stale" || status === "amber" || status === "warn")
+    return "text-amber-500";
   return "text-rose-500";
 }
 
