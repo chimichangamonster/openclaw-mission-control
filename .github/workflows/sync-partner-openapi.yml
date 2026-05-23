@@ -54,10 +54,13 @@ jobs:
       - name: Export partner OpenAPI spec
         working-directory: backend
         env:
-          # Settings() requires AUTH_MODE at import. No real auth happens
-          # in the exporter — it imports a router and walks its routes.
-          # Any valid AuthMode value works; the spec generation is offline.
+          # Settings() runs full validation at import — AUTH_MODE=local also
+          # requires a 50+ char non-placeholder LOCAL_AUTH_TOKEN. Provide a
+          # synthetic value that satisfies length + non-placeholder checks.
+          # No real auth happens in the exporter (it imports a router and
+          # walks its routes — zero network, zero DB, zero token use).
           AUTH_MODE: local
+          LOCAL_AUTH_TOKEN: "ci-openapi-export-synthetic-token-not-used-for-real-auth-1234567890"
         run: |
           python - <<'PY'
           import json
