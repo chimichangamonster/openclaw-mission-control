@@ -1,0 +1,120 @@
+name: Sync Partner OpenAPI to Docs Repo
+
+# Step 8 of Partner API v1 Session B — see
+# docs/business/partner-api-v1-scope.md in openclaw-business-platform.
+#
+# On every push to master that touches a partner-API surface file, regenerate
+# the public OpenAPI subset (the same artifact GET /api/v1/partner/openapi.json
+# serves at runtime), then open a PR against chimichangamonster/vantageclaw-docs
+# updating api-reference/openapi.json.
+#
+# Single source of truth: the partner router's routes. The committed copy in
+# the docs repo lets Mintlify render without runtime-fetching MC backend; the
+# PR-not-direct-push lets a human review the spec diff before docs publish.
+#
+# Requires repo secret DOCS_REPO_TOKEN — a fine-scoped PAT (or GitHub App
+# installation token) with `contents: write` + `pull-requests: write` on
+# chimichangamonster/vantageclaw-docs ONLY. NOT a broad-scoped token.
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "backend/app/api/partner.py"
+      - "backend/app/api/partner_openapi.py"
+      - "backend/app/schemas/partner_api.py"
+      - "backend/app/schemas/partner_webhooks.py"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    name: Export spec + open PR against docs repo
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout MC fork
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          # Install the project — partner_openapi has minimal transitive deps
+          # (fastapi, sqlmodel), but pyproject.toml is the canonical surface.
+          pip install -e .
+
+      - name: Export partner OpenAPI spec
+        working-directory: backend
+        env:
+          # Settings() requires AUTH_MODE at import. No real auth happens
+          # in the exporter — it imports a router and walks its routes.
+          # Any valid AuthMode value works; the spec generation is offline.
+          AUTH_MODE: local
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from app.api.partner_openapi import (
+              _build_partner_openapi,
+              reset_partner_openapi_cache,
+          )
+          reset_partner_openapi_cache()
+          spec = _build_partner_openapi()
+          out = Path("../partner-openapi.json")
+          out.write_text(json.dumps(spec, indent=2, sort_keys=True) + "\n")
+          print(f"wrote {out.resolve()} ({out.stat().st_size} bytes)")
+          PY
+
+      - name: Checkout docs repo
+        uses: actions/checkout@v4
+        with:
+          repository: chimichangamonster/vantageclaw-docs
+          token: ${{ secrets.DOCS_REPO_TOKEN }}
+          path: docs-repo
+          # Need full history for branch creation + PR base
+          fetch-depth: 0
+
+      - name: Copy spec into docs repo
+        run: |
+          mkdir -p docs-repo/api-reference
+          cp partner-openapi.json docs-repo/api-reference/openapi.json
+
+      - name: Check for diff
+        id: diff
+        working-directory: docs-repo
+        run: |
+          if git diff --quiet api-reference/openapi.json; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Spec unchanged — nothing to sync."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Spec changed — will open PR."
+          fi
+
+      - name: Open PR against docs repo
+        if: steps.diff.outputs.changed == 'true'
+        working-directory: docs-repo
+        env:
+          GH_TOKEN: ${{ secrets.DOCS_REPO_TOKEN }}
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          BRANCH="sync/partner-openapi-${SOURCE_SHA::8}"
+          git config user.name "vc-sync-bot"
+          git config user.email "vc-sync-bot@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add api-reference/openapi.json
+          git commit -m "sync: partner OpenAPI spec from MC ${SOURCE_SHA::8}"
+          git push -u origin "$BRANCH"
+          gh pr create \
+            --title "sync: partner OpenAPI spec from MC ${SOURCE_SHA::8}" \
+            --body "Automated sync from openclaw-mission-control@${SOURCE_SHA}. Review the spec diff before merging — Mintlify renders this file at developers.vantageclaw.ai." \
+            --base main \
+            --head "$BRANCH"
