@@ -90,6 +90,13 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 asyncio_default_fixture_loop_scope = "function"
+# Deselect the container-booting gateway_contract suite by default (it's slow + needs the
+# openclaw:local image). The runbook runs it explicitly with `pytest -m gateway_contract`,
+# which overrides this addopts `-m` filter (CLI wins).
+addopts = "-m 'not gateway_contract'"
+markers = [
+    "gateway_contract: integration tests that boot a real openclaw:local container and assert the MC<->gateway contract (runbook Phase 1.5 upgrade gate). Auto-skips when docker or the image is unavailable. Run with: pytest -m gateway_contract -v",
+]
 
 [tool.coverage.run]
 branch = true
