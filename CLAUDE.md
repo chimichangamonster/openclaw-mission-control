@@ -6,6 +6,7 @@ VantageClaw fork of abhi1693/openclaw-mission-control. Separate git repo (not a 
 - `origin` — our fork (chimichangamonster/openclaw-mission-control) — push here
 - `upstream` — abhi1693/openclaw-mission-control — read-only, used by `make sync-upstream` if needed
 - Reconfigured 2026-04-09: previously `origin`/`fork` swap, renamed so `git status` reports honest "ahead/behind" against the fork instead of phantom drift against upstream
+- **`gh` gotcha:** because an `upstream` remote exists, `gh pr create` / `gh pr merge` / `gh pr view` default their base to **abhi1693's** repo, not our fork — symptom: `gh pr create` fails with "No commits between master and <branch>" / "Head ref must be a branch". Fix: run `gh repo set-default chimichangamonster/openclaw-mission-control` once per clone (already set on the primary clone 2026-06-03), or pass `--repo chimichangamonster/openclaw-mission-control` to each `gh pr` command. Fresh clones must re-run `set-default`.
 
 ### Upstream-sync discipline — FROZEN as of 2026-04-20
 
