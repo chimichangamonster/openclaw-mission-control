@@ -674,17 +674,23 @@ async def test_health_payload_shape(gateway: _GatewayHarness) -> None:
 
 # The gateway runs its config "doctor" at boot and flags unrecognized keys ("Unknown
 # config keys" / "Config invalid"; on stricter versions it can refuse to start — CLAUDE.md
-# Known Gotchas). This boots a dedicated gateway with a mounted openclaw.json containing the
-# `env` block MC's template writes and asserts (a) the gateway reaches steady state and
-# (b) the boot logs report NO unknown/invalid config. If upstream renames/removes a key we
-# write, the doctor flags it and this fails.
+# Known Gotchas). This boots a dedicated gateway with a mounted openclaw.json carrying the
+# load-bearing config keys MC actually writes and asserts (a) the gateway reaches steady
+# state and (b) the boot logs report NO unknown/invalid config. If upstream renames/removes
+# one of these keys, the doctor flags it and this fails.
 #
-# Scoped to the `env` key for now: a fully-valid representative config is version-specific
-# (e.g. 2026.2.22 rejects arbitrary `agents.<name>` keys via openclaw.json), so broader
-# key coverage (agents.* / compaction.mode) is deferred to calibration against a real
-# production config snapshot. Verified `env`-only is clean on 2026.2.22 (2026-06-03).
+# Keys covered (the structural surface MC depends on; secrets/per-agent rows omitted —
+# `agents.<name>` entries are gateway-rejected from a hand-built config on 2026.2.22, and
+# real tokens must never enter a test): `env` (template writes it), `gateway.controlUi`
+# (the live vantage connect-auth block), and `agents.defaults.compaction.mode="default"`
+# (the persistent-Discord-session lifeline — CLAUDE.md Session Context Management). Verified
+# clean on the 2026.2.22 baseline 2026-06-03.
 _REPRESENTATIVE_OPENCLAW_JSON = {
     "env": {"OPENROUTER_API_KEY": "sk-contract-placeholder"},
+    "gateway": {
+        "controlUi": {"allowInsecureAuth": True, "dangerouslyDisableDeviceAuth": True},
+    },
+    "agents": {"defaults": {"compaction": {"mode": "default"}}},
 }
 _CONFIG_REJECTION_MARKERS = ("unknown config keys", "config invalid", "unrecognized key")
 
