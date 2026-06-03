@@ -18,10 +18,13 @@ red = the image never reaches production.
 WHAT IT PROTECTS (the contract surface a version bump can silently break)
 -------------------------------------------------------------------------
 1. The connect handshake — PROTOCOL_VERSION=3, the ``connect.challenge`` nonce flow,
-   operator-scope negotiation, and ``OPENCLAW_GATEWAY_TOKEN`` auth. (Connects in
-   device-pairing mode; production uses control_ui over the docker network, but that needs
-   a secure context a docker-published localhost port can't offer — see
-   ``_GatewayContainer.config`` for the full rationale. The one documented fidelity gap.)
+   operator-scope negotiation, and ``OPENCLAW_GATEWAY_TOKEN`` auth. Connects in **control_ui
+   mode** (``disable_device_pairing=true``), EXACTLY how production MC dials every gateway,
+   over a 1:1-published loopback port so the gateway's auto-seeded Origin allowlist accepts
+   MC's Origin (see ``_GatewayContainer.config`` + the CONNECT POLICY note). Recalibrated
+   2026-06-03 after the 2026.5.2 upgrade attempt: that version added an Origin allowlist AND
+   started rejecting unapproved devices, which broke the prior device-pairing harness — exactly
+   the connect-contract drift this suite exists to catch.
 2. The 3 error strings MC's retry / skip logic sniffs by TEXT — impossible to test with
    mocks, the single most fragile coupling:
      * ``already exists`` (provisioning agents.create idempotency)
@@ -91,15 +94,39 @@ pytestmark = pytest.mark.gateway_contract
 # ---------------------------------------------------------------------------
 
 IMAGE = os.environ.get("OPENCLAW_CONTRACT_IMAGE", "openclaw:local")
-# Container-internal gateway port. Production binds 18800 for vantage; the value
-# is arbitrary for a throwaway container — we publish it to an ephemeral host port.
-CONTAINER_PORT = 18800
 # Production parity: `node dist/index.js gateway --allow-unconfigured --bind lan --port N`.
 # Image ENTRYPOINT is docker-entrypoint.sh (execs the command array — no doubling),
 # WORKDIR /app, User node, so `node dist/index.js ...` resolves correctly.
+#
+# CONNECT POLICY (recalibrated for 2026.5.2 — see module docstring): each container binds a
+# UNIQUE free port and publishes it 1:1 (host port == container port), so the gateway's
+# auto-seeded `gateway.controlUi.allowedOrigins` (http://127.0.0.1:<port>) matches the Origin
+# MC's control_ui client sends when it dials ws://127.0.0.1:<port>. The 1:1 mapping (not an
+# ephemeral host port) is what makes the Origin deterministic; a unique port per container
+# keeps the module fixture and the function-scoped fresh containers from colliding.
 GATEWAY_BIND = os.environ.get("OPENCLAW_CONTRACT_BIND", "lan")
 READY_TIMEOUT_S = 60.0
 DOCKER_OP_TIMEOUT_S = 120.0
+
+# Minimal openclaw.json mounted into every throwaway container that does not supply its own.
+# control_ui mode requires device auth to be disabled; this is the production vantage block
+# (verified against the live openclaw.json 2026-06-03). `allowedOrigins` is intentionally
+# OMITTED — the gateway auto-seeds http://127.0.0.1:<port> + http://localhost:<port> at boot
+# (required since v2026.2.26), which is exactly the Origin our 1:1-published client sends.
+_DEFAULT_CONTROL_UI_CONFIG = {
+    "env": {"OPENROUTER_API_KEY": "sk-contract-placeholder"},
+    "gateway": {"controlUi": {"allowInsecureAuth": True, "dangerouslyDisableDeviceAuth": True}},
+    "agents": {"defaults": {"compaction": {"mode": "default"}}},
+}
+
+
+def _free_tcp_port() -> int:
+    """Reserve a currently-free loopback TCP port for a 1:1 host<->container publish."""
+    import socket
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        return int(sock.getsockname()[1])
 
 # Markers the gateway uses to say "I don't know that method." A consumed RPC that
 # trips one of these has been RENAMED/REMOVED upstream — the core upgrade risk.
@@ -124,6 +151,12 @@ def _run(cmd: list[str], *, timeout: float = DOCKER_OP_TIMEOUT_S) -> subprocess.
         cmd,
         capture_output=True,
         text=True,
+        # Decode as UTF-8 with replacement: docker logs carry non-ASCII (e.g. the `…` the
+        # gateway prints at boot), and on Windows the default cp1252 decode crashes the
+        # subprocess reader thread mid-capture — which could swallow the very error string a
+        # readiness failure needs to surface. errors="replace" keeps capture lossless-enough.
+        encoding="utf-8",
+        errors="replace",
         timeout=timeout,
         check=False,
     )
@@ -180,7 +213,19 @@ class _GatewayContainer:
         self.image = image
         self.token = token or secrets.token_hex(24)
         self.extra_env = extra_env or {}
-        self.host_openclaw_dir = host_openclaw_dir
+        self.port = _free_tcp_port()
+        # control_ui mode needs an openclaw.json that disables device auth. If the caller did
+        # not supply one, mint a throwaway dir with the default control_ui config and own its
+        # lifecycle (cleaned up in stop()).
+        self._owned_config_dir: tempfile.TemporaryDirectory[str] | None = None
+        if host_openclaw_dir is None:
+            self._owned_config_dir = tempfile.TemporaryDirectory(prefix="vc-gw-contract-cfg-")
+            Path(self._owned_config_dir.name, "openclaw.json").write_text(
+                json.dumps(_DEFAULT_CONTROL_UI_CONFIG, indent=2), encoding="utf-8"
+            )
+            self.host_openclaw_dir: str = self._owned_config_dir.name
+        else:
+            self.host_openclaw_dir = host_openclaw_dir
         self.name = f"vc-gw-contract-{uuid4().hex[:12]}"
         self._started = False
 
@@ -194,18 +239,20 @@ class _GatewayContainer:
         ]
         for key, value in self.extra_env.items():
             cmd += ["-e", f"{key}={value}"]
-        if self.host_openclaw_dir is not None:
-            # Bind the whole .openclaw dir (matches production); more reliable than a
-            # single-file mount on Docker Desktop. Requires the drive to be file-shared.
-            cmd += ["-v", f"{self.host_openclaw_dir}:/home/node/.openclaw"]
-        # Publish the gateway port to an ephemeral host port on loopback.
-        cmd += ["-p", f"127.0.0.1::{CONTAINER_PORT}"]
+        # Always bind the whole .openclaw dir (matches production); more reliable than a
+        # single-file mount on Docker Desktop. Requires the drive to be file-shared. The dir is
+        # either caller-supplied or the default control_ui config minted in __init__.
+        cmd += ["-v", f"{self.host_openclaw_dir}:/home/node/.openclaw"]
+        # Publish 1:1 (host port == container port) so the gateway's auto-seeded allowedOrigins
+        # (http://127.0.0.1:<port>) matches the Origin MC's control_ui client sends. See the
+        # CONNECT POLICY note near the top of this module.
+        cmd += ["-p", f"127.0.0.1:{self.port}:{self.port}"]
         cmd += [
             self.image,
             "node", "dist/index.js", "gateway",
             "--allow-unconfigured",
             "--bind", GATEWAY_BIND,
-            "--port", str(CONTAINER_PORT),
+            "--port", str(self.port),
         ]
         result = _run(cmd)
         if result.returncode != 0:
@@ -215,31 +262,25 @@ class _GatewayContainer:
         self._started = True
 
     def published_port(self) -> int:
-        result = _run(["docker", "port", self.name, str(CONTAINER_PORT)], timeout=30)
-        if result.returncode != 0:
-            raise RuntimeError(f"`docker port` failed: {result.stderr.strip()}")
-        # Output like "127.0.0.1:55001" (possibly multiple lines for v4/v6).
-        for line in result.stdout.splitlines():
-            line = line.strip()
-            if ":" in line:
-                return int(line.rsplit(":", 1)[1])
-        raise RuntimeError(f"could not parse published port from: {result.stdout!r}")
+        # 1:1 publish — the host port equals the container bind port chosen in __init__.
+        return self.port
 
     def config(self) -> GatewayConfig:
-        port = self.published_port()
         return GatewayConfig(
-            url=f"ws://127.0.0.1:{port}",
+            url=f"ws://127.0.0.1:{self.port}",
             token=self.token,
-            # Device-pairing mode (ed25519 + token), NOT control_ui. Production connects in
-            # control_ui mode (disable_device_pairing=true) over the docker network, but the
-            # gateway rejects control_ui over a docker-PUBLISHED localhost port —
-            # "control ui requires device identity (use HTTPS or localhost secure context)" —
-            # because NAT makes the connection look non-local. Device mode exercises the same
-            # PROTOCOL_VERSION negotiation, connect.challenge nonce, and operator-scope
-            # handshake, and EVERY downstream RPC / error-string / event shape is connect-mode
-            # independent. The connect-mode difference is the one documented fidelity gap of a
-            # localhost harness (verified against the 2026.2.22 baseline 2026-06-03).
-            disable_device_pairing=False,
+            # control_ui mode (disable_device_pairing=True) — EXACTLY how production MC dials
+            # every gateway. Recalibrated 2026-06-03 for the two 2026.5.2 connect-policy changes:
+            # (1) the gateway now enforces an Origin allowlist (since v2026.2.26) — satisfied here
+            # by the 1:1 port publish so MC's Origin http://127.0.0.1:<port> matches the auto-seed;
+            # and (2) device-pairing now rejects an unapproved device ("pairing required: device is
+            # not approved yet"), so the prior device-mode convenience is gone. The mounted
+            # openclaw.json supplies allowInsecureAuth + dangerouslyDisableDeviceAuth so control_ui
+            # auth is accepted without a paired device. NOTE: this targets 2026.5.2+ semantics; the
+            # 2026.2.22 baseline rejected control_ui over a published localhost port, so A/B against
+            # that image is expected to fail at connect (the baseline was calibrated green with the
+            # prior device-mode harness — see git history + memory project_gateway_upgrade_strategy).
+            disable_device_pairing=True,
             allow_insecure_tls=False,
         )
 
@@ -247,12 +288,17 @@ class _GatewayContainer:
         if not self._started:
             return "(container never started)"
         result = _run(["docker", "logs", "--tail", str(tail), self.name], timeout=30)
-        return (result.stdout + result.stderr).strip()
+        # `text=True` can still yield None for an empty stream on some platforms (Windows);
+        # guard both so a readiness-timeout error message is never masked by a TypeError here.
+        return ((result.stdout or "") + (result.stderr or "")).strip()
 
     def stop(self) -> None:
         if self._started:
             _run(["docker", "rm", "-f", self.name], timeout=60)
             self._started = False
+        if self._owned_config_dir is not None:
+            self._owned_config_dir.cleanup()
+            self._owned_config_dir = None
 
 
 def _wait_ready(container: _GatewayContainer) -> GatewayConfig:
