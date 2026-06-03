@@ -722,6 +722,90 @@ def test_openclaw_json_boots_without_unknown_key_rejection() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Tier 2 — production's control_ui + token connect path (item-98 pre-flight)
+# ---------------------------------------------------------------------------
+
+# Production connects in control_ui mode (disable_device_pairing=true) + token, NOT the
+# device-pairing mode the module `gateway` fixture uses. A bare gateway rejects control_ui
+# over a docker-published port ("control ui requires device identity ...") because it isn't
+# a local/secure context; production allows it via this gateway config block (verified
+# against the live vantage openclaw.json 2026-06-03). This test boots a gateway WITH that
+# block and asserts MC's REAL control_ui connect path is accepted — closing the connect-mode
+# fidelity gap. It matters specifically for the 2026.2.22->2026.5.2 upgrade: upstream is
+# actively reworking the control_ui device-pairing-skip path across that delta
+# (changelog #25428 / #30740 / #69431), and the device-pairing test would not catch a
+# regression in it.
+_CONTROL_UI_OPENCLAW_JSON = {
+    "env": {"OPENROUTER_API_KEY": "sk-contract-placeholder"},
+    "gateway": {
+        "controlUi": {"allowInsecureAuth": True, "dangerouslyDisableDeviceAuth": True},
+    },
+}
+
+
+def test_control_ui_token_connect_path() -> None:
+    """MC's production connect path — control_ui (disable_device_pairing=True) + token —
+    must be accepted by a gateway carrying the production ``gateway.controlUi`` config.
+
+    Synchronous on purpose (drives an ``asyncio.run`` readiness probe). Fails hard if the
+    gateway answers the control_ui handshake with a device-identity / pairing rejection —
+    that means the upstream control_ui auth path the platform depends on has regressed.
+    """
+    _require_docker_and_image()
+    with tempfile.TemporaryDirectory(prefix="vc-gw-contract-cui-") as tmp:
+        cfg_dir = Path(tmp)
+        (cfg_dir / "openclaw.json").write_text(
+            json.dumps(_CONTROL_UI_OPENCLAW_JSON, indent=2), encoding="utf-8"
+        )
+        container = _GatewayContainer(host_openclaw_dir=str(cfg_dir))
+        try:
+            container.start()
+        except RuntimeError as exc:
+            pytest.skip(f"could not bind-mount controlUi config (host/Docker setup): {exc}")
+        try:
+            port = container.published_port()
+            # The production connect mode: control_ui + token (NOT device-pairing).
+            cui = GatewayConfig(
+                url=f"ws://127.0.0.1:{port}",
+                token=container.token,
+                disable_device_pairing=True,
+                allow_insecure_tls=False,
+            )
+
+            async def _probe() -> object:
+                deadline = time.monotonic() + READY_TIMEOUT_S
+                last = "(no attempt completed)"
+                while time.monotonic() < deadline:
+                    try:
+                        return await openclaw_call("health", config=cui)
+                    except OpenClawGatewayError as exc:
+                        msg = str(exc).lower()
+                        # A device-identity / pairing rejection is the contract failure this
+                        # test exists to catch — fail hard, do NOT retry it as a boot blip.
+                        if "device identity" in msg or "pairing" in msg:
+                            raise AssertionError(
+                                "control_ui + token connect was REJECTED "
+                                f"({exc!r}) — production's connect/auth path has regressed. "
+                                "gateway.controlUi.allowInsecureAuth / dangerouslyDisableDeviceAuth "
+                                "may no longer be honored upstream."
+                            ) from exc
+                        # Anything else (boot not finished, transport blip) — keep polling.
+                        last = str(exc)
+                        await asyncio.sleep(1.0)
+                msg = (
+                    f"gateway never accepted control_ui within {READY_TIMEOUT_S:.0f}s. "
+                    f"Last error: {last}\n--- container logs ---\n{container.logs()}"
+                )
+                raise RuntimeError(msg)
+
+            payload = asyncio.run(_probe())
+            assert isinstance(payload, dict), f"health returned {type(payload).__name__}"
+            assert payload.get("ok") is True, f"control_ui health.ok not True: {payload!r}"
+        finally:
+            container.stop()
+
+
+# ---------------------------------------------------------------------------
 # Tier 3 — live chat round-trip + chat/health EVENT shapes (LLM-gated, opt-in)
 # ---------------------------------------------------------------------------
 
