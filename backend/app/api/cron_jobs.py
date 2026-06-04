@@ -325,6 +325,9 @@ async def get_cron_job_runs(
     )
     if isinstance(result, list):
         return result
-    if isinstance(result, dict) and "runs" in result:
-        return result["runs"]  # type: ignore[no-any-return]
+    if isinstance(result, dict):
+        # Gateway cron.runs returns a page object keyed "entries" on both
+        # 2026.2.22 and 2026.5.2 (older shapes used "runs"). Accept either,
+        # falling back to [] so the endpoint never 500s on an unexpected shape.
+        return result.get("runs") or result.get("entries") or []  # type: ignore[no-any-return]
     return []

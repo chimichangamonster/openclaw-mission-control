@@ -509,3 +509,53 @@ class TestNormalizeJob:
         assert result["schedule_type"] == ""
         assert result["timezone"] == "UTC"
         assert result["announce"] is False
+
+
+# ---------------------------------------------------------------------------
+# Tests: cron.runs result unwrapping
+# ---------------------------------------------------------------------------
+
+
+def unwrap_cron_runs(result: Any) -> list[dict[str, Any]]:
+    """Mirror get_cron_job_runs result-unwrapping (app/api/cron_jobs.py).
+
+    The gateway cron.runs RPC returns a page object keyed ``entries`` on both
+    2026.2.22 and 2026.5.2; older shapes used ``runs``. Accept either, default [].
+    """
+    if isinstance(result, list):
+        return result
+    if isinstance(result, dict):
+        return result.get("runs") or result.get("entries") or []
+    return []
+
+
+class TestCronRunsUnwrap:
+    """Lock the cron.runs entries/runs key contract.
+
+    Regression: the gateway cron.runs page is keyed ``entries`` on both
+    2026.2.22 and 2026.5.2, but the endpoint originally only checked ``runs``,
+    so run-history silently returned []. Surfaced by the 2026.5.2 rollout audit
+    (CRON-4 / MC-COMPAT-002).
+    """
+
+    def test_entries_key_is_unwrapped(self) -> None:
+        page = {"entries": [{"id": "r1", "status": "ok"}], "total": 1, "hasMore": False}
+        assert unwrap_cron_runs(page) == [{"id": "r1", "status": "ok"}]
+
+    def test_runs_key_still_supported(self) -> None:
+        assert unwrap_cron_runs({"runs": [{"id": "r2"}]}) == [{"id": "r2"}]
+
+    def test_runs_preferred_when_both_present(self) -> None:
+        # "runs" is checked first for backward compatibility.
+        result = unwrap_cron_runs({"runs": [{"id": "old"}], "entries": [{"id": "new"}]})
+        assert result == [{"id": "old"}]
+
+    def test_bare_list_passthrough(self) -> None:
+        assert unwrap_cron_runs([{"id": "r3"}]) == [{"id": "r3"}]
+
+    def test_empty_entries_returns_empty_list(self) -> None:
+        assert unwrap_cron_runs({"entries": [], "total": 0}) == []
+
+    def test_unknown_shape_returns_empty_list(self) -> None:
+        assert unwrap_cron_runs({"unexpected": 1}) == []
+        assert unwrap_cron_runs(None) == []
