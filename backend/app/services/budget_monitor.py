@@ -18,6 +18,7 @@ from app.db.session import async_session_maker
 from app.models.budget import BudgetConfig, DailyAgentSpend
 from app.models.gateways import Gateway
 from app.services.error_tracker import track_error
+from app.services.openclaw.gateway_resolver import optional_gateway_client_config
 from app.services.openclaw.gateway_rpc import (
     GatewayConfig,
     compact_session,
@@ -64,9 +65,12 @@ async def _get_gateway_config_for_org(org_id: UUID) -> GatewayConfig | None:
             select(Gateway).where(Gateway.organization_id == org_id).limit(1)
         )
         gateway = result.scalars().first()
-    if not gateway or not gateway.url:
-        return None
-    return GatewayConfig(url=gateway.url, token=gateway.token)
+    # Route through gateway_resolver — the sole GatewayConfig-from-Gateway
+    # constructor — so disable_device_pairing + allow_insecure_tls are always
+    # derived from the DB record. On OpenClaw 2026.5.2 a dropped
+    # disable_device_pairing defaults to device mode and the device-pairing
+    # gate rejects the connection. See tests/test_gateway_pairing_chokepoint.py.
+    return optional_gateway_client_config(gateway)
 
 
 async def _get_or_create_budget_config(org_id: UUID) -> BudgetConfig:

@@ -248,7 +248,8 @@ async def get_usage_by_model(
 
     from app.db.session import async_session_maker
     from app.models.gateways import Gateway
-    from app.services.openclaw.gateway_rpc import GatewayConfig, openclaw_call
+    from app.services.openclaw.gateway_resolver import gateway_client_config
+    from app.services.openclaw.gateway_rpc import openclaw_call
 
     # Find gateway for this org
     async with async_session_maker() as db_session:
@@ -260,7 +261,9 @@ async def get_usage_by_model(
     if not gateway or not gateway.url:
         return {"models": [], "total_cost": 0}
 
-    config = GatewayConfig(url=gateway.url, token=gateway.token)
+    # url presence already guaranteed by the guard above, so the strict
+    # constructor is safe; it threads disable_device_pairing + allow_insecure_tls.
+    config = gateway_client_config(gateway)
     try:
         sessions_data = await openclaw_call(
             "sessions.list", config=config, org_id=str(org_ctx.organization.id)

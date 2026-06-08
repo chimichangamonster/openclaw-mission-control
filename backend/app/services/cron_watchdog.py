@@ -14,6 +14,7 @@ from app.core.time import utcnow
 from app.db.session import async_session_maker
 from app.models.gateways import Gateway
 from app.services.error_tracker import track_error
+from app.services.openclaw.gateway_resolver import optional_gateway_client_config
 from app.services.openclaw.gateway_rpc import GatewayConfig, send_message
 
 logger = get_logger(__name__)
@@ -39,9 +40,9 @@ async def _get_first_gateway_config() -> GatewayConfig | None:
             select(Gateway).where(Gateway.url.isnot(None)).limit(1)  # type: ignore[attr-defined]
         )
         gateway = result.scalars().first()
-    if not gateway or not gateway.url:
-        return None
-    return GatewayConfig(url=gateway.url, token=gateway.token)
+    # Route through gateway_resolver so disable_device_pairing is threaded
+    # (else 2026.5.2's device-pairing gate rejects the alert connection).
+    return optional_gateway_client_config(gateway)
 
 
 async def _send_alert(gw_config: GatewayConfig, message: str) -> None:

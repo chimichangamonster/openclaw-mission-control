@@ -9,7 +9,8 @@ from pydantic import BaseModel
 
 from app.api.deps import ORG_MEMBER_DEP
 from app.core.logging import get_logger
-from app.services.openclaw.gateway_rpc import GatewayConfig, openclaw_call
+from app.services.openclaw.gateway_resolver import optional_gateway_client_config
+from app.services.openclaw.gateway_rpc import openclaw_call
 from app.services.organizations import OrganizationContext
 
 logger = get_logger(__name__)
@@ -48,10 +49,12 @@ async def get_live_feed(
         )
         gateway = result.scalars().first()
 
-    if not gateway:
+    # optional_gateway_client_config returns None for a missing gateway OR an
+    # empty url (the guard here intentionally does NOT check url), preserving the
+    # graceful-empty-feed contract while threading disable_device_pairing.
+    config = optional_gateway_client_config(gateway)
+    if config is None:
         return LiveFeedResponse(sessions=[], timestamp=datetime.now(UTC).isoformat())
-
-    config = GatewayConfig(url=gateway.url, token=gateway.token)
     try:
         sessions_data = await openclaw_call(
             "sessions.list", config=config, org_id=str(ctx.organization.id)
