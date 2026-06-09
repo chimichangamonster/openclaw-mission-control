@@ -884,16 +884,17 @@ async def system_health() -> Any:
     if error_count_1h >= 10:
         issues.append(f"{error_count_1h} errors in last hour")
 
-    # ── Cron Health (per-org gateway scan) ─────────────────────────────────
-    # Disabled jobs are excluded from the failed count — see
-    # app.services.cron_health for the rationale (operator-disabled crons
-    # carrying stale `lastRunStatus: error` would otherwise pin /system/health
-    # to degraded forever).
+    # ── Cron Health (per-org cron.list RPC, item 142) ──────────────────────
+    # Asks each gateway over RPC — the on-disk jobs.json is 0600/root-owned on
+    # OpenClaw 2026.5.2+ and unreadable from this container. Disabled jobs are
+    # excluded from the failed count — see app.services.cron_health for the
+    # rationale (operator-disabled crons carrying stale `lastRunStatus: error`
+    # would otherwise pin /system/health to degraded forever).
     cron_failed = 0
     try:
         from app.services.cron_health import scan_cron_health
 
-        cron_result = scan_cron_health()
+        cron_result = await scan_cron_health()
         components["cron_jobs"] = cron_result
         cron_failed = cron_result.get("failed", 0)
     except Exception as exc:
