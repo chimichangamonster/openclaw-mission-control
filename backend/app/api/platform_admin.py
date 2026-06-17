@@ -28,6 +28,7 @@ from app.models.organization_members import OrganizationMember
 from app.models.organization_settings import OrganizationSettings
 from app.models.organizations import Organization
 from app.services.audit import log_audit
+from app.services.capability_map import build_capability_map
 from app.services.infra_health import check_infra_health
 from app.services.openclaw.gateway_resolver import gateway_client_config
 from app.services.openclaw.gateway_rpc import OpenClawGatewayError, openclaw_call
@@ -416,6 +417,48 @@ async def org_readiness_check(
         "ready": passed == total,
         "checks": checks,
     }
+
+
+# ---------------------------------------------------------------------------
+# Per-org capability map (item 144) — owner/admin single-screen deployment view
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/orgs/{org_id}/capability-map",
+    summary="Per-org capability map — agents/skills/crons/integrations/flags/template",
+)
+async def org_capability_map(
+    org_id: UUID,
+    admin: User = ADMIN_DEP,
+    session: AsyncSession = SESSION_DEP,
+) -> dict[str, Any]:
+    """Composite read-only snapshot of one org's deployment (item 144).
+
+    Aggregates from live sources only (DB + cron.list RPC + registry.yml) — no
+    hand-maintained lists. Full detail (includes the skills section and
+    per-integration detail); the client-facing reduced view is the separate
+    member-scoped ``/organizations/me/capability-overview`` endpoint (item 145).
+
+    Zero mutations. RPC failures degrade gracefully (``crons.reachable: false``)
+    rather than 500.
+    """
+    org = await _get_org_or_404(org_id, session)
+    result = await build_capability_map(session, org, redacted=False)
+
+    await log_audit(
+        org_id=org_id,
+        action="platform.capability_map",
+        user_id=admin.id,
+        resource_type="organization",
+        resource_id=org_id,
+        details={
+            "agents": len(result.get("agents", [])),
+            "integrations": len(result.get("integrations", [])),
+        },
+    )
+
+    return result
 
 
 # ---------------------------------------------------------------------------

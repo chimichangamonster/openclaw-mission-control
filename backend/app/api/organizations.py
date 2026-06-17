@@ -451,6 +451,29 @@ async def get_my_membership(
 
 
 @router.get(
+    "/me/capability-overview",
+    summary="Client-facing read-only 'Your platform' overview (item 145)",
+)
+async def get_my_capability_overview(
+    session: AsyncSession = SESSION_DEP,
+    ctx: OrganizationContext = ORG_MEMBER_DEP,
+) -> dict[str, Any]:
+    """Read-only plain-language overview of the active org's deployment (item 145).
+
+    Member-visible. Shares the item-144 composite aggregation with a reduced,
+    redacted field set: friendly capability labels (not raw skill slugs — skills
+    are the proprietary layer), no infra detail, and a trust-posture block making
+    the HITL / auto-post-never / tenant-isolation guarantees visible.
+
+    Scoped to the caller's active organization — there is no cross-org variant on
+    this surface (that is the platform-owner ``/platform`` path).
+    """
+    from app.services.capability_map import build_capability_map
+
+    return await build_capability_map(session, ctx.organization, redacted=True)
+
+
+@router.get(
     "/me/members",
     response_model=DefaultLimitOffsetPage[OrganizationMemberRead],
 )
