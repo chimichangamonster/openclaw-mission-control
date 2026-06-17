@@ -12,9 +12,11 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends curl ca-certificates git \
   && rm -rf /var/lib/apt/lists/*
 
-# Install uv (https://github.com/astral-sh/uv)
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-ENV PATH="/root/.local/bin:${PATH}"
+# Install uv (https://github.com/astral-sh/uv) — copy from the official image.
+# Avoids `curl … | sh`, which silently no-ops when curl can't verify the TLS cert
+# on a TLS-intercepted build network (the pipe's exit status is sh's, not curl's),
+# leaving uv missing. Docker pulls ghcr.io over its own (working) TLS path.
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
 
 # --- deps layer ---
 FROM base AS deps
