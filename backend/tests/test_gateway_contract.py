@@ -608,7 +608,7 @@ _RECOGNITION_SWEEP: list[tuple[str, dict | None]] = [
     ("agents.delete", {"agentId": "contract-nope"}),
     ("agents.files.list", {"agentId": "contract-nope"}),
     ("agents.files.get", {"agentId": "contract-nope", "name": "SOUL.md"}),
-    ("cron.update", {"id": "contract-nope"}),
+    ("cron.update", {"jobId": "contract-nope", "patch": {}}),  # 2026.5.2 envelope
     ("cron.remove", {"id": "contract-nope"}),
     ("cron.run", {"id": "contract-nope"}),
     ("cron.runs", {"id": "contract-nope"}),
@@ -682,6 +682,56 @@ async def test_cron_snake_to_camel_roundtrip(gateway: _GatewayHarness) -> None:
         assert delivery.get("mode") == "none", (
             f"delivery.mode round-trip broke (got {delivery!r}) — note 'silent' silently "
             f"coerces to 'announce' (see CLAUDE.md cron gotcha)"
+        )
+    finally:
+        await _call_capture(gateway, "cron.remove", {"id": job_id})
+
+
+@pytest.mark.asyncio(loop_scope="module")
+async def test_cron_update_envelope_contract(gateway: _GatewayHarness) -> None:
+    """cron.update must accept the ``{jobId, patch:{...}}`` envelope, NOT ``{id, ...}``.
+
+    OpenClaw 2026.5.2 changed cron.update from the flat ``{id, payload, schedule, ...}``
+    shape to ``{jobId, patch:{...}}``. MC's ``build_update_params`` emitted the old shape,
+    so the /cron-jobs UI's edit + enable/disable toggle silently 502'd from the 2026-06-09
+    fleet upgrade until 2026-06-17 — the cron.add round-trip above never exercised update, so
+    nothing caught it. This locks both directions: new shape recognized, old shape rejected.
+    If a future gateway bump flips this again, this test fails and forces a review of
+    ``build_update_params`` (see memory reference_cron_update_rpc_shape_2026_5_2).
+    """
+    add_params = {
+        "name": f"contract-cronupd-{uuid4().hex[:8]}",
+        "agentId": "contract-agent",
+        "enabled": False,
+        "schedule": {"kind": "cron", "expr": "0 9 * * 1", "tz": "America/Edmonton"},
+        "payload": {"message": "before update", "timeoutSeconds": 30},
+        "sessionTarget": "isolated",
+        "delivery": {"mode": "none"},
+    }
+    job, add_err = await _call_capture(gateway, "cron.add", add_params)
+    assert add_err is None, f"cron.add failed: {add_err!r}"
+    job_id = job.get("id") if isinstance(job, dict) else None
+    assert isinstance(job_id, str) and job_id, f"cron.add did not return an id: {job!r}"
+
+    try:
+        # New 2026.5.2 envelope — exactly what build_update_params() emits.
+        _new, new_err = await _call_capture(
+            gateway,
+            "cron.update",
+            {"jobId": job_id, "patch": {"payload": {"message": "after update"}, "enabled": True}},
+        )
+        assert new_err is None, (
+            f"cron.update rejected the {{jobId, patch}} envelope — gateway schema may have "
+            f"changed again; review build_update_params: {new_err!r}"
+        )
+
+        # Pre-2026.5.2 flat shape MUST be rejected — proves we're on the new contract.
+        _old, old_err = await _call_capture(
+            gateway, "cron.update", {"id": job_id, "payload": {"message": "flat shape"}}
+        )
+        assert old_err is not None, (
+            "cron.update accepted the legacy {id, payload} shape — gateway reverted to the "
+            "pre-2026.5.2 contract; build_update_params must follow."
         )
     finally:
         await _call_capture(gateway, "cron.remove", {"id": job_id})

@@ -3,135 +3,23 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Any
 
 import pytest
 from pydantic import ValidationError
-from sqlmodel import SQLModel
 
-# ---------------------------------------------------------------------------
-# Re-implement the param-building helpers here to avoid triggering the
-# psycopg/DB import chain that comes with importing from app.api.cron_jobs.
-# ---------------------------------------------------------------------------
+from app.schemas.cron_jobs import (
+    CronJobCreate,
+    CronJobUpdate,
+    build_add_params,
+    build_update_params,
+)
 
-
-class _NonEmpty(str):
-    @classmethod
-    def __get_validators__(cls):
-        yield cls._validate
-
-    @classmethod
-    def _validate(cls, v: str) -> str:
-        if not v or not v.strip():
-            raise ValueError("must not be empty")
-        return v.strip()
-
-
-class CronJobCreate(SQLModel):
-    name: str
-    agent_id: str
-    schedule_type: Literal["cron", "every", "at"]
-    schedule_expr: str
-    timezone: str = "America/Edmonton"
-    message: str = ""
-    thinking: str = ""
-    timeout_seconds: int = 300
-    session_target: str = "isolated"
-    announce: bool = False
-    enabled: bool = True
-    description: str = ""
-
-
-class CronJobUpdate(SQLModel):
-    name: str | None = None
-    agent_id: str | None = None
-    schedule_type: Literal["cron", "every", "at"] | None = None
-    schedule_expr: str | None = None
-    timezone: str | None = None
-    message: str | None = None
-    thinking: str | None = None
-    timeout_seconds: int | None = None
-    session_target: str | None = None
-    announce: bool | None = None
-    enabled: bool | None = None
-    description: str | None = None
-
-
-def build_add_params(payload: CronJobCreate) -> dict[str, Any]:
-    """Map CronJobCreate → gateway cron.add RPC params."""
-    schedule: dict[str, Any] = {"kind": payload.schedule_type}
-    if payload.schedule_type == "cron":
-        schedule["expr"] = payload.schedule_expr
-    elif payload.schedule_type == "every":
-        schedule["every"] = payload.schedule_expr
-    elif payload.schedule_type == "at":
-        schedule["at"] = payload.schedule_expr
-    schedule["tz"] = payload.timezone
-
-    params: dict[str, Any] = {
-        "name": payload.name,
-        "agentId": payload.agent_id,
-        "enabled": payload.enabled,
-        "schedule": schedule,
-        "payload": {"message": payload.message},
-        "sessionTarget": payload.session_target,
-        "delivery": {"mode": "announce" if payload.announce else "none"},
-    }
-    if payload.description:
-        params["description"] = payload.description
-    if payload.thinking:
-        params["payload"]["thinking"] = payload.thinking
-    if payload.timeout_seconds:
-        params["payload"]["timeoutSeconds"] = payload.timeout_seconds
-    return params
-
-
-def build_update_params(job_id: str, payload: CronJobUpdate) -> dict[str, Any]:
-    """Map CronJobUpdate → gateway cron.update RPC params."""
-    params: dict[str, Any] = {"id": job_id}
-    if payload.name is not None:
-        params["name"] = payload.name
-    if payload.description is not None:
-        params["description"] = payload.description
-    if payload.agent_id is not None:
-        params["agentId"] = payload.agent_id
-    if payload.enabled is not None:
-        params["enabled"] = payload.enabled
-    if payload.session_target is not None:
-        params["sessionTarget"] = payload.session_target
-
-    if any(v is not None for v in [payload.schedule_type, payload.schedule_expr, payload.timezone]):
-        schedule: dict[str, Any] = {}
-        if payload.schedule_type is not None:
-            schedule["kind"] = payload.schedule_type
-            expr = payload.schedule_expr
-            if expr is not None:
-                if payload.schedule_type == "cron":
-                    schedule["expr"] = expr
-                elif payload.schedule_type == "every":
-                    schedule["every"] = expr
-                elif payload.schedule_type == "at":
-                    schedule["at"] = expr
-        elif payload.schedule_expr is not None:
-            schedule["expr"] = payload.schedule_expr
-        if payload.timezone is not None:
-            schedule["tz"] = payload.timezone
-        params["schedule"] = schedule
-
-    payload_update: dict[str, Any] = {}
-    if payload.message is not None:
-        payload_update["message"] = payload.message
-    if payload.thinking is not None:
-        payload_update["thinking"] = payload.thinking
-    if payload.timeout_seconds is not None:
-        payload_update["timeoutSeconds"] = payload.timeout_seconds
-    if payload_update:
-        params["payload"] = payload_update
-
-    if payload.announce is not None:
-        params["delivery"] = {"mode": "announce" if payload.announce else "none"}
-
-    return params
+# build_add_params / build_update_params / the schemas are imported from
+# app.schemas.cron_jobs (DB-free), so these tests exercise the REAL functions.
+# A duplicated copy is what let the 2026.5.2 cron.update schema drift ship
+# undetected. normalize_job / unwrap_cron_runs are still re-implemented below —
+# they live in app.api.cron_jobs, which pulls the psycopg/DB import chain.
 
 
 def normalize_job(j: dict) -> dict:
@@ -398,52 +286,62 @@ class TestBuildAddParams:
 
 
 class TestBuildUpdateParams:
-    """Verify partial update param mapping."""
+    """Verify partial update param mapping.
 
-    def test_only_id_when_empty_update(self) -> None:
+    OpenClaw 2026.5.2 requires the ``{jobId, patch:{...}}`` envelope for
+    cron.update — the old flat ``{id, ...}`` shape 502s. These assertions lock
+    the envelope so the regression that silently broke the cron UI (edit +
+    enable/disable) from the 2026-06-09 upgrade can't recur.
+    """
+
+    def test_envelope_when_empty_update(self) -> None:
         update = CronJobUpdate()
         params = build_update_params("job-123", update)
-        assert params == {"id": "job-123"}
+        assert params == {"jobId": "job-123", "patch": {}}
+        # The pre-2026.5.2 flat shape must NOT appear.
+        assert "id" not in params
+        assert "payload" not in params
 
     def test_enable_toggle(self) -> None:
         update = CronJobUpdate(enabled=False)
         params = build_update_params("job-123", update)
-        assert params["enabled"] is False
-        assert "schedule" not in params
-        assert "payload" not in params
+        assert params["jobId"] == "job-123"
+        assert params["patch"]["enabled"] is False
+        assert "schedule" not in params["patch"]
+        assert "payload" not in params["patch"]
 
     def test_schedule_update(self) -> None:
         update = CronJobUpdate(schedule_type="every", schedule_expr="4h")
         params = build_update_params("job-123", update)
-        assert params["schedule"]["kind"] == "every"
-        assert params["schedule"]["every"] == "4h"
+        assert params["patch"]["schedule"]["kind"] == "every"
+        assert params["patch"]["schedule"]["every"] == "4h"
 
     def test_message_update(self) -> None:
         update = CronJobUpdate(message="new instructions")
         params = build_update_params("job-123", update)
-        assert params["payload"]["message"] == "new instructions"
+        assert params["patch"]["payload"]["message"] == "new instructions"
 
     def test_announce_toggle(self) -> None:
         update = CronJobUpdate(announce=True)
         params = build_update_params("job-123", update)
-        assert params["delivery"]["mode"] == "announce"
+        assert params["patch"]["delivery"]["mode"] == "announce"
 
     def test_announce_off_maps_to_none(self) -> None:
         """Regression: item 42 — update path must not emit 'silent' either."""
         update = CronJobUpdate(announce=False)
         params = build_update_params("job-123", update)
-        assert params["delivery"]["mode"] == "none"
-        assert params["delivery"]["mode"] != "silent"
+        assert params["patch"]["delivery"]["mode"] == "none"
+        assert params["patch"]["delivery"]["mode"] != "silent"
 
     def test_timezone_only_update(self) -> None:
         update = CronJobUpdate(timezone="UTC")
         params = build_update_params("job-123", update)
-        assert params["schedule"]["tz"] == "UTC"
+        assert params["patch"]["schedule"]["tz"] == "UTC"
 
     def test_expr_without_type_uses_generic_key(self) -> None:
         update = CronJobUpdate(schedule_expr="0 10 * * *")
         params = build_update_params("job-123", update)
-        assert params["schedule"]["expr"] == "0 10 * * *"
+        assert params["patch"]["schedule"]["expr"] == "0 10 * * *"
 
 
 # ---------------------------------------------------------------------------

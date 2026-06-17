@@ -15,7 +15,12 @@ from app.core.logging import get_logger
 from app.core.workspace import resolve_org_workspace
 from app.db.session import async_session_maker
 from app.models.gateways import Gateway
-from app.schemas.cron_jobs import CronJobCreate, CronJobUpdate
+from app.schemas.cron_jobs import (
+    CronJobCreate,
+    CronJobUpdate,
+    build_add_params,
+    build_update_params,
+)
 from app.services.openclaw.gateway_resolver import gateway_client_config
 from app.services.openclaw.gateway_rpc import (
     GatewayConfig,
@@ -145,91 +150,6 @@ async def _rpc_call(
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
 
 
-def _build_add_params(payload: CronJobCreate) -> dict[str, Any]:
-    """Map a CronJobCreate schema to the gateway cron.add RPC params."""
-    schedule: dict[str, Any] = {"kind": payload.schedule_type}
-    if payload.schedule_type == "cron":
-        schedule["expr"] = payload.schedule_expr
-    elif payload.schedule_type == "every":
-        schedule["every"] = payload.schedule_expr
-    elif payload.schedule_type == "at":
-        schedule["at"] = payload.schedule_expr
-    schedule["tz"] = payload.timezone
-
-    params: dict[str, Any] = {
-        "name": payload.name,
-        "agentId": payload.agent_id,
-        "enabled": payload.enabled,
-        "schedule": schedule,
-        "payload": {
-            "message": payload.message,
-        },
-        "sessionTarget": payload.session_target,
-        "delivery": {"mode": "announce" if payload.announce else "none"},
-    }
-    if payload.description:
-        params["description"] = payload.description
-    if payload.thinking:
-        params["payload"]["thinking"] = payload.thinking
-    if payload.timeout_seconds:
-        params["payload"]["timeoutSeconds"] = payload.timeout_seconds
-    return params
-
-
-def _build_update_params(job_id: str, payload: CronJobUpdate) -> dict[str, Any]:
-    """Map a CronJobUpdate schema to the gateway cron.update RPC params."""
-    params: dict[str, Any] = {"id": job_id}
-
-    if payload.name is not None:
-        params["name"] = payload.name
-    if payload.description is not None:
-        params["description"] = payload.description
-    if payload.agent_id is not None:
-        params["agentId"] = payload.agent_id
-    if payload.enabled is not None:
-        params["enabled"] = payload.enabled
-    if payload.session_target is not None:
-        params["sessionTarget"] = payload.session_target
-
-    # Schedule fields — only include if any schedule field changed
-    if any(v is not None for v in [payload.schedule_type, payload.schedule_expr, payload.timezone]):
-        schedule: dict[str, Any] = {}
-        if payload.schedule_type is not None:
-            schedule["kind"] = payload.schedule_type
-            # Set the correct key for the expression
-            expr = payload.schedule_expr
-            if expr is not None:
-                if payload.schedule_type == "cron":
-                    schedule["expr"] = expr
-                elif payload.schedule_type == "every":
-                    schedule["every"] = expr
-                elif payload.schedule_type == "at":
-                    schedule["at"] = expr
-        elif payload.schedule_expr is not None:
-            # Expression changed but type didn't — use generic expr key
-            schedule["expr"] = payload.schedule_expr
-        if payload.timezone is not None:
-            schedule["tz"] = payload.timezone
-        params["schedule"] = schedule
-
-    # Payload fields
-    payload_update: dict[str, Any] = {}
-    if payload.message is not None:
-        payload_update["message"] = payload.message
-    if payload.thinking is not None:
-        payload_update["thinking"] = payload.thinking
-    if payload.timeout_seconds is not None:
-        payload_update["timeoutSeconds"] = payload.timeout_seconds
-    if payload_update:
-        params["payload"] = payload_update
-
-    # Delivery
-    if payload.announce is not None:
-        params["delivery"] = {"mode": "announce" if payload.announce else "none"}
-
-    return params
-
-
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
@@ -271,7 +191,7 @@ async def create_cron_job(
 ) -> dict[str, Any]:
     """Create a new cron job via the gateway."""
     config = await _get_gateway_config(org_ctx)
-    params = _build_add_params(payload)
+    params = build_add_params(payload)
     result = await _rpc_call("cron.add", params, config, org_id=str(org_ctx.organization.id))
     # Gateway assigns the UUID and returns it as {ok: true, id: <uuid>}
     return result if isinstance(result, dict) else {"ok": True}
@@ -285,7 +205,7 @@ async def update_cron_job(
 ) -> dict[str, Any]:
     """Update an existing cron job via the gateway."""
     config = await _get_gateway_config(org_ctx)
-    params = _build_update_params(job_id, payload)
+    params = build_update_params(job_id, payload)
     result = await _rpc_call("cron.update", params, config, org_id=str(org_ctx.organization.id))
     return result if isinstance(result, dict) else {"ok": True}
 
