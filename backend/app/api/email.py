@@ -460,6 +460,51 @@ async def update_email_message(
     await session.commit()
     await session.refresh(msg)
 
+    # Best-effort: mirror read-state back to the provider so it survives a
+    # re-insert (180-day retention cleanup + re-sync, folder move, reconnect),
+    # where the provider is the source of truth. Only is_read is mirrored —
+    # is_starred/triage stay MC-local (providers have no clean mapping). A
+    # provider hiccup must NOT fail the user's click (read-state is a UX
+    # convenience), so we log and swallow.
+    if payload.is_read is not None and msg.provider_message_id:
+        try:
+            access_token = await get_valid_access_token(session, account)
+            if account.provider == "zoho":
+                from app.services.email.providers.zoho import mark_read as zoho_mark_read
+
+                await zoho_mark_read(
+                    access_token,
+                    account.provider_account_id or "",
+                    msg.provider_message_id,
+                    read=payload.is_read,
+                )
+            elif account.provider == "microsoft":
+                from app.services.email.providers.microsoft import mark_read as msft_mark_read
+
+                await msft_mark_read(
+                    access_token,
+                    msg.provider_message_id,
+                    read=payload.is_read,
+                )
+            elif account.provider == "google":
+                from app.services.email.providers.google import mark_read as google_mark_read
+
+                await google_mark_read(
+                    access_token,
+                    msg.provider_message_id,
+                    read=payload.is_read,
+                )
+        except Exception:
+            logger.warning(
+                "email.mark_read.provider_push_failed",
+                extra={
+                    "account_id": str(account.id),
+                    "message_id": str(msg.id),
+                    "provider": account.provider,
+                },
+                exc_info=True,
+            )
+
     # Fire Langfuse score when user re-categorizes a triaged email
     if new_category and new_category != old_category and old_category is not None:
         from app.services.langfuse_client import score_trace
