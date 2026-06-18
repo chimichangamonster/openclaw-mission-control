@@ -89,6 +89,10 @@ async def test_local_auth_users_me_requires_and_accepts_valid_token(
             assert payload["clerk_user_id"] == expected_user_id
             assert payload["email"] == expected_email
             assert payload["name"] == expected_name
+            # Regression: the local-auth user must be seeded with a timezone so
+            # isOnboardingComplete() passes — otherwise DashboardShell loops it
+            # back to /onboarding on every page load.
+            assert payload["timezone"] == auth_module.LOCAL_AUTH_TIMEZONE
 
             repeat = await client.get(
                 "/api/v1/users/me",

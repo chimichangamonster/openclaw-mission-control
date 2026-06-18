@@ -49,6 +49,10 @@ SESSION_DEP = Depends(get_session)
 LOCAL_AUTH_USER_ID = "local-auth-user"
 LOCAL_AUTH_EMAIL = "admin@home.local"
 LOCAL_AUTH_NAME = "Local User"
+# The local-auth user never walks the onboarding wizard, so seed a timezone
+# (matching the org default) — otherwise isOnboardingComplete() stays false and
+# DashboardShell redirects every page load back to /onboarding.
+LOCAL_AUTH_TIMEZONE = "America/Edmonton"
 
 
 class ClerkTokenPayload(BaseModel):
@@ -427,6 +431,7 @@ async def _get_or_create_local_user(session: AsyncSession) -> User:
     defaults: dict[str, object] = {
         "email": LOCAL_AUTH_EMAIL,
         "name": LOCAL_AUTH_NAME,
+        "timezone": LOCAL_AUTH_TIMEZONE,
     }
     user, _created = await crud.get_or_create(
         session,
@@ -440,6 +445,11 @@ async def _get_or_create_local_user(session: AsyncSession) -> User:
         changed = True
     if not user.name:
         user.name = LOCAL_AUTH_NAME
+        changed = True
+    # Backfill timezone for rows seeded before this default existed — without it
+    # the onboarding-completeness check loops the local-auth user forever.
+    if not user.timezone:
+        user.timezone = LOCAL_AUTH_TIMEZONE
         changed = True
     if changed:
         session.add(user)

@@ -312,19 +312,19 @@ export default function OnboardingPage() {
     [timezones],
   );
 
-  // If profile already complete, advance past Step 1. Invited members
-  // (non-admin) skip the org-setup wizard entirely and go to dashboard;
-  // admin/owner founders proceed to the Industry step.
+  // A user who lands on /onboarding with an already-complete profile is a
+  // returning, already-onboarded user (Clerk sign-in force-redirects here) —
+  // send them straight to the dashboard regardless of role. Owners/admins were
+  // previously parked on the Industry step, which surfaced the org-setup wizard
+  // to fully-onboarded users on every sign-in. New founders never hit this
+  // effect: the profile-save mutation sets profileSaved=true before this can
+  // fire, so they still walk the wizard via that path.
   useEffect(() => {
     if (profile && isOnboardingComplete(profile) && !profileSaved) {
       setProfileSaved(true);
-      if (skipOrgWizard) {
-        router.replace("/dashboard");
-        return;
-      }
-      setStep("industry");
+      router.replace("/dashboard");
     }
-  }, [profile, profileSaved, skipOrgWizard, router]);
+  }, [profile, profileSaved, router]);
 
   // Load templates
   useEffect(() => {
