@@ -57,7 +57,8 @@ export function DashboardSidebar() {
   const { isPlatformOwner } = usePlatformRole(isSignedIn);
   const { fullView, toggle: toggleFullView } = useSidebarFullView();
   const showAdminItems = isPlatformOwner && fullView;
-  const { unreadReportsCount, unreadEmailCount } = useNotifications();
+  const { unreadReportsCount, unreadEmailCount, unreadSessions } = useNotifications();
+  const unreadSessionCount = unreadSessions.size;
   const healthQuery = useQuery<{ status?: string } | undefined>({
     queryKey: ["/api/v1/system/health"],
     queryFn: async () => {
@@ -142,8 +143,16 @@ export function DashboardSidebar() {
                     : "hover:bg-[color:var(--surface-muted)]",
                 )}
               >
-                <MessageSquare className="h-4 w-4" />
-                Chat
+                <MessageSquare className="h-4 w-4 shrink-0" />
+                <span className="flex-1">Chat</span>
+                {unreadSessionCount > 0 ? (
+                  <span
+                    aria-label={`${unreadSessionCount} conversation${unreadSessionCount === 1 ? "" : "s"} with new agent messages`}
+                    className="ml-auto inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-blue-500 px-1.5 text-[10px] font-semibold leading-5 text-white"
+                  >
+                    {unreadSessionCount > 99 ? "99+" : unreadSessionCount}
+                  </span>
+                ) : null}
               </Link>
               <Link
                 href="/activity"

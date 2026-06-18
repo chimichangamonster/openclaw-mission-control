@@ -66,6 +66,40 @@ export function useNotifications() {
 }
 
 // ---------------------------------------------------------------------------
+// Pure event helpers (exported for testing)
+// ---------------------------------------------------------------------------
+
+/** Minimal shape of a normalised activity event from `/activity/live/stream`. */
+export interface ActivityEventLike {
+  event_type?: string;
+  channel?: string;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Decide which chat session (if any) an activity event should mark as having
+ * an unread agent reply. Returns the session key to mark unread, or null.
+ *
+ * Only `agent.responded` (gateway chat-turn completion) counts, and the
+ * session key lives in `channel` — the gateway listener puts it there;
+ * `metadata` carries only runId/hasMessage. `cron.completed` also contains
+ * the substring "completed" but its isolated session keys must NOT surface in
+ * the chat sidebar, so we match the exact event_type. The session the user is
+ * actively viewing is excluded — a reply you're watching isn't "unread".
+ * Falls back to `metadata.sessionKey` for forward-compatibility.
+ */
+export function unreadSessionKeyFromEvent(
+  event: ActivityEventLike,
+  activeSessionKey: string | null,
+): string | null {
+  if (event.event_type !== "agent.responded") return null;
+  const sessionKey =
+    event.channel || (event.metadata?.sessionKey as string | undefined);
+  if (!sessionKey || sessionKey === activeSessionKey) return null;
+  return sessionKey;
+}
+
+// ---------------------------------------------------------------------------
 // Toast display
 // ---------------------------------------------------------------------------
 
@@ -203,6 +237,17 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     orgIdRef.current = orgId;
   }, [orgId]);
 
+  // Drop unread-chat markers on a real org switch — gateway session keys are
+  // org-specific, so carrying them over would show a misleading badge for
+  // sessions that don't exist in the new org. This is React's sanctioned
+  // "adjust state when a prop changes" pattern (set during render, not in an
+  // effect — avoids the cascading-render that setState-in-effect causes).
+  const [unreadSessionsOrgId, setUnreadSessionsOrgId] = useState(orgId);
+  if (orgId !== unreadSessionsOrgId) {
+    setUnreadSessionsOrgId(orgId);
+    setUnreadSessions(new Set());
+  }
+
   useEffect(() => {
     emailEnabledRef.current = emailEnabled;
   }, [emailEnabled]);
@@ -302,6 +347,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
           const data = JSON.parse(e.data) as {
             event_type: string;
             agent_name: string;
+            channel: string;
             message: string;
             metadata: Record<string, unknown>;
             timestamp: string;
@@ -376,18 +422,20 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
           }
 
           // ── Agent responded in a session (unread tracking) ────
-          if (eventType.includes("responded") || eventType.includes("completed")) {
-            // If there's a session key in metadata, mark it as unread
-            // (unless the user is currently viewing that session)
-            const sessionKey = data.metadata?.sessionKey as string | undefined;
-            if (sessionKey && sessionKey !== activeSessionRef.current) {
-              setUnreadSessions((prev) => {
-                if (prev.has(sessionKey)) return prev;
-                const next = new Set(prev);
-                next.add(sessionKey);
-                return next;
-              });
-            }
+          // See unreadSessionKeyFromEvent above for the matching rules (the
+          // session key is in `channel`, not metadata; only `agent.responded`
+          // counts; the active session is excluded).
+          const unreadKey = unreadSessionKeyFromEvent(
+            { event_type: eventType, channel: data.channel, metadata: data.metadata },
+            activeSessionRef.current,
+          );
+          if (unreadKey) {
+            setUnreadSessions((prev) => {
+              if (prev.has(unreadKey)) return prev;
+              const next = new Set(prev);
+              next.add(unreadKey);
+              return next;
+            });
           }
         } catch {
           /* ignore parse errors */
